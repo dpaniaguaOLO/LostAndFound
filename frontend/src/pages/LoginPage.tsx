@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import logoUrl from '../assets/logo-olo.svg';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ApiRequestError } from '../lib/api';
@@ -38,13 +39,16 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-50 to-slate-100 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4">
       <div className="card w-full max-w-md p-8">
-        <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-            L&amp;F
-          </span>
-          <h1 className="text-xl font-semibold text-slate-800">Lost and Found</h1>
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <img src={logoUrl} alt="OLO — Overseas Logistics Operations" className="h-12 w-auto" />
+          <div>
+            <h1 className="text-xl font-semibold text-ink">Lost &amp; Found</h1>
+            <p className="text-xs uppercase tracking-wide text-olo-700">
+              Overseas Logistics Operations
+            </p>
+          </div>
           <p className="text-sm text-slate-500">
             {mode === 'login'
               ? 'Inicia sesión para acceder al muro de objetos'

@@ -1,24 +1,38 @@
 /** @type {import('tailwindcss').Config} */
+
+// Tokens de marca OLO (Overseas Logistics Operations).
+// Verde primario verificado en el logo oficial: #00a785 (olo-500).
+// Documentado en docs/OLO_BRAND_RESEARCH.md.
+const olo = {
+  50: '#e6f7f2',
+  100: '#c0ebe0',
+  200: '#8fd9c7',
+  300: '#4ab397', // variante verde verificada en el sitio
+  400: '#1cb692',
+  500: '#00a785', // VERDE DE MARCA (verificado en logo-olo.svg)
+  600: '#008f72',
+  700: '#00745d',
+  800: '#005a48',
+  900: '#00392e',
+};
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#eef6ff',
-          100: '#d9ebff',
-          200: '#bcdcff',
-          300: '#8ec6ff',
-          400: '#59a6ff',
-          500: '#3485fb',
-          600: '#1f66f0',
-          700: '#1850dd',
-          800: '#1a43b3',
-          900: '#1b3c8d',
-        },
+        olo,
+        // Alias de marca -> OLO. Los componentes usan `brand-*` y heredan el verde oficial.
+        brand: olo,
+        // Tinta del texto, tomada del wordmark oficial.
+        ink: '#251e1f',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Open Sans es la tipografía del sitio oficial de OLO (Google Fonts).
+        sans: ['"Open Sans"', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      boxShadow: {
+        card: '0 1px 2px 0 rgb(37 30 31 / 0.04), 0 1px 3px 0 rgb(37 30 31 / 0.08)',
       },
     },
   },

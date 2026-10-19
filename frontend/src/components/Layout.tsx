@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { Notification } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { Logo } from './Logo';
 
 const navItems = [
   { to: '/', label: 'Muro', end: true },
@@ -44,11 +45,8 @@ export function Layout() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 font-semibold text-slate-800">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-              L&amp;F
-            </span>
-            <span className="hidden sm:inline">Lost and Found</span>
+          <Link to="/" className="flex items-center" aria-label="Lost and Found — OLO">
+            <Logo />
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">

@@ -2,10 +2,11 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.1.0
+- **Versión actual**: 0.2.0
 - **Fecha**: 2026-10-19
-- **Commit más reciente**: primer release `0.1.0` (ver `git log`)
-- **Última funcionalidad completada**: MVP completo (frontend + backend integrados)
+- **Commit más reciente**: identidad visual de OLO (ver `git log`)
+- **Última funcionalidad completada**: rebranding corporativo OLO (colores, tipografía,
+  logo oficial, sistema de diseño con tokens). Investigación en `docs/OLO_BRAND_RESEARCH.md`.
 
 ## Estado de las pruebas
 

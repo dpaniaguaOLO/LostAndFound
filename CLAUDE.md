@@ -37,6 +37,10 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
 - Frontend: **React 18 + Vite 5 + TypeScript** (strict) + **Tailwind CSS 3** + **React Router 6**.
 - Backend: **Node + Express 4 + TypeScript** (ESM) + **Prisma 5** + **SQLite** (desarrollo).
 - Tipos/contratos compartidos: paquete **`@laf/shared`** (única fuente de verdad).
+- Identidad visual alineada con **OLO** (verde de marca `#00a785`, tipografía Open Sans,
+  logo oficial). Investigación en `docs/OLO_BRAND_RESEARCH.md`; tokens centralizados en
+  `frontend/tailwind.config.js` (paleta `olo-*`, alias `brand-*` → `olo`) y
+  `frontend/src/index.css`.
 - Auth: **JWT** (header `Authorization: Bearer`), contraseñas con **bcryptjs**.
 - Validación: **zod** en el backend. Subida de imágenes: **multer 2.x** a disco local.
 - Seguridad HTTP: **helmet** + **cors**.

@@ -40,9 +40,11 @@ export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
 
 export function statusBadgeClass(status: string): string {
   switch (status) {
+    // Estados activos: azul neutro (independiente del verde de marca OLO para evitar
+    // que un estado se confunda con una acción/elemento corporativo).
     case 'PUBLISHED':
     case 'OPEN':
-      return 'bg-brand-100 text-brand-800';
+      return 'bg-sky-100 text-sky-800';
     case 'CLAIMED':
     case 'MATCHED':
     case 'PENDING':

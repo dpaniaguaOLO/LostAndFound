@@ -1,22 +1,28 @@
+/* Tipografía oficial de OLO (Open Sans). Ver docs/OLO_BRAND_RESEARCH.md */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    font-family: Inter, system-ui, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Open Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
   }
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    /* Texto en la tinta de marca (#251e1f) sobre fondo neutro claro. */
+    @apply bg-slate-50 text-ink antialiased;
   }
 }
 
 @layer components {
+  /* --- Botones --- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
   }
+  /* Acción principal = verde de marca OLO */
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+    @apply btn bg-olo-600 text-white hover:bg-olo-700 focus:ring-olo-500;
   }
   .btn-secondary {
     @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus:ring-slate-400;
@@ -24,16 +30,20 @@
   .btn-danger {
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
+
+  /* --- Formularios --- */
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-olo-500 focus:outline-none focus:ring-1 focus:ring-olo-500;
   }
   .label {
     @apply mb-1 block text-sm font-medium text-slate-700;
   }
+
+  /* --- Superficies --- */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-xl border border-slate-200 bg-white shadow-card;
   }
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
 }
