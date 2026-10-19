@@ -1,6 +1,7 @@
 import { prisma } from '../db.js';
 import { matchItems, type MatchableItem } from './matching.js';
 import { notify } from './notify.js';
+import { parseSignature } from './visual.js';
 
 // Umbral mínimo para avisar automáticamente al dueño del reporte perdido.
 const AUTO_NOTIFY_THRESHOLD = 55;
@@ -13,6 +14,7 @@ interface LostLike {
   location: string;
   lostAt: Date;
   reporterId: string;
+  imageSignature?: string | null;
 }
 
 /**
@@ -26,7 +28,10 @@ export async function notifyBestMatchForLost(lost: LostLike): Promise<{
 } | null> {
   const found = await prisma.foundItem.findMany({
     where: { status: { in: ['PUBLISHED', 'CLAIMED'] } },
-    select: { id: true, title: true, description: true, category: true, location: true, foundAt: true },
+    select: {
+      id: true, title: true, description: true, category: true, location: true,
+      foundAt: true, imageSignature: true,
+    },
   });
   if (found.length === 0) return null;
 
@@ -37,6 +42,7 @@ export async function notifyBestMatchForLost(lost: LostLike): Promise<{
     category: lost.category,
     location: lost.location,
     date: lost.lostAt,
+    signature: parseSignature(lost.imageSignature),
   };
   const candidates: MatchableItem[] = found.map((f) => ({
     id: f.id,
@@ -45,6 +51,7 @@ export async function notifyBestMatchForLost(lost: LostLike): Promise<{
     category: f.category,
     location: f.location,
     date: f.foundAt,
+    signature: parseSignature(f.imageSignature),
   }));
 
   const [best] = matchItems(reference, candidates, { limit: 1, minScore: AUTO_NOTIFY_THRESHOLD });

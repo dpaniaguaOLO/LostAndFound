@@ -36,6 +36,7 @@ model FoundItem {
   location    String
   foundAt     DateTime
   imageUrl    String?
+  imageSignature String? // firma visual (JSON) para búsqueda por imagen
   status      String   @default("PUBLISHED") // PUBLISHED | CLAIMED | RETURNED | ARCHIVED
   reporterId  String
   reporter    User     @relation(fields: [reporterId], references: [id])
@@ -55,6 +56,7 @@ model LostReport {
   location    String
   lostAt      DateTime
   imageUrl    String?
+  imageSignature String? // firma visual (JSON) para búsqueda por imagen
   status      String   @default("OPEN") // OPEN | MATCHED | RESOLVED | CLOSED
   reporterId  String
   reporter    User     @relation(fields: [reporterId], references: [id])

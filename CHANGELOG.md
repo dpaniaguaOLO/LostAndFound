@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.8.0] - 2026-10-19 (rama `feature/ia-visual`)
+
+Búsqueda visual ligera (sin modelos pesados ni servicios externos).
+
+### Añadido
+- **Firma visual de imágenes** (`backend/src/lib/visual.ts`): dHash (estructura) +
+  histograma de color por rejilla, calculados con `sharp`. Rápido, local, sin GPU.
+- Al subir una foto (encontrado o perdido) se calcula y guarda su firma en
+  `imageSignature` (migración `image_signature`).
+- El **emparejado** suma una señal de **similitud visual** cuando ambos objetos tienen
+  foto (reescalando los pesos), y muestra el motivo "Imagen parecida" en coincidencias
+  fuertes. Aplica también al aviso automático.
+- Script `backend/scripts/backfill_signatures.ts` para firmar imágenes ya existentes.
+- Pruebas del motor visual (`visual.test.ts`).
+
+### Notas
+- Es una base **ligera** a propósito (hash + color), no un modelo neuronal. Distingue bien
+  color y forma general; con fotos reales mejora respecto a imágenes planas. La capa está
+  aislada para sustituirla por embeddings (CLIP/MobileNet) más adelante sin tocar la app.
+
+---
+
+
 ## [0.7.0] - 2026-10-19 (rama `feature/ia`)
 
 Fase 1 de asistencia con IA local (sin LLM).
