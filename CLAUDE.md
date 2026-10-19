@@ -52,6 +52,9 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
   `backend/src/lib/matching.ts`. Da búsqueda semántica y emparejado perdido↔encontrado.
   No usa ningún proveedor externo ni API key; todo corre en el servidor. Capa aislada:
   se puede sustituir por embeddings en el futuro sin tocar las rutas.
+  - **Aviso automático**: al crear un reporte perdido (`POST /lost-reports`), se ejecuta el
+    emparejado y, si la mejor coincidencia ≥55%, se notifica al dueño (`matchNotify.ts`).
+  - **Asistente de búsqueda** (`assistant.ts`): intención por palabras clave, sin LLM.
 
 **Estructura de carpetas**
 ```
@@ -169,6 +172,7 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | PATCH | `/api/notifications/read-all` | sí | — | `{ ok: true }` |
 | POST | `/api/ai/search` | sí | `{ query, limit? }` | `SemanticSearchResponse` (encontrados rankeados 0–100) |
 | GET | `/api/ai/match/:lostReportId` | sí (autor o admin) | — | `MatchSuggestionsResponse` (encontrados candidatos con score y motivos) |
+| POST | `/api/ai/assistant` | sí | `{ question }` | `AssistantResponse` (texto + items reales) |
 | GET | `/api/admin/stats` | admin | — | `{ users, foundItems, lostReports, claimsPending, returned }` |
 | GET | `/api/admin/users` | admin | — | `User[]` |
 | PATCH | `/api/admin/users/:id/role` | admin | `{ role: ADMIN\|EMPLOYEE }` | `User` |

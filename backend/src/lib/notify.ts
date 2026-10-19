@@ -7,6 +7,7 @@ interface NotifyInput {
     | 'CLAIM_APPROVED'
     | 'CLAIM_REJECTED'
     | 'ITEM_RETURNED'
+    | 'MATCH_FOUND'
     | 'SYSTEM';
   title: string;
   body: string;

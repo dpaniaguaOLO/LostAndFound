@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0] - 2026-10-19 (rama `feature/ia`)
+
+Fase 1 de asistencia con IA local (sin LLM).
+
+### Añadido
+- **Aviso automático de coincidencias**: al reportar un objeto perdido, el sistema busca
+  entre los encontrados y, si hay una coincidencia fuerte (≥55%), envía una notificación
+  `MATCH_FOUND` al dueño con el porcentaje y un enlace al objeto.
+- **Asistente de búsqueda** (botón flotante en toda la app): interpreta preguntas frecuentes
+  por intención (categoría, ubicación, rango de fecha; encontrados vs perdidos) y responde
+  con datos reales de la base, enlazando los objetos. No es un LLM ni conversa libremente.
+- Backend: `POST /api/ai/assistant`, `backend/src/lib/assistant.ts`,
+  `backend/src/lib/matchNotify.ts`. Contratos `AssistantRequest/Response` y tipo de
+  notificación `MATCH_FOUND` en `@laf/shared`.
+- Las notificaciones con objeto relacionado ahora llevan a su detalle al pulsarlas.
+
+---
+
 ## [0.6.0] - 2026-10-19 (rama `feature/ia`)
 
 Búsqueda inteligente y emparejado con IA local (sin servicios externos).

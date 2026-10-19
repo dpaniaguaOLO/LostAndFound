@@ -42,6 +42,7 @@ export type NotificationType =
   | 'CLAIM_APPROVED'
   | 'CLAIM_REJECTED'
   | 'ITEM_RETURNED'
+  | 'MATCH_FOUND' // la IA detectó un objeto encontrado que coincide con uno perdido
   | 'SYSTEM';
 
 /** Categorías sugeridas para clasificar objetos. */
@@ -225,4 +226,17 @@ export interface SemanticSearchResponse {
 export interface MatchSuggestionsResponse {
   lostReportId: string;
   suggestions: ScoredFoundItem[];
+}
+
+/** Pregunta al asistente de búsqueda. */
+export interface AssistantRequest {
+  question: string;
+}
+
+/** Respuesta del asistente: texto legible + items reales que la respaldan. */
+export interface AssistantResponse {
+  answer: string;
+  kind: 'found' | 'lost';
+  foundItems: FoundItem[];
+  lostReports: LostReport[];
 }

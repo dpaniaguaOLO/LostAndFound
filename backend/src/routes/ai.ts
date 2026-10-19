@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { badRequest, notFound, forbidden } from '../lib/http.js';
+import { composeAnswer, parseIntent } from '../lib/assistant.js';
 import { matchItems, semanticSearch, type MatchableItem } from '../lib/matching.js';
-import { serializeFoundItem } from '../lib/serialize.js';
+import { serializeFoundItem, serializeLostReport } from '../lib/serialize.js';
 import { authenticate } from '../middleware/authenticate.js';
 
 export const aiRouter = Router();
@@ -89,6 +90,59 @@ aiRouter.get(
         score: r.score,
         reasons: r.reasons,
       })),
+    });
+  }),
+);
+
+// POST /api/ai/assistant — asistente de búsqueda (sin LLM): interpreta la
+// pregunta por intención y responde con datos reales de la base.
+aiRouter.post(
+  '/assistant',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const question = String(req.body?.question ?? '').trim();
+    if (question.length < 2) throw badRequest('Escribe una pregunta');
+
+    const intent = parseIntent(question);
+
+    // Filtro base común (categoría, ubicación, fecha).
+    const where: Record<string, unknown> = {};
+    if (intent.categories.length) where.category = { in: intent.categories };
+    if (intent.location) where.location = { contains: intent.location };
+
+    let foundItems: ReturnType<typeof serializeFoundItem>[] = [];
+    let lostReports: ReturnType<typeof serializeLostReport>[] = [];
+    let count = 0;
+
+    if (intent.kind === 'found') {
+      const w = { ...where, status: { in: ['PUBLISHED', 'CLAIMED'] } };
+      if (intent.since) (w as Record<string, unknown>).foundAt = { gte: intent.since };
+      const rows = await prisma.foundItem.findMany({
+        where: w,
+        include: { reporter: { select: { id: true, name: true } } },
+        orderBy: { foundAt: 'desc' },
+        take: 10,
+      });
+      count = rows.length;
+      foundItems = rows.map(serializeFoundItem);
+    } else {
+      const w = { ...where };
+      if (intent.since) (w as Record<string, unknown>).lostAt = { gte: intent.since };
+      const rows = await prisma.lostReport.findMany({
+        where: w,
+        include: { reporter: { select: { id: true, name: true } } },
+        orderBy: { lostAt: 'desc' },
+        take: 10,
+      });
+      count = rows.length;
+      lostReports = rows.map(serializeLostReport);
+    }
+
+    res.json({
+      answer: composeAnswer(intent, count),
+      kind: intent.kind,
+      foundItems,
+      lostReports,
     });
   }),
 );

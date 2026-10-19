@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Notification } from '@laf/shared';
 import { EmptyState, ErrorState, Spinner } from '../components/ui';
 import { useToast } from '../context/ToastContext';
@@ -7,6 +8,7 @@ import { formatDateTime } from '../lib/format';
 
 export function NotificationsPage() {
   const { notify } = useToast();
+  const navigate = useNavigate();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,9 +72,14 @@ export function NotificationsPage() {
           {items.map((n) => (
             <button
               key={n.id}
-              onClick={() => !n.read && markOne(n.id)}
+              onClick={() => {
+                if (!n.read) markOne(n.id);
+                // Las notificaciones con objeto relacionado (p. ej. coincidencia) llevan a su detalle.
+                if (n.relatedItemId) navigate(`/objetos/${n.relatedItemId}`);
+              }}
               className={
                 'card flex flex-col items-start gap-1 p-4 text-left transition ' +
+                (n.relatedItemId ? 'hover:border-olo-300 ' : '') +
                 (n.read
                   ? 'opacity-70'
                   : 'border-olo-200 bg-olo-50/40 dark:border-olo-500/30 dark:bg-olo-500/10')
@@ -83,7 +90,12 @@ export function NotificationsPage() {
                 {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-olo-600 dark:bg-olo-400" />}
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300">{n.body}</p>
-              <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(n.createdAt)}</span>
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(n.createdAt)}</span>
+                {n.relatedItemId && (
+                  <span className="text-xs font-medium text-olo-700 dark:text-olo-400">Ver objeto →</span>
+                )}
+              </div>
             </button>
           ))}
         </div>
