@@ -5,6 +5,7 @@ import { AdminPage } from './pages/AdminPage';
 import { ClaimsPage } from './pages/ClaimsPage';
 import { FoundItemDetailPage } from './pages/FoundItemDetailPage';
 import { LoginPage } from './pages/LoginPage';
+import { LostReportDetailPage } from './pages/LostReportDetailPage';
 import { MyThingsPage } from './pages/MyThingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { NotificationsPage } from './pages/NotificationsPage';
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <WallPage /> },
       { path: 'objetos/:id', element: <FoundItemDetailPage /> },
+      { path: 'perdidos/:id', element: <LostReportDetailPage /> },
       { path: 'publicar', element: <PublishPage /> },
       { path: 'mis-objetos', element: <MyThingsPage /> },
       { path: 'reclamaciones', element: <ClaimsPage /> },

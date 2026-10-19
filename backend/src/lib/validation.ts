@@ -43,7 +43,9 @@ export const createLostReportSchema = z.object({
   title: z.string().min(2).max(140),
   description: z.string().min(2).max(2000),
   category: categorySchema,
-  location: z.string().min(1).max(200),
+  // Ubicación opcional: quien pierde algo a menudo no sabe dónde lo dejó.
+  // Se normaliza a cadena vacía si no se envía.
+  location: z.string().max(200).optional().default(''),
   lostAt: z.string().datetime({ message: 'lostAt debe ser una fecha ISO 8601' }),
 });
 

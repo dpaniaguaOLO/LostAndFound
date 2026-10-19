@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0] - 2026-10-19
+
+Mejoras de la vista de coincidencias y ubicación opcional.
+
+### Añadido
+- **Comparación de imágenes lado a lado** en las sugerencias de coincidencia: miniatura del
+  objeto perdido junto a la del encontrado, con el porcentaje en medio.
+- **Desglose del porcentaje** por señal (descripción, imagen, categoría, ubicación, fecha)
+  con barras, expandible con "Ver por qué coincide". El backend devuelve `breakdown`.
+- **Página de detalle del objeto perdido** (`/perdidos/:id`) que muestra las coincidencias
+  de la IA de forma destacada (no colapsadas).
+
+### Cambiado
+- La **ubicación es opcional al reportar un objeto perdido** (quien pierde algo a menudo no
+  sabe dónde lo dejó). El emparejado tolera la ubicación vacía.
+
+---
+
+
 ## [0.9.0] - 2026-10-19
 
 Privilegios de administración: moderación, supervisión e historial.

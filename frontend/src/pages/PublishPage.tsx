@@ -86,6 +86,7 @@ export function PublishPage() {
         key={mode}
         dateLabel={mode === 'found' ? 'Fecha en que se encontró' : 'Fecha en que se perdió'}
         submitLabel={mode === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
+        optionalLocation={mode === 'lost'}
         onSubmit={handleSubmit}
       />
     </div>

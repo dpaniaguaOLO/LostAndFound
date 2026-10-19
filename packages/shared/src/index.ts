@@ -157,7 +157,7 @@ export interface CreateLostReportRequest {
   title: string;
   description: string;
   category: ItemCategory;
-  location: string;
+  location?: string; // opcional: a veces no se sabe dónde se perdió
   lostAt: string; // ISO 8601
 }
 
@@ -203,11 +203,30 @@ export interface FoundItemsQuery {
 // Búsqueda inteligente y emparejado (IA local, sin servicios externos)
 // ---------------------------------------------------------------------------
 
+/** Desglose de cada señal de coincidencia (0..100). `image` null si no aplica. */
+export interface MatchBreakdown {
+  text: number;
+  image: number | null;
+  category: number;
+  location: number;
+  date: number;
+}
+
 /** Un objeto encontrado acompañado de su puntaje de relevancia/coincidencia. */
 export interface ScoredFoundItem {
   item: FoundItem;
   score: number; // 0..100
   reasons: string[]; // motivos legibles de la coincidencia (puede ir vacío en búsqueda)
+  breakdown?: MatchBreakdown; // desglose por señal (presente en emparejado)
+}
+
+/** El objeto perdido de referencia, para comparar lado a lado en la vista. */
+export interface MatchReference {
+  id: string;
+  title: string;
+  category: ItemCategory;
+  location: string;
+  imageUrl: string | null;
 }
 
 /** Petición de búsqueda semántica en lenguaje natural. */
@@ -225,6 +244,7 @@ export interface SemanticSearchResponse {
 /** Respuesta de sugerencias de coincidencia para un objeto perdido. */
 export interface MatchSuggestionsResponse {
   lostReportId: string;
+  reference: MatchReference; // el objeto perdido (para comparar lado a lado)
   suggestions: ScoredFoundItem[];
 }
 

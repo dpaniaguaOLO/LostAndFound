@@ -88,10 +88,18 @@ aiRouter.get(
 
     res.json({
       lostReportId: lost.id,
+      reference: {
+        id: lost.id,
+        title: lost.title,
+        category: lost.category,
+        location: lost.location,
+        imageUrl: lost.imageUrl ?? null,
+      },
       suggestions: suggestions.map((r) => ({
         item: serializeFoundItem(byId.get(r.item.id)!),
         score: r.score,
         reasons: r.reasons,
+        breakdown: r.breakdown,
       })),
     });
   }),

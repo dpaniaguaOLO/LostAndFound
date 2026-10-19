@@ -82,9 +82,11 @@ export function MyThingsPage() {
           {tab === 'found'
             ? found.map((i) => <FoundItemCard key={i.id} item={i} />)
             : lost.map((i) => (
-                // Cada objeto perdido propio muestra sus posibles coincidencias (IA).
+                // Cada objeto perdido propio: tarjeta + acceso al detalle + coincidencias.
                 <div key={i.id} className="card overflow-hidden">
-                  <LostReportCard item={i} embedded />
+                  <Link to={`/perdidos/${i.id}`} className="block transition hover:opacity-90">
+                    <LostReportCard item={i} embedded />
+                  </Link>
                   <MatchSuggestions lostReportId={i.id} />
                 </div>
               ))}

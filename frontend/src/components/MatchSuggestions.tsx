@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { MatchSuggestionsResponse, ScoredFoundItem } from '@laf/shared';
+import type { MatchBreakdown, MatchReference, MatchSuggestionsResponse, ScoredFoundItem } from '@laf/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { CATEGORY_LABELS } from '../lib/format';
 
@@ -10,32 +10,100 @@ function scoreClass(score: number): string {
   return 'bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300';
 }
 
+/** Miniatura de un objeto (imagen o marcador). */
+function Thumb({ src, alt, label }: { src: string | null; alt: string; label: string }) {
+  return (
+    <div className="flex w-20 shrink-0 flex-col items-center gap-1">
+      {src ? (
+        <img src={src} alt={alt} className="h-20 w-20 rounded-lg object-cover" />
+      ) : (
+        <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-olo-dark-800 dark:text-slate-600">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 11 3.5-4 2.5 3 3-4L18 16H6Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
+      )}
+      <span className="text-center text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/** Barra de desglose de una señal. */
+function SignalBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-20 shrink-0 text-[11px] text-slate-500 dark:text-slate-400">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-olo-dark-800">
+        <div className="h-full rounded-full bg-olo-500" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      </div>
+      <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
+        {value}%
+      </span>
+    </div>
+  );
+}
+
+function Breakdown({ b }: { b: MatchBreakdown }) {
+  return (
+    <div className="mt-2 flex flex-col gap-1 rounded-lg bg-slate-50 p-2 dark:bg-olo-dark-900">
+      <SignalBar label="Descripción" value={b.text} />
+      {b.image !== null && <SignalBar label="Imagen" value={b.image} />}
+      <SignalBar label="Categoría" value={b.category} />
+      <SignalBar label="Ubicación" value={b.location} />
+      <SignalBar label="Fecha" value={b.date} />
+    </div>
+  );
+}
+
 /**
- * Sugerencias de coincidencia (IA local) para un objeto perdido: al expandir,
- * consulta /ai/match/:id y muestra los encontrados que podrían corresponder,
- * con su porcentaje y los motivos.
+ * Sugerencias de coincidencia (IA local) para un objeto perdido. Muestra, para
+ * cada candidato encontrado: comparación de imágenes lado a lado (perdido vs
+ * encontrado), porcentaje total, motivos y desglose de señales.
  */
-export function MatchSuggestions({ lostReportId }: { lostReportId: string }) {
-  const [open, setOpen] = useState(false);
+export function MatchSuggestions({
+  lostReportId,
+  defaultOpen = false,
+}: {
+  lostReportId: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [reference, setReference] = useState<MatchReference | null>(null);
   const [data, setData] = useState<ScoredFoundItem[] | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null); // id con desglose abierto
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function fetchSuggestions() {
+    if (data !== null || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api<MatchSuggestionsResponse>(`/ai/match/${lostReportId}`);
+      setReference(res.reference);
+      setData(res.suggestions);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'No se pudieron cargar sugerencias');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Si arranca abierto (vista de detalle), carga de inmediato.
+  useEffect(() => {
+    if (defaultOpen) void fetchSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultOpen]);
 
   async function toggle() {
     const next = !open;
     setOpen(next);
-    if (next && data === null && !loading) {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await api<MatchSuggestionsResponse>(`/ai/match/${lostReportId}`);
-        setData(res.suggestions);
-      } catch (err) {
-        setError(err instanceof ApiRequestError ? err.message : 'No se pudieron cargar sugerencias');
-      } finally {
-        setLoading(false);
-      }
-    }
+    if (next) await fetchSuggestions();
   }
 
   return (
@@ -74,22 +142,32 @@ export function MatchSuggestions({ lostReportId }: { lostReportId: string }) {
               Todavía no hay objetos encontrados que se parezcan a este.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-3">
               {data.map((s) => (
-                <li key={s.item.id}>
-                  <Link
-                    to={`/objetos/${s.item.id}`}
-                    className="flex items-start gap-3 rounded-lg border border-slate-200 p-2 transition hover:border-olo-300 hover:bg-slate-50 dark:border-olo-dark-800 dark:hover:bg-olo-dark-800"
-                  >
+                <li
+                  key={s.item.id}
+                  className="rounded-lg border border-slate-200 p-3 dark:border-olo-dark-800"
+                >
+                  {/* Comparación lado a lado: perdido vs encontrado */}
+                  <div className="flex items-center gap-3">
+                    <Thumb src={reference?.imageUrl ?? null} alt="Tu objeto" label="Perdido" />
+                    <div className="flex flex-col items-center text-slate-300 dark:text-slate-600">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className={`badge mt-1 ${scoreClass(s.score)}`}>{s.score}%</span>
+                    </div>
+                    <Thumb src={s.item.imageUrl} alt={s.item.title} label="Encontrado" />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-slate-800 dark:text-slate-100">
-                          {s.item.title}
-                        </span>
-                        <span className={`badge shrink-0 ${scoreClass(s.score)}`}>{s.score}%</span>
-                      </div>
+                      <Link
+                        to={`/objetos/${s.item.id}`}
+                        className="truncate font-medium text-slate-800 hover:text-olo-700 dark:text-slate-100 dark:hover:text-olo-400"
+                      >
+                        {s.item.title}
+                      </Link>
                       <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {CATEGORY_LABELS[s.item.category]} · {s.item.location}
+                        {CATEGORY_LABELS[s.item.category]}
+                        {s.item.location ? ` · ${s.item.location}` : ''}
                       </p>
                       {s.reasons.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -104,7 +182,20 @@ export function MatchSuggestions({ lostReportId }: { lostReportId: string }) {
                         </div>
                       )}
                     </div>
-                  </Link>
+                  </div>
+
+                  {/* Desglose del % (expandible) */}
+                  {s.breakdown && (
+                    <>
+                      <button
+                        onClick={() => setExpanded(expanded === s.item.id ? null : s.item.id)}
+                        className="mt-2 text-xs font-medium text-olo-700 hover:underline dark:text-olo-400"
+                      >
+                        {expanded === s.item.id ? 'Ocultar desglose' : 'Ver por qué coincide'}
+                      </button>
+                      {expanded === s.item.id && <Breakdown b={s.breakdown} />}
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

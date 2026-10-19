@@ -19,10 +19,12 @@ export function ItemForm({
   dateLabel,
   submitLabel,
   onSubmit,
+  optionalLocation = false,
 }: {
   dateLabel: string;
   submitLabel: string;
   onSubmit: (values: ItemFormValues) => Promise<void>;
+  optionalLocation?: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [values, setValues] = useState<ItemFormValues>({
@@ -123,15 +125,15 @@ export function ItemForm({
 
       <div>
         <label className="label" htmlFor="location">
-          Ubicación
+          Ubicación{optionalLocation ? ' (opcional)' : ''}
         </label>
         <input
           id="location"
           className="input"
           value={values.location}
           onChange={(e) => setValues({ ...values, location: e.target.value })}
-          required
-          placeholder="Ej. Recepción, piso 3"
+          required={!optionalLocation}
+          placeholder={optionalLocation ? 'Si no sabes dónde, déjalo en blanco' : 'Ej. Recepción, piso 3'}
         />
       </div>
 

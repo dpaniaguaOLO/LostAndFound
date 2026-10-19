@@ -17,10 +17,20 @@ export interface MatchableItem {
   signature?: VisualSignature | null; // firma visual opcional (búsqueda por imagen)
 }
 
+/** Desglose de cada señal (0..100). `image` es null cuando no aplica. */
+export interface MatchBreakdown {
+  text: number;
+  image: number | null;
+  category: number;
+  location: number;
+  date: number;
+}
+
 export interface MatchResult<T> {
   item: T;
   score: number; // 0..100
   reasons: string[];
+  breakdown: MatchBreakdown;
 }
 
 // Pesos base (sin imagen). Suman 1.
@@ -96,7 +106,15 @@ export function matchItems<T extends MatchableItem>(
     if (locSim > 0.3) reasons.push('Ubicación parecida');
     if (dSim > 0.7) reasons.push('Fechas cercanas');
 
-    return { item: c, score, reasons };
+    const breakdown: MatchBreakdown = {
+      text: Math.round(textSim * 100),
+      image: bothHaveImage ? Math.round(visSim * 100) : null,
+      category: Math.round(catSim * 100),
+      location: Math.round(locSim * 100),
+      date: Math.round(dSim * 100),
+    };
+
+    return { item: c, score, reasons, breakdown };
   });
 
   return results
@@ -128,7 +146,14 @@ export function semanticSearch<T extends MatchableItem>(
     const catBonus = qTokens.has(tokenize(c.category)[0] ?? '') ? 0.1 : 0;
     const locBonus = locationSim(query, c.location) > 0.3 ? 0.08 : 0;
     const score = Math.round(Math.min(1, textSim + catBonus + locBonus) * 100);
-    return { item: c, score, reasons: [] };
+    const breakdown: MatchBreakdown = {
+      text: Math.round(textSim * 100),
+      image: null,
+      category: 0,
+      location: 0,
+      date: 0,
+    };
+    return { item: c, score, reasons: [], breakdown };
   });
 
   return results
