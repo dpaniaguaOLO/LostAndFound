@@ -1,0 +1,11 @@
+# Normaliza finales de línea: evita diffs ruidosos entre Windows/macOS/Linux.
+* text=auto eol=lf
+
+# Archivos binarios (no tocar finales de línea)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.db binary
