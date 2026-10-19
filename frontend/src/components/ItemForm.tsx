@@ -141,7 +141,7 @@ export function ItemForm({
           id="image"
           type="file"
           accept="image/*"
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-brand-700 hover:file:bg-brand-100"
+          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-olo-50 file:px-4 file:py-2 file:text-olo-700 hover:file:bg-olo-100 dark:text-slate-400 dark:file:bg-olo-500/15 dark:file:text-olo-300"
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
         {preview && (

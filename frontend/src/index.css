@@ -10,38 +10,38 @@
     font-family: 'Open Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
   }
   body {
-    /* Texto en la tinta de marca (#251e1f) sobre fondo neutro claro. */
-    @apply bg-slate-50 text-ink antialiased;
+    /* Claro: tinta de marca sobre neutro claro. Oscuro: texto claro sobre slate-950. */
+    @apply bg-slate-50 text-ink antialiased transition-colors dark:bg-slate-950 dark:text-slate-100;
   }
 }
 
 @layer components {
   /* --- Botones --- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-slate-900;
   }
-  /* Acción principal = verde de marca OLO */
+  /* Acción principal = verde de marca OLO (se aclara un paso en oscuro) */
   .btn-primary {
-    @apply btn bg-olo-600 text-white hover:bg-olo-700 focus:ring-olo-500;
+    @apply btn bg-olo-600 text-white hover:bg-olo-700 focus:ring-olo-500 dark:bg-olo-500 dark:text-slate-950 dark:hover:bg-olo-400;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus:ring-slate-400;
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600;
   }
 
   /* --- Formularios --- */
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-olo-500 focus:outline-none focus:ring-1 focus:ring-olo-500;
+    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-olo-500 focus:outline-none focus:ring-1 focus:ring-olo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
   }
 
   /* --- Superficies --- */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+    @apply rounded-xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900;
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;

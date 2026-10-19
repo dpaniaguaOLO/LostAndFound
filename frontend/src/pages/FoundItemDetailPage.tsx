@@ -78,7 +78,10 @@ export function FoundItemDetailPage() {
 
   return (
     <div>
-      <button className="mb-4 text-sm text-brand-700 hover:underline" onClick={() => navigate(-1)}>
+      <button
+        className="mb-4 text-sm text-olo-700 hover:underline dark:text-olo-400"
+        onClick={() => navigate(-1)}
+      >
         ← Volver
       </button>
 
@@ -89,32 +92,32 @@ export function FoundItemDetailPage() {
 
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-semibold text-slate-800">{item.title}</h1>
+            <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.title}</h1>
             <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
           </div>
 
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-slate-500">Categoría</dt>
-              <dd className="font-medium">{CATEGORY_LABELS[item.category]}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">Categoría</dt>
+              <dd className="font-medium dark:text-slate-200">{CATEGORY_LABELS[item.category]}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Ubicación</dt>
-              <dd className="font-medium">{item.location}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">Ubicación</dt>
+              <dd className="font-medium dark:text-slate-200">{item.location}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Encontrado el</dt>
-              <dd className="font-medium">{formatDate(item.foundAt)}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">Encontrado el</dt>
+              <dd className="font-medium dark:text-slate-200">{formatDate(item.foundAt)}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Publicado por</dt>
-              <dd className="font-medium">{item.reporter.name}</dd>
+              <dt className="text-slate-500 dark:text-slate-400">Publicado por</dt>
+              <dd className="font-medium dark:text-slate-200">{item.reporter.name}</dd>
             </div>
           </dl>
 
           <div>
-            <h2 className="text-sm font-medium text-slate-500">Descripción</h2>
-            <p className="mt-1 whitespace-pre-line text-slate-700">{item.description}</p>
+            <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400">Descripción</h2>
+            <p className="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
           <div className="mt-2 flex flex-wrap gap-3">
@@ -136,7 +139,7 @@ export function FoundItemDetailPage() {
           </div>
 
           {item.status === 'RETURNED' && (
-            <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-300">
               Este objeto ya fue devuelto a su dueño.
             </p>
           )}
@@ -145,14 +148,14 @@ export function FoundItemDetailPage() {
 
       {claimOpen && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Reclamar objeto"
         >
           <form onSubmit={submitClaim} className="card w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-slate-800">Reclamar "{item.title}"</h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Reclamar "{item.title}"</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Describe por qué este objeto es tuyo para ayudar a verificar la devolución.
             </p>
             <textarea

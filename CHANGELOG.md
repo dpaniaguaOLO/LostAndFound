@@ -4,6 +4,21 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.3.0] - 2026-10-19
+
+Modo oscuro.
+
+### Añadido
+- Modo oscuro con estrategia `class` de Tailwind (`darkMode: 'class'`).
+- `ThemeContext` con persistencia en `localStorage` (`laf.theme`) y respeto de la
+  preferencia del sistema (`prefers-color-scheme`) cuando no hay elección manual.
+- Botón de alternancia (sol/luna) en la barra de navegación.
+- Script anti-parpadeo (FOUC) en `index.html` que aplica el tema antes de pintar.
+- Variantes `dark:` en tokens de componentes (botones, inputs, tarjetas) y en todas las
+  páginas y componentes; los colores de estado funcional también tienen versión oscura.
+
+---
+
 ## [0.2.0] - 2026-10-19
 
 Identidad visual corporativa de OLO (Overseas Logistics Operations).

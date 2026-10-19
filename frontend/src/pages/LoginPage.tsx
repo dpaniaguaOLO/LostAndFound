@@ -39,17 +39,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4 dark:from-slate-900 dark:to-slate-950">
       <div className="card w-full max-w-md p-8">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <img src={logoUrl} alt="OLO — Overseas Logistics Operations" className="h-12 w-auto" />
           <div>
-            <h1 className="text-xl font-semibold text-ink">Lost &amp; Found</h1>
-            <p className="text-xs uppercase tracking-wide text-olo-700">
+            <h1 className="text-xl font-semibold text-ink dark:text-slate-100">Lost &amp; Found</h1>
+            <p className="text-xs uppercase tracking-wide text-olo-700 dark:text-olo-400">
               Overseas Logistics Operations
             </p>
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {mode === 'login'
               ? 'Inicia sesión para acceder al muro de objetos'
               : 'Crea tu cuenta de empleado'}
@@ -107,19 +107,19 @@ export function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 text-center text-sm text-slate-500">
+        <div className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
           {mode === 'login' ? (
-            <button className="text-brand-700 hover:underline" onClick={() => setMode('register')}>
+            <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('register')}>
               ¿No tienes cuenta? Regístrate
             </button>
           ) : (
-            <button className="text-brand-700 hover:underline" onClick={() => setMode('login')}>
+            <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('login')}>
               ¿Ya tienes cuenta? Inicia sesión
             </button>
           )}
         </div>
 
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500">
+        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           Cuentas de prueba: <strong>admin@empresa.com</strong> /{' '}
           <strong>empleado@empresa.com</strong> — contraseña <strong>password123</strong>
         </div>

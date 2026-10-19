@@ -62,8 +62,8 @@ export function AdminPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Panel administrativo</h1>
-      <p className="mb-6 text-sm text-slate-500">Resumen del sistema y gestión de usuarios.</p>
+      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Panel administrativo</h1>
+      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Resumen del sistema y gestión de usuarios.</p>
 
       {/* Tarjetas de métricas inspiradas en cómo OLO presenta sus indicadores
           (cifra grande + etiqueta corta), con borde superior en verde de marca. */}
@@ -81,10 +81,10 @@ export function AdminPage() {
         ))}
       </div>
 
-      <h2 className="mb-3 text-lg font-semibold text-slate-800">Usuarios</h2>
+      <h2 className="mb-3 text-lg font-semibold text-slate-800 dark:text-slate-100">Usuarios</h2>
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-slate-500">
+          <thead className="border-b border-slate-200 text-slate-500 dark:border-slate-800 dark:text-slate-400">
             <tr>
               <th className="px-4 py-3 font-medium">Nombre</th>
               <th className="px-4 py-3 font-medium">Correo</th>
@@ -95,17 +95,17 @@ export function AdminPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-3 font-medium text-slate-800">{u.name}</td>
-                <td className="px-4 py-3 text-slate-600">{u.email}</td>
+              <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
+                <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.email}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`badge ${u.role === 'ADMIN' ? 'bg-brand-100 text-brand-800' : 'bg-slate-100 text-slate-600'}`}
+                    className={`badge ${u.role === 'ADMIN' ? 'bg-olo-100 text-olo-800 dark:bg-olo-500/15 dark:text-olo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}
                   >
                     {u.role === 'ADMIN' ? 'Administrador' : 'Empleado'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-500">{formatDate(u.createdAt)}</td>
+                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(u.createdAt)}</td>
                 <td className="px-4 py-3">
                   {u.role === 'ADMIN' ? (
                     <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>

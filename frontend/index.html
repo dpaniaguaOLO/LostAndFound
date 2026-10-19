@@ -6,6 +6,18 @@
     <meta name="theme-color" content="#00a785" />
     <link rel="icon" type="image/svg+xml" href="/favicon-olo.svg" />
     <title>Lost &amp; Found · OLO</title>
+    <script>
+      // Aplica el tema antes de pintar para evitar parpadeo (FOUC).
+      (function () {
+        try {
+          var s = localStorage.getItem('laf.theme');
+          var dark = s === 'dark' || (!s && matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          if (dark) root.classList.add('dark');
+          root.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

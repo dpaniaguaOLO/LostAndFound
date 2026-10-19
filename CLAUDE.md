@@ -41,6 +41,9 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
   logo oficial). Investigación en `docs/OLO_BRAND_RESEARCH.md`; tokens centralizados en
   `frontend/tailwind.config.js` (paleta `olo-*`, alias `brand-*` → `olo`) y
   `frontend/src/index.css`.
+- **Modo claro/oscuro**: Tailwind `darkMode: 'class'`. Estado en `ThemeContext`
+  (persistido en `localStorage` `laf.theme`, con respeto de `prefers-color-scheme`).
+  Toggle en la barra de navegación. Script anti-FOUC en `index.html`.
 - Auth: **JWT** (header `Authorization: Bearer`), contraseñas con **bcryptjs**.
 - Validación: **zod** en el backend. Subida de imágenes: **multer 2.x** a disco local.
 - Seguridad HTTP: **helmet** + **cors**.

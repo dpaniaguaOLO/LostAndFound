@@ -37,20 +37,20 @@ export function MyThingsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Mis cosas</h1>
-      <p className="mb-5 text-sm text-slate-500">
+      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Mis cosas</h1>
+      <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
         Tus objetos publicados y tus reportes de objetos perdidos.
       </p>
 
-      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1">
+      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
         <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'found' ? 'bg-brand-600 text-white' : 'text-slate-600'}`}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'found' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
           onClick={() => setTab('found')}
         >
           Encontrados ({found.length})
         </button>
         <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'lost' ? 'bg-brand-600 text-white' : 'text-slate-600'}`}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'lost' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
           onClick={() => setTab('lost')}
         >
           Perdidos ({lost.length})

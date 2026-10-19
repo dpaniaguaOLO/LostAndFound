@@ -50,20 +50,20 @@ export function ClaimsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800">Reclamaciones</h1>
-      <p className="mb-5 text-sm text-slate-500">
+      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Reclamaciones</h1>
+      <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
         Gestiona las solicitudes de objetos que publicaste y las que tú hiciste.
       </p>
 
-      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1">
+      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
         <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'incoming' ? 'bg-brand-600 text-white' : 'text-slate-600'}`}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'incoming' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
           onClick={() => setTab('incoming')}
         >
           Recibidas
         </button>
         <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'mine' ? 'bg-brand-600 text-white' : 'text-slate-600'}`}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'mine' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
           onClick={() => setTab('mine')}
         >
           Mías
@@ -96,18 +96,18 @@ export function ClaimsPage() {
             <div key={claim.id} className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-slate-800">
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-100">
                     {claim.foundItem?.title ?? 'Objeto'}
                   </h3>
                   <StatusBadge status={claim.status} label={CLAIM_STATUS_LABELS[claim.status]} />
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{claim.message}</p>
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{claim.message}</p>
+                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                   {tab === 'incoming' ? `De ${claim.claimant.name} · ` : ''}
                   {formatDateTime(claim.createdAt)}
                 </p>
                 {claim.reviewNote && (
-                  <p className="mt-1 text-xs text-slate-500">Nota: {claim.reviewNote}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nota: {claim.reviewNote}</p>
                 )}
               </div>
 

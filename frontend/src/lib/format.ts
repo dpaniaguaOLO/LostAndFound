@@ -44,22 +44,22 @@ export function statusBadgeClass(status: string): string {
     // que un estado se confunda con una acción/elemento corporativo).
     case 'PUBLISHED':
     case 'OPEN':
-      return 'bg-sky-100 text-sky-800';
+      return 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300';
     case 'CLAIMED':
     case 'MATCHED':
     case 'PENDING':
-      return 'bg-amber-100 text-amber-800';
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300';
     case 'RETURNED':
     case 'RESOLVED':
     case 'APPROVED':
-      return 'bg-green-100 text-green-800';
+      return 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300';
     case 'REJECTED':
     case 'ARCHIVED':
     case 'CLOSED':
     case 'CANCELLED':
-      return 'bg-slate-200 text-slate-700';
+      return 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
     default:
-      return 'bg-slate-100 text-slate-700';
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
   }
 }
 

@@ -49,8 +49,8 @@ export function NotificationsPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800">Notificaciones</h1>
-          <p className="text-sm text-slate-500">{unread} sin leer</p>
+          <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Notificaciones</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{unread} sin leer</p>
         </div>
         {unread > 0 && (
           <button className="btn-secondary" onClick={markAll}>
@@ -73,15 +73,17 @@ export function NotificationsPage() {
               onClick={() => !n.read && markOne(n.id)}
               className={
                 'card flex flex-col items-start gap-1 p-4 text-left transition ' +
-                (n.read ? 'opacity-70' : 'border-brand-200 bg-brand-50/40')
+                (n.read
+                  ? 'opacity-70'
+                  : 'border-olo-200 bg-olo-50/40 dark:border-olo-500/30 dark:bg-olo-500/10')
               }
             >
               <div className="flex w-full items-center justify-between gap-2">
-                <span className="font-medium text-slate-800">{n.title}</span>
-                {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-600" />}
+                <span className="font-medium text-slate-800 dark:text-slate-100">{n.title}</span>
+                {!n.read && <span className="h-2 w-2 shrink-0 rounded-full bg-olo-600 dark:bg-olo-400" />}
               </div>
-              <p className="text-sm text-slate-600">{n.body}</p>
-              <span className="text-xs text-slate-400">{formatDateTime(n.createdAt)}</span>
+              <p className="text-sm text-slate-600 dark:text-slate-300">{n.body}</p>
+              <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(n.createdAt)}</span>
             </button>
           ))}
         </div>

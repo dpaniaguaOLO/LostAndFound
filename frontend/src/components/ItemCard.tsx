@@ -13,17 +13,21 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
   return (
     <Link
       to={`/objetos/${item.id}`}
-      className="card group overflow-hidden transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+      className="card group overflow-hidden transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-olo-500"
     >
       <ItemImage src={item.imageUrl} alt={item.title} />
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-slate-800 group-hover:text-brand-700">{item.title}</h3>
+          <h3 className="font-semibold text-slate-800 group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-400">
+            {item.title}
+          </h3>
           <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
         </div>
-        <p className="line-clamp-2 text-sm text-slate-500">{item.description}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="badge bg-slate-100 text-slate-600">{CATEGORY_LABELS[item.category]}</span>
+        <p className="line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span className="badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {CATEGORY_LABELS[item.category]}
+          </span>
           <span>· {item.location}</span>
           <span>· {formatDate(item.foundAt)}</span>
         </div>
@@ -39,12 +43,14 @@ export function LostReportCard({ item }: { item: LostReport }) {
       <ItemImage src={item.imageUrl} alt={item.title} />
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-slate-800">{item.title}</h3>
+          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{item.title}</h3>
           <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
         </div>
-        <p className="line-clamp-2 text-sm text-slate-500">{item.description}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="badge bg-slate-100 text-slate-600">{CATEGORY_LABELS[item.category]}</span>
+        <p className="line-clamp-2 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span className="badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {CATEGORY_LABELS[item.category]}
+          </span>
           <span>· {item.location}</span>
           <span>· {formatDate(item.lostAt)}</span>
         </div>
