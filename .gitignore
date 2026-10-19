@@ -38,6 +38,11 @@ logs/
 coverage/
 .eslintcache
 
+# Entornos de Python (herramientas de presentación/capturas)
+.venv/
+__pycache__/
+*.pyc
+
 # Sistema operativo / editor
 .DS_Store
 Thumbs.db
