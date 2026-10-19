@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { Notification } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { Assistant } from './Assistant';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -183,6 +184,9 @@ export function Layout() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>
+
+      {/* Asistente de búsqueda flotante (disponible en toda la app) */}
+      <Assistant />
     </div>
   );
 }

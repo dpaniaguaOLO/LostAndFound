@@ -42,6 +42,7 @@ export type NotificationType =
   | 'CLAIM_APPROVED'
   | 'CLAIM_REJECTED'
   | 'ITEM_RETURNED'
+  | 'MATCH_FOUND' // la IA detectó un objeto encontrado que coincide con uno perdido
   | 'SYSTEM';
 
 /** Categorías sugeridas para clasificar objetos. */
@@ -196,4 +197,46 @@ export interface FoundItemsQuery {
   location?: string;
   page?: number;
   pageSize?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Búsqueda inteligente y emparejado (IA local, sin servicios externos)
+// ---------------------------------------------------------------------------
+
+/** Un objeto encontrado acompañado de su puntaje de relevancia/coincidencia. */
+export interface ScoredFoundItem {
+  item: FoundItem;
+  score: number; // 0..100
+  reasons: string[]; // motivos legibles de la coincidencia (puede ir vacío en búsqueda)
+}
+
+/** Petición de búsqueda semántica en lenguaje natural. */
+export interface SemanticSearchRequest {
+  query: string;
+  limit?: number;
+}
+
+/** Respuesta de búsqueda semántica. */
+export interface SemanticSearchResponse {
+  query: string;
+  results: ScoredFoundItem[];
+}
+
+/** Respuesta de sugerencias de coincidencia para un objeto perdido. */
+export interface MatchSuggestionsResponse {
+  lostReportId: string;
+  suggestions: ScoredFoundItem[];
+}
+
+/** Pregunta al asistente de búsqueda. */
+export interface AssistantRequest {
+  question: string;
+}
+
+/** Respuesta del asistente: texto legible + items reales que la respaldan. */
+export interface AssistantResponse {
+  answer: string;
+  kind: 'found' | 'lost';
+  foundItems: FoundItem[];
+  lostReports: LostReport[];
 }

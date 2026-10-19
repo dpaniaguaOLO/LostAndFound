@@ -4,6 +4,7 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { forbidden, notFound } from '../lib/http.js';
 import { serializeLostReport } from '../lib/serialize.js';
 import { createLostReportSchema, parseOrThrow } from '../lib/validation.js';
+import { notifyBestMatchForLost } from '../lib/matchNotify.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { publicUrlFor, uploadImage } from '../middleware/upload.js';
 
@@ -86,6 +87,19 @@ lostReportsRouter.post(
       },
       include: reporterSelect,
     });
+
+    // IA: busca una coincidencia entre los encontrados y avisa al dueño si la hay.
+    // No bloquea la respuesta si algo falla en el emparejado.
+    notifyBestMatchForLost({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      category: item.category,
+      location: item.location,
+      lostAt: item.lostAt,
+      reporterId: item.reporterId,
+    }).catch((e) => console.error('[match-notify]', e));
+
     res.status(201).json(serializeLostReport(item));
   }),
 );

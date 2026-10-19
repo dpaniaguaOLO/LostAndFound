@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { config } from './config.js';
 import { errorHandler } from './middleware/authenticate.js';
 import { adminRouter } from './routes/admin.js';
+import { aiRouter } from './routes/ai.js';
 import { authRouter } from './routes/auth.js';
 import { claimsRouter } from './routes/claims.js';
 import { foundItemsRouter } from './routes/foundItems.js';
@@ -23,7 +24,7 @@ export function createApp() {
   // Archivos subidos (imágenes). En producción conviene usar almacenamiento privado + URLs firmadas.
   app.use('/uploads', express.static(path.resolve(config.uploadDir)));
 
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '0.5.0' }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '0.7.0' }));
 
   app.use('/api/auth', authRouter);
   app.use('/api/found-items', foundItemsRouter);
@@ -31,6 +32,7 @@ export function createApp() {
   app.use('/api/claims', claimsRouter);
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/ai', aiRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND', message: 'Ruta no encontrada' }));
   app.use(errorHandler);

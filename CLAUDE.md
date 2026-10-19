@@ -47,6 +47,14 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
 - Auth: **JWT** (header `Authorization: Bearer`), contraseñas con **bcryptjs**.
 - Validación: **zod** en el backend. Subida de imágenes: **multer 2.x** a disco local.
 - Seguridad HTTP: **helmet** + **cors**.
+- **IA local (sin servicios externos)**: motor de NLP clásico (TF-IDF + similitud de coseno
+  + señales de categoría/ubicación/fecha) en `backend/src/lib/nlp.ts` y
+  `backend/src/lib/matching.ts`. Da búsqueda semántica y emparejado perdido↔encontrado.
+  No usa ningún proveedor externo ni API key; todo corre en el servidor. Capa aislada:
+  se puede sustituir por embeddings en el futuro sin tocar las rutas.
+  - **Aviso automático**: al crear un reporte perdido (`POST /lost-reports`), se ejecuta el
+    emparejado y, si la mejor coincidencia ≥55%, se notifica al dueño (`matchNotify.ts`).
+  - **Asistente de búsqueda** (`assistant.ts`): intención por palabras clave, sin LLM.
 
 **Estructura de carpetas**
 ```
@@ -162,14 +170,17 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | GET | `/api/notifications` | sí | — | `Notification[]` (máx 100) |
 | PATCH | `/api/notifications/:id/read` | sí | — | `Notification` |
 | PATCH | `/api/notifications/read-all` | sí | — | `{ ok: true }` |
+| POST | `/api/ai/search` | sí | `{ query, limit? }` | `SemanticSearchResponse` (encontrados rankeados 0–100) |
+| GET | `/api/ai/match/:lostReportId` | sí (autor o admin) | — | `MatchSuggestionsResponse` (encontrados candidatos con score y motivos) |
+| POST | `/api/ai/assistant` | sí | `{ question }` | `AssistantResponse` (texto + items reales) |
 | GET | `/api/admin/stats` | admin | — | `{ users, foundItems, lostReports, claimsPending, returned }` |
 | GET | `/api/admin/users` | admin | — | `User[]` |
 | PATCH | `/api/admin/users/:id/role` | admin | `{ role: ADMIN\|EMPLOYEE }` | `User` |
 
 ### Pendientes (NO implementados aún)
 - `POST /api/auth/forgot-password` / `reset-password` (recuperación de contraseña).
-- Emparejado automático perdido↔encontrado y endpoint de sugerencias.
 - Notificaciones por email (actualmente solo en base de datos / UI).
+- (Hecho en rama `feature/ia`) Búsqueda semántica y emparejado perdido↔encontrado.
 
 ---
 

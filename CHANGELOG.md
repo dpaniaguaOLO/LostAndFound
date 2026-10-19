@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.7.0] - 2026-10-19 (rama `feature/ia`)
+
+Fase 1 de asistencia con IA local (sin LLM).
+
+### Añadido
+- **Aviso automático de coincidencias**: al reportar un objeto perdido, el sistema busca
+  entre los encontrados y, si hay una coincidencia fuerte (≥55%), envía una notificación
+  `MATCH_FOUND` al dueño con el porcentaje y un enlace al objeto.
+- **Asistente de búsqueda** (botón flotante en toda la app): interpreta preguntas frecuentes
+  por intención (categoría, ubicación, rango de fecha; encontrados vs perdidos) y responde
+  con datos reales de la base, enlazando los objetos. No es un LLM ni conversa libremente.
+- Backend: `POST /api/ai/assistant`, `backend/src/lib/assistant.ts`,
+  `backend/src/lib/matchNotify.ts`. Contratos `AssistantRequest/Response` y tipo de
+  notificación `MATCH_FOUND` en `@laf/shared`.
+- Las notificaciones con objeto relacionado ahora llevan a su detalle al pulsarlas.
+
+---
+
+## [0.6.0] - 2026-10-19 (rama `feature/ia`)
+
+Búsqueda inteligente y emparejado con IA local (sin servicios externos).
+
+### Añadido
+- **Motor de IA local** (`backend/src/lib/nlp.ts`, `matching.ts`): NLP clásico con
+  normalización en español (acentos, stopwords, stemming ligero, sinónimos del dominio),
+  TF-IDF + similitud de coseno, y señales de categoría/ubicación/fecha. Con pruebas.
+- **Búsqueda semántica** (`POST /api/ai/search`): el colaborador describe el objeto en
+  lenguaje natural y recibe los encontrados ordenados por relevancia (0–100%).
+- **Emparejado perdido↔encontrado** (`GET /api/ai/match/:lostReportId`): sugiere objetos
+  encontrados que podrían corresponder a un perdido, con porcentaje y motivos.
+- Frontend: caja de **Búsqueda inteligente** en el Muro y panel **"Ver posibles
+  coincidencias"** en cada objeto perdido de "Mis objetos".
+- Contratos en `@laf/shared`: `ScoredFoundItem`, `SemanticSearchRequest/Response`,
+  `MatchSuggestionsResponse`.
+
+### Notas
+- Toda la IA corre en el servidor; **no** se usan proveedores externos ni API keys, y no se
+  envían datos a terceros. La capa está aislada para poder migrar a embeddings más adelante.
+
+---
+
+
 Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
