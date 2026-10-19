@@ -158,8 +158,10 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | GET | `/api/found-items` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<FoundItem>` |
 | GET | `/api/found-items/:id` | sí | — | `FoundItem` |
 | POST | `/api/found-items` | sí | `multipart/form-data`: `title, description, category, location, foundAt(ISO)`, `image?` | `201 FoundItem` |
+| PATCH | `/api/found-items/:id` | sí (autor o admin) | cuerpo como POST | `FoundItem` (editar) |
 | PATCH | `/api/found-items/:id/return` | sí (autor o admin) | — | `FoundItem` |
 | PATCH | `/api/found-items/:id/archive` | sí (admin) | — | `FoundItem` |
+| DELETE | `/api/found-items/:id` | sí (admin) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
 | GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
@@ -180,6 +182,10 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | GET | `/api/admin/stats` | admin | — | `{ users, foundItems, lostReports, claimsPending, returned }` |
 | GET | `/api/admin/users` | admin | — | `User[]` |
 | PATCH | `/api/admin/users/:id/role` | admin | `{ role: ADMIN\|EMPLOYEE }` | `User` |
+| GET | `/api/admin/audit` | admin | `limit?` | `AuditEntry[]` (historial) |
+| GET | `/api/claims/all` | admin | — | `Claim[]` (bandeja global) |
+| PATCH | `/api/lost-reports/:id` | sí (autor o admin) | cuerpo como POST | `LostReport` (editar) |
+| DELETE | `/api/lost-reports/:id` | sí (admin) | — | `{ ok }` |
 
 ### Pendientes (NO implementados aún)
 - `POST /api/auth/forgot-password` / `reset-password` (recuperación de contraseña).
@@ -206,6 +212,15 @@ Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `S
 - `status`: `PENDING | APPROVED | REJECTED | CANCELLED`.
 
 **Notification**: `id, userId→User, type, title, body, read, relatedItemId?, createdAt`.
+
+**AuditLog**: `id, actorId→User, action, entityType, entityId, summary, createdAt`. Registro
+de trazabilidad para el panel admin (migración `audit_log`).
+
+**Privilegios de ADMIN** (además de lo de un colaborador): panel con métricas, gestión de
+usuarios/roles, **moderar cualquier objeto** (editar/archivar/eliminar, no solo los propios),
+**resolver cualquier reclamación y marcar cualquier devolución**, bandeja global de
+reclamaciones e **historial de auditoría**. El borrado es destructivo y se registra; se
+prefiere archivar.
 
 **Reglas de negocio clave**
 - No se puede reclamar un objeto propio, ni uno `RETURNED`/`ARCHIVED`.

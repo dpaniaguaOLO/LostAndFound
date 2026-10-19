@@ -21,6 +21,8 @@ export function FoundItemDetailPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [confirmReturn, setConfirmReturn] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   function load() {
     if (!id) return;
@@ -73,6 +75,32 @@ export function FoundItemDetailPage() {
       notify(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar', 'error');
     } finally {
       setConfirmReturn(false);
+    }
+  }
+
+  // Moderación (solo admin): archivar retira del muro; eliminar borra definitivamente.
+  async function archiveItem() {
+    if (!item) return;
+    try {
+      const updated = await api<FoundItem>(`/found-items/${item.id}/archive`, { method: 'PATCH' });
+      setItem(updated);
+      notify('Objeto archivado', 'success');
+    } catch (err) {
+      notify(err instanceof ApiRequestError ? err.message : 'No se pudo archivar', 'error');
+    } finally {
+      setConfirmArchive(false);
+    }
+  }
+
+  async function deleteItem() {
+    if (!item) return;
+    try {
+      await api(`/found-items/${item.id}`, { method: 'DELETE' });
+      notify('Objeto eliminado', 'success');
+      navigate('/');
+    } catch (err) {
+      notify(err instanceof ApiRequestError ? err.message : 'No se pudo eliminar', 'error');
+      setConfirmDelete(false);
     }
   }
 
@@ -138,6 +166,25 @@ export function FoundItemDetailPage() {
             )}
           </div>
 
+          {/* Acciones de moderación (solo administradores) */}
+          {isAdmin && (
+            <div className="mt-1 rounded-lg border border-slate-200 p-3 dark:border-olo-dark-800">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Administración
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                {item.status !== 'ARCHIVED' && (
+                  <button className="btn-secondary" onClick={() => setConfirmArchive(true)}>
+                    Archivar
+                  </button>
+                )}
+                <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          )}
+
           {item.status === 'RETURNED' && (
             <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-500/10 dark:text-green-300">
               Este objeto ya fue devuelto a su dueño.
@@ -185,6 +232,25 @@ export function FoundItemDetailPage() {
         confirmLabel="Sí, marcar devuelto"
         onConfirm={markReturned}
         onCancel={() => setConfirmReturn(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmArchive}
+        title="Archivar objeto"
+        message="El objeto se retirará del muro pero quedará registrado. Es una acción reversible."
+        confirmLabel="Archivar"
+        onConfirm={archiveItem}
+        onCancel={() => setConfirmArchive(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar objeto"
+        message="Esta acción es permanente y borra el objeto y sus reclamaciones. No se puede deshacer."
+        confirmLabel="Eliminar definitivamente"
+        danger
+        onConfirm={deleteItem}
+        onCancel={() => setConfirmDelete(false)}
       />
     </div>
   );

@@ -24,7 +24,7 @@ export function createApp() {
   // Archivos subidos (imágenes). En producción conviene usar almacenamiento privado + URLs firmadas.
   app.use('/uploads', express.static(path.resolve(config.uploadDir)));
 
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '0.8.0' }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '0.9.0' }));
 
   app.use('/api/auth', authRouter);
   app.use('/api/found-items', foundItemsRouter);

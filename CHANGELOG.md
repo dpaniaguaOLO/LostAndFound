@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.9.0] - 2026-10-19
+
+Privilegios de administración: moderación, supervisión e historial.
+
+### Añadido
+- **Moderación de objetos** (admin): editar, archivar y eliminar cualquier objeto
+  encontrado o perdido, no solo los propios. Botones en el detalle del objeto.
+  - `PATCH /api/found-items/:id`, `DELETE /api/found-items/:id`, y equivalentes en
+    `lost-reports`.
+- **Bandeja global de reclamaciones** para admin (`GET /api/claims/all`) y pestaña
+  "Reclamaciones" en el panel.
+- **Historial / auditoría** (`GET /api/admin/audit`, modelo `AuditLog`): registra
+  devoluciones, moderación, revisión de reclamaciones y cambios de rol, con autor y fecha.
+  Pestaña "Historial" en el panel.
+- Panel de administración reorganizado en pestañas: Resumen · Reclamaciones · Historial.
+
+### Notas
+- El borrado es solo para admin y pide confirmación; se prefiere "archivar" (reversible)
+  frente a "eliminar" (permanente). Todo queda registrado en el historial.
+- Migración `audit_log`.
+
+---
+
+
 ## [0.8.0] - 2026-10-19 (rama `feature/ia-visual`)
 
 Búsqueda visual ligera (sin modelos pesados ni servicios externos).

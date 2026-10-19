@@ -240,3 +240,28 @@ export interface AssistantResponse {
   foundItems: FoundItem[];
   lostReports: LostReport[];
 }
+
+// ---------------------------------------------------------------------------
+// Auditoría (panel de administración)
+// ---------------------------------------------------------------------------
+
+export type AuditAction =
+  | 'FOUND_ITEM_EDITED'
+  | 'FOUND_ITEM_ARCHIVED'
+  | 'FOUND_ITEM_DELETED'
+  | 'FOUND_ITEM_RETURNED'
+  | 'LOST_REPORT_EDITED'
+  | 'LOST_REPORT_DELETED'
+  | 'LOST_REPORT_RESOLVED'
+  | 'CLAIM_REVIEWED'
+  | 'USER_ROLE_CHANGED';
+
+export interface AuditEntry {
+  id: string;
+  action: AuditAction;
+  entityType: 'FoundItem' | 'LostReport' | 'Claim' | 'User';
+  entityId: string;
+  summary: string;
+  actor: Pick<User, 'id' | 'name'>;
+  createdAt: string; // ISO 8601
+}

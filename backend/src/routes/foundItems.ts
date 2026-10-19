@@ -7,6 +7,7 @@ import { createFoundItemSchema, parseOrThrow } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
+import { writeAudit } from '../lib/audit.js';
 
 export const foundItemsRouter = Router();
 
@@ -122,6 +123,35 @@ foundItemsRouter.patch(
       data: { status: 'RETURNED' },
       include: reporterSelect,
     });
+    await writeAudit(req.auth!.sub, 'FOUND_ITEM_RETURNED', 'FoundItem', item.id, item.title);
+    res.json(serializeFoundItem(updated));
+  }),
+);
+
+// PATCH /api/found-items/:id — editar (autor o admin). Moderación de contenido.
+foundItemsRouter.patch(
+  '/:id',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
+    if (!item) throw notFound('Objeto no encontrado');
+    const isOwner = item.reporterId === req.auth!.sub;
+    const isAdmin = req.auth!.role === 'ADMIN';
+    if (!isOwner && !isAdmin) throw forbidden('No puedes editar este objeto');
+
+    const body = parseOrThrow(createFoundItemSchema, req.body);
+    const updated = await prisma.foundItem.update({
+      where: { id: item.id },
+      data: {
+        title: body.title,
+        description: body.description,
+        category: body.category,
+        location: body.location,
+        foundAt: new Date(body.foundAt),
+      },
+      include: reporterSelect,
+    });
+    await writeAudit(req.auth!.sub, 'FOUND_ITEM_EDITED', 'FoundItem', item.id, item.title);
     res.json(serializeFoundItem(updated));
   }),
 );
@@ -139,7 +169,29 @@ foundItemsRouter.patch(
       data: { status: 'ARCHIVED' },
       include: reporterSelect,
     });
+    await writeAudit(req.auth!.sub, 'FOUND_ITEM_ARCHIVED', 'FoundItem', item.id, item.title);
     res.json(serializeFoundItem(updated));
+  }),
+);
+
+// DELETE /api/found-items/:id — eliminar (solo admin). Moderación destructiva.
+foundItemsRouter.delete(
+  '/:id',
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const item = await prisma.foundItem.findUnique({
+      where: { id: req.params.id },
+      include: { claims: true },
+    });
+    if (!item) throw notFound('Objeto no encontrado');
+    // Borra primero las reclamaciones asociadas para respetar la relación.
+    await prisma.$transaction([
+      prisma.claim.deleteMany({ where: { foundItemId: item.id } }),
+      prisma.foundItem.delete({ where: { id: item.id } }),
+    ]);
+    await writeAudit(req.auth!.sub, 'FOUND_ITEM_DELETED', 'FoundItem', item.id, item.title);
+    res.json({ ok: true });
   }),
 );
 

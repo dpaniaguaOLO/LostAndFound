@@ -5,9 +5,10 @@ import { forbidden, notFound } from '../lib/http.js';
 import { serializeLostReport } from '../lib/serialize.js';
 import { createLostReportSchema, parseOrThrow } from '../lib/validation.js';
 import { notifyBestMatchForLost } from '../lib/matchNotify.js';
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
+import { writeAudit } from '../lib/audit.js';
 
 export const lostReportsRouter = Router();
 
@@ -133,7 +134,49 @@ lostReportsRouter.patch(
       data: { status: 'RESOLVED' },
       include: reporterSelect,
     });
+    await writeAudit(req.auth!.sub, 'LOST_REPORT_RESOLVED', 'LostReport', item.id, item.title);
     res.json(serializeLostReport(updated));
+  }),
+);
+
+// PATCH /api/lost-reports/:id — editar (autor o admin).
+lostReportsRouter.patch(
+  '/:id',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
+    if (!item) throw notFound('Reporte no encontrado');
+    const isOwner = item.reporterId === req.auth!.sub;
+    if (!isOwner && req.auth!.role !== 'ADMIN') throw forbidden('No puedes editar este reporte');
+
+    const body = parseOrThrow(createLostReportSchema, req.body);
+    const updated = await prisma.lostReport.update({
+      where: { id: item.id },
+      data: {
+        title: body.title,
+        description: body.description,
+        category: body.category,
+        location: body.location,
+        lostAt: new Date(body.lostAt),
+      },
+      include: reporterSelect,
+    });
+    await writeAudit(req.auth!.sub, 'LOST_REPORT_EDITED', 'LostReport', item.id, item.title);
+    res.json(serializeLostReport(updated));
+  }),
+);
+
+// DELETE /api/lost-reports/:id — eliminar (solo admin).
+lostReportsRouter.delete(
+  '/:id',
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
+    if (!item) throw notFound('Reporte no encontrado');
+    await prisma.lostReport.delete({ where: { id: item.id } });
+    await writeAudit(req.auth!.sub, 'LOST_REPORT_DELETED', 'LostReport', item.id, item.title);
+    res.json({ ok: true });
   }),
 );
 

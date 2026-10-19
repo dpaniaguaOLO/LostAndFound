@@ -26,6 +26,7 @@ model User {
   claims        Claim[]        @relation("ClaimClaimant")
   reviewedClaims Claim[]       @relation("ClaimReviewer")
   notifications Notification[]
+  auditLogs     AuditLog[]
 }
 
 model FoundItem {
@@ -97,4 +98,20 @@ model Notification {
   createdAt     DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// Registro de auditoría: eventos clave para trazabilidad (devoluciones,
+// moderación, cambios de rol). Lo consulta el historial del panel admin.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String // usuario que ejecutó la acción
+  actor      User     @relation(fields: [actorId], references: [id])
+  action     String // p. ej. FOUND_ITEM_RETURNED, CLAIM_REVIEWED, USER_ROLE_CHANGED
+  entityType String // FoundItem | LostReport | Claim | User
+  entityId   String
+  summary    String // texto legible del evento
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
 }

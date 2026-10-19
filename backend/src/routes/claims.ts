@@ -5,7 +5,8 @@ import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { notify } from '../lib/notify.js';
 import { serializeClaim } from '../lib/serialize.js';
 import { createClaimSchema, parseOrThrow, reviewClaimSchema } from '../lib/validation.js';
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+import { writeAudit } from '../lib/audit.js';
 
 export const claimsRouter = Router();
 
@@ -137,7 +138,30 @@ claimsRouter.patch(
       relatedItemId: claim.foundItemId,
     });
 
+    await writeAudit(
+      req.auth!.sub,
+      'CLAIM_REVIEWED',
+      'Claim',
+      claim.id,
+      `Reclamación ${body.status === 'APPROVED' ? 'aprobada' : 'rechazada'} de "${claim.foundItem.title}"`,
+    );
+
     res.json(serializeClaim(updated));
+  }),
+);
+
+// GET /api/claims/all — todas las reclamaciones (solo admin). Bandeja global.
+claimsRouter.get(
+  '/all',
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const claims = await prisma.claim.findMany({
+      include: claimInclude,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    res.json(claims.map(serializeClaim));
   }),
 );
 
