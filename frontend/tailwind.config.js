@@ -16,12 +16,12 @@ const olo = {
   900: '#00392e',
 };
 
-// Superficies oscuras con una leve tinta verde de la marca, para que el modo
-// oscuro siga sintiéndose "OLO" en lugar de un gris neutro genérico.
+// Superficies del modo oscuro: gris oscuro / negro neutro (sobrio y legible).
+// El verde de marca OLO se mantiene solo como color de acento, no de fondo.
 const oloDark = {
-  950: '#071612', // fondo de la app
-  900: '#0c201a', // tarjetas / superficies
-  800: '#143028', // bordes y separadores
+  950: '#0b0e12', // fondo de la app (casi negro)
+  900: '#151a21', // tarjetas / superficies
+  800: '#272e38', // bordes y separadores
 };
 
 export default {

@@ -4,6 +4,15 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.3.2] - 2026-10-19
+
+### Cambiado
+- Las superficies del modo oscuro pasan a **gris oscuro / negro neutro** (`#0b0e12`,
+  `#151a21`, `#272e38`) en lugar del tinte verde. El verde de marca OLO se conserva solo
+  como color de acento.
+
+---
+
 ## [0.3.1] - 2026-10-19
 
 Correcciones del modo oscuro y refuerzo de la identidad de OLO.
