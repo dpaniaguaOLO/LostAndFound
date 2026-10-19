@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
-import { EmptyState, ErrorState, Spinner } from '../components/ui';
+import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
 import { api, ApiRequestError } from '../lib/api';
 
-type Tab = 'found' | 'lost';
+type Tab = 'lost' | 'found';
 
 export function MyThingsPage() {
-  const [tab, setTab] = useState<Tab>('found');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Pestaña inicial desde ?tab= (al publicar un perdido redirige aquí con tab=lost).
+  const initialTab: Tab = searchParams.get('tab') === 'found' ? 'found' : 'lost';
+  const [tab, setTab] = useState<Tab>(initialTab);
+
   const [found, setFound] = useState<FoundItem[]>([]);
   const [lost, setLost] = useState<LostReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,36 +30,37 @@ export function MyThingsPage() {
         setLost(l);
       })
       .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar tus publicaciones'),
+        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar tus objetos'),
       )
       .finally(() => setLoading(false));
   }
 
   useEffect(load, []);
 
+  function changeTab(next: Tab) {
+    setTab(next);
+    setSearchParams(next === 'lost' ? {} : { tab: 'found' }, { replace: true });
+  }
+
   const items = tab === 'found' ? found : lost;
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Mis publicaciones</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
+        Mis objetos
+      </h1>
       <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-        Tus objetos encontrados publicados y tus reportes de objetos perdidos.
+        Los objetos que tú perdiste o encontraste.
       </p>
 
-      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-olo-dark-800 dark:bg-olo-dark-900">
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'found' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
-          onClick={() => setTab('found')}
-        >
-          Encontrados ({found.length})
-        </button>
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'lost' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
-          onClick={() => setTab('lost')}
-        >
-          Perdidos ({lost.length})
-        </button>
-      </div>
+      <Tabs<Tab>
+        tabs={[
+          { key: 'lost', label: `Perdidos (${lost.length})` },
+          { key: 'found', label: `Encontrados (${found.length})` },
+        ]}
+        value={tab}
+        onChange={changeTab}
+      />
 
       {loading ? (
         <Spinner />
@@ -63,10 +68,11 @@ export function MyThingsPage() {
         <ErrorState message={error} onRetry={load} />
       ) : items.length === 0 ? (
         <EmptyState
-          title={tab === 'found' ? 'No has publicado objetos' : 'No has reportado objetos perdidos'}
+          title={tab === 'found' ? 'No has publicado objetos encontrados' : 'No has reportado objetos perdidos'}
+          description="Usa el botón para registrar uno."
           action={
-            <Link to={tab === 'found' ? '/publicar' : '/perdidos'} className="btn-primary">
-              {tab === 'found' ? 'Publicar objeto' : 'Reportar objeto perdido'}
+            <Link to={tab === 'found' ? '/publicar' : '/publicar'} className="btn-primary">
+              {tab === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
             </Link>
           }
         />

@@ -1,26 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { FoundItem, Paginated } from '@laf/shared';
+import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
-import { FoundItemCard } from '../components/ItemCard';
-import { EmptyState, ErrorState, Spinner } from '../components/ui';
+import { FoundItemCard, LostReportCard } from '../components/ItemCard';
+import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
 import { api, ApiRequestError } from '../lib/api';
 import { useDebounce } from '../lib/useDebounce';
 
+type Tab = 'found' | 'lost';
+
 export function WallPage() {
+  const [tab, setTab] = useState<Tab>('found');
   const [filters, setFilters] = useState<FilterValues>({ search: '', category: '', location: '' });
   const debouncedSearch = useDebounce(filters.search);
   const debouncedLocation = useDebounce(filters.location);
 
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<Paginated<FoundItem> | null>(null);
+  const [found, setFound] = useState<Paginated<FoundItem> | null>(null);
+  const [lost, setLost] = useState<Paginated<LostReport> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Vuelve a la página 1 cuando cambian los filtros.
+  // Vuelve a la página 1 al cambiar pestaña o filtros.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, filters.category, debouncedLocation]);
+  }, [tab, debouncedSearch, filters.category, debouncedLocation]);
 
   useEffect(() => {
     let active = true;
@@ -33,8 +37,13 @@ export function WallPage() {
     if (debouncedLocation) params.set('location', debouncedLocation);
     params.set('page', String(page));
 
-    api<Paginated<FoundItem>>(`/found-items?${params.toString()}`)
-      .then((data) => active && setResult(data))
+    const endpoint = tab === 'found' ? '/found-items' : '/lost-reports';
+    api<Paginated<FoundItem | LostReport>>(`${endpoint}?${params.toString()}`)
+      .then((data) => {
+        if (!active) return;
+        if (tab === 'found') setFound(data as Paginated<FoundItem>);
+        else setLost(data as Paginated<LostReport>);
+      })
       .catch((err) => {
         if (!active) return;
         setError(err instanceof ApiRequestError ? err.message : 'Error al cargar el muro');
@@ -44,23 +53,32 @@ export function WallPage() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, filters.category, debouncedLocation, page]);
+  }, [tab, debouncedSearch, filters.category, debouncedLocation, page]);
+
+  const result = tab === 'found' ? found : lost;
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
-            Objetos encontrados
-          </h1>
+          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Muro</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Consulta lo que se ha encontrado en las instalaciones.
+            Objetos publicados por los colaboradores en las instalaciones.
           </p>
         </div>
         <Link to="/publicar" className="btn-primary w-full sm:w-auto">
-          Publicar objeto
+          Publicar
         </Link>
       </div>
+
+      <Tabs<Tab>
+        tabs={[
+          { key: 'found', label: 'Encontrados' },
+          { key: 'lost', label: 'Perdidos' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       <Filters value={filters} onChange={setFilters} />
 
@@ -70,20 +88,26 @@ export function WallPage() {
         <ErrorState message={error} onRetry={() => setPage((p) => p)} />
       ) : !result || result.data.length === 0 ? (
         <EmptyState
-          title="No hay objetos que coincidan"
-          description="Ajusta la búsqueda o publica un objeto que hayas encontrado."
+          title={
+            tab === 'found' ? 'No hay objetos encontrados' : 'No hay objetos perdidos reportados'
+          }
+          description="Ajusta la búsqueda o publica desde el botón Publicar."
           action={
             <Link to="/publicar" className="btn-primary">
-              Publicar objeto
+              Publicar
             </Link>
           }
         />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {result.data.map((item) => (
-              <FoundItemCard key={item.id} item={item} />
-            ))}
+            {tab === 'found'
+              ? (result.data as FoundItem[]).map((item) => (
+                  <FoundItemCard key={item.id} item={item} />
+                ))
+              : (result.data as LostReport[]).map((item) => (
+                  <LostReportCard key={item.id} item={item} />
+                ))}
           </div>
 
           {result.totalPages > 1 && (

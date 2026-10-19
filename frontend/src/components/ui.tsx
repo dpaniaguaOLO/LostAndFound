@@ -52,6 +52,36 @@ export function StatusBadge({ status, label }: { status: string; label: string }
   return <span className={`badge ${statusBadgeClass(status)}`}>{label}</span>;
 }
 
+/** Barra de pestañas reutilizable. */
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+}: {
+  tabs: { key: T; label: string }[];
+  value: T;
+  onChange: (key: T) => void;
+}) {
+  return (
+    <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-olo-dark-800 dark:bg-olo-dark-900">
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          className={
+            'rounded-md px-4 py-1.5 text-sm font-medium transition ' +
+            (value === t.key
+              ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950'
+              : 'text-slate-600 hover:text-olo-700 dark:text-slate-300 dark:hover:text-olo-300')
+          }
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Imagen del objeto o un marcador de posición accesible. */
 export function ItemImage({ src, alt }: { src: string | null; alt: string }) {
   if (!src) {

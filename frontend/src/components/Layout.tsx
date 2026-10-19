@@ -6,11 +6,11 @@ import { api } from '../lib/api';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
-// Navegación principal: etiquetas cortas de una sola palabra para que la barra
-// no se sature ni parta texto en dos líneas.
+// Navegación principal: Muro (todo lo de los colaboradores), Mis objetos
+// (lo mío), Publicar (encontrado o perdido) y Reclamaciones.
 const navItems = [
-  { to: '/', label: 'Encontrados', end: true },
-  { to: '/perdidos', label: 'Perdidos' },
+  { to: '/', label: 'Muro', end: true },
+  { to: '/mis-objetos', label: 'Mis objetos' },
   { to: '/publicar', label: 'Publicar' },
   { to: '/reclamaciones', label: 'Reclamaciones' },
 ];
@@ -119,15 +119,15 @@ export function Layout() {
                   className="card absolute right-0 mt-2 w-52 overflow-hidden p-1 shadow-lg"
                 >
                   <div className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">
-                    N° {user?.employeeId}
+                    {user?.name} · N° {user?.employeeId}
                   </div>
                   <Link
-                    to="/mis-publicaciones"
+                    to="/mis-objetos"
                     onClick={() => setUserMenu(false)}
                     className="block rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-800"
                     role="menuitem"
                   >
-                    Mis publicaciones
+                    Mis objetos
                   </Link>
                   <button
                     onClick={handleLogout}
@@ -168,13 +168,6 @@ export function Layout() {
                 {item.label}
               </NavLink>
             ))}
-            <NavLink
-              to="/mis-publicaciones"
-              className={linkClass}
-              onClick={() => setOpen(false)}
-            >
-              Mis publicaciones
-            </NavLink>
             {isAdmin && (
               <NavLink to="/admin" className={linkClass} onClick={() => setOpen(false)}>
                 Admin

@@ -4,6 +4,26 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.5.0] - 2026-10-19
+
+Reestructuración de módulos según el flujo de trabajo del colaborador.
+
+### Cambiado
+- **Muro**: ahora muestra las publicaciones de todos los colaboradores con pestañas
+  **Encontrados** y **Perdidos**.
+- **Mis objetos** (antes "Mis publicaciones"): los objetos propios, con pestañas
+  **Perdidos** y **Encontrados**.
+- **Publicar**: una sola pantalla con selector **"Encontré un objeto" / "Perdí un objeto"**
+  que usa el endpoint y los textos correspondientes.
+- Navegación simplificada: **Muro · Mis objetos · Publicar · Reclamaciones** (se elimina la
+  sección separada de "Perdidos"; los perdidos viven en el Muro y en Mis objetos).
+
+### Eliminado
+- Página independiente de reporte de perdidos (`LostReportsPage`): su función se integró en
+  Publicar y en el Muro.
+
+---
+
 ## [0.4.1] - 2026-10-19
 
 ### Cambiado
