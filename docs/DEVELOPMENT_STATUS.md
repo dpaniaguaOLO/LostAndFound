@@ -2,11 +2,11 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.3.0
+- **Versión actual**: 0.3.1
 - **Fecha**: 2026-10-19
-- **Commit más reciente**: modo oscuro (ver `git log`)
-- **Última funcionalidad completada**: modo oscuro con toggle, persistencia y respeto de la
-  preferencia del sistema; variantes `dark:` en toda la interfaz.
+- **Commit más reciente**: correcciones de modo oscuro (ver `git log`)
+- **Última funcionalidad completada**: modo oscuro con toggle (corregido), persistencia y
+  preferencia del sistema; logo legible en oscuro; superficies oscuras con tinte de marca OLO.
 
 ## Estado de las pruebas
 

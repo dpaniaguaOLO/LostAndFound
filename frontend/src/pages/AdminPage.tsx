@@ -84,7 +84,7 @@ export function AdminPage() {
       <h2 className="mb-3 text-lg font-semibold text-slate-800 dark:text-slate-100">Usuarios</h2>
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <thead className="border-b border-slate-200 text-slate-500 dark:border-olo-dark-800 dark:text-slate-400">
             <tr>
               <th className="px-4 py-3 font-medium">Nombre</th>
               <th className="px-4 py-3 font-medium">Correo</th>
@@ -95,7 +95,7 @@ export function AdminPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+              <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-olo-dark-800">
                 <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
                 <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.email}</td>
                 <td className="px-4 py-3">

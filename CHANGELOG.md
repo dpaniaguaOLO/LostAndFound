@@ -4,6 +4,22 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.3.1] - 2026-10-19
+
+Correcciones del modo oscuro y refuerzo de la identidad de OLO.
+
+### Corregido
+- El botón de cambio de tema ahora aplica el cambio directamente al DOM en el clic
+  (antes podía no reflejarse si el estado y el DOM se desincronizaban).
+- El logo de OLO era casi invisible en modo oscuro: ahora el SVG está incrustado y el
+  texto del wordmark se aclara en oscuro, manteniendo el bloque verde de marca.
+
+### Cambiado
+- Las superficies del modo oscuro usan un **tinte verde de OLO** (`olo-dark-950/900/800`)
+  en vez de gris neutro, para que el tema oscuro siga sintiéndose corporativo.
+
+---
+
 ## [0.3.0] - 2026-10-19
 
 Modo oscuro.

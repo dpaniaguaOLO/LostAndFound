@@ -42,11 +42,11 @@ export function Layout() {
     'rounded-lg px-3 py-2 text-sm font-medium transition ' +
     (isActive
       ? 'bg-olo-50 text-olo-700 dark:bg-olo-500/15 dark:text-olo-300'
-      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800');
+      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-800');
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-olo-dark-800 dark:bg-olo-dark-900/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="flex items-center" aria-label="Lost and Found — OLO">
             <Logo />
@@ -69,7 +69,7 @@ export function Layout() {
             <ThemeToggle />
             <Link
               to="/notificaciones"
-              className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-800"
               aria-label={`Notificaciones${unread ? `, ${unread} sin leer` : ''}`}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -93,7 +93,7 @@ export function Layout() {
             </div>
 
             <button
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 md:hidden"
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-800 md:hidden"
               onClick={() => setOpen((v) => !v)}
               aria-label="Abrir menú"
               aria-expanded={open}
@@ -106,7 +106,7 @@ export function Layout() {
         </div>
 
         {open && (
-          <nav className="flex flex-col gap-1 border-t border-slate-200 px-4 py-3 dark:border-slate-800 md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-slate-200 px-4 py-3 dark:border-olo-dark-800 md:hidden">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}

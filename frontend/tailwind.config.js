@@ -16,6 +16,14 @@ const olo = {
   900: '#00392e',
 };
 
+// Superficies oscuras con una leve tinta verde de la marca, para que el modo
+// oscuro siga sintiéndose "OLO" en lugar de un gris neutro genérico.
+const oloDark = {
+  950: '#071612', // fondo de la app
+  900: '#0c201a', // tarjetas / superficies
+  800: '#143028', // bordes y separadores
+};
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   darkMode: 'class',
@@ -23,6 +31,7 @@ export default {
     extend: {
       colors: {
         olo,
+        'olo-dark': oloDark,
         // Alias de marca -> OLO. Los componentes usan `brand-*` y heredan el verde oficial.
         brand: olo,
         // Tinta del texto, tomada del wordmark oficial.

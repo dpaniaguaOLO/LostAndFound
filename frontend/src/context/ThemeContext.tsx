@@ -20,25 +20,26 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/** Lee la preferencia guardada o, si no hay, la del sistema. */
-function getInitialTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
+/** Aplica/quita la clase `dark` en <html> y ajusta color-scheme nativo. */
 function applyThemeClass(theme: Theme) {
   const root = document.documentElement;
   root.classList.toggle('dark', theme === 'dark');
-  root.style.colorScheme = theme; // ajusta scrollbars/controles nativos
+  root.style.colorScheme = theme;
+}
+
+/** Tema actual según el DOM (lo fija el script anti-FOUC de index.html). */
+function currentDomTheme(): Theme {
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  // El estado inicial se toma del DOM, que ya refleja la preferencia guardada o del sistema.
+  const [theme, setThemeState] = useState<Theme>(currentDomTheme);
 
+  // Aplica la clase cuando cambia el estado. No escribe en localStorage aquí:
+  // solo se persiste cuando el usuario elige explícitamente (setTheme/toggle).
   useEffect(() => {
     applyThemeClass(theme);
-    localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   // Si el usuario no ha elegido manualmente, sigue los cambios del sistema.
@@ -51,8 +52,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
-  const toggle = useCallback(() => setThemeState((t) => (t === 'dark' ? 'light' : 'dark')), []);
+  const setTheme = useCallback((t: Theme) => {
+    localStorage.setItem(STORAGE_KEY, t);
+    applyThemeClass(t); // aplica de inmediato, sin esperar al re-render
+    setThemeState(t);
+  }, []);
+
+  const toggle = useCallback(() => {
+    setThemeState((prev) => {
+      const next: Theme = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(STORAGE_KEY, next);
+      applyThemeClass(next);
+      return next;
+    });
+  }, []);
 
   const value = useMemo(() => ({ theme, toggle, setTheme }), [theme, toggle, setTheme]);
 

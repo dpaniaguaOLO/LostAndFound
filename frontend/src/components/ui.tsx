@@ -25,7 +25,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center dark:border-slate-700 dark:bg-slate-900">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white py-16 text-center dark:border-olo-dark-800 dark:bg-olo-dark-900">
       <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">{title}</h3>
       {description && <p className="max-w-md text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
@@ -56,7 +56,7 @@ export function StatusBadge({ status, label }: { status: string; label: string }
 export function ItemImage({ src, alt }: { src: string | null; alt: string }) {
   if (!src) {
     return (
-      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-t-xl bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600">
+      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-t-xl bg-slate-100 text-slate-400 dark:bg-olo-dark-800 dark:text-slate-600">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
             d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 11 3.5-4 2.5 3 3-4L18 16H6Z"

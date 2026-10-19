@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import logoUrl from '../assets/logo-olo.svg';
+import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { ApiRequestError } from '../lib/api';
@@ -42,7 +42,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4 dark:from-slate-900 dark:to-slate-950">
       <div className="card w-full max-w-md p-8">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <img src={logoUrl} alt="OLO — Overseas Logistics Operations" className="h-12 w-auto" />
+          <Logo showWordmark={false} markClassName="h-11 w-auto" />
           <div>
             <h1 className="text-xl font-semibold text-ink dark:text-slate-100">Lost &amp; Found</h1>
             <p className="text-xs uppercase tracking-wide text-olo-700 dark:text-olo-400">
@@ -119,7 +119,7 @@ export function LoginPage() {
           )}
         </div>
 
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-olo-dark-800 dark:text-slate-400">
           Cuentas de prueba: <strong>admin@empresa.com</strong> /{' '}
           <strong>empleado@empresa.com</strong> — contraseña <strong>password123</strong>
         </div>

@@ -55,7 +55,7 @@ export function ClaimsPage() {
         Gestiona las solicitudes de objetos que publicaste y las que tú hiciste.
       </p>
 
-      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-olo-dark-800 dark:bg-olo-dark-900">
         <button
           className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'incoming' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
           onClick={() => setTab('incoming')}
