@@ -36,10 +36,13 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
   );
 }
 
-/** Tarjeta para un reporte de objeto perdido (sin enlace a detalle propio). */
-export function LostReportCard({ item }: { item: LostReport }) {
+/**
+ * Tarjeta para un reporte de objeto perdido (sin enlace a detalle propio).
+ * `embedded`: omite el contenedor `card` cuando se inserta dentro de otra tarjeta.
+ */
+export function LostReportCard({ item, embedded = false }: { item: LostReport; embedded?: boolean }) {
   return (
-    <div className="card overflow-hidden">
+    <div className={embedded ? 'overflow-hidden' : 'card overflow-hidden'}>
       <ItemImage src={item.imageUrl} alt={item.title} />
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">

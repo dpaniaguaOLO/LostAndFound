@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.0] - 2026-10-19 (rama `feature/ia`)
+
+Búsqueda inteligente y emparejado con IA local (sin servicios externos).
+
+### Añadido
+- **Motor de IA local** (`backend/src/lib/nlp.ts`, `matching.ts`): NLP clásico con
+  normalización en español (acentos, stopwords, stemming ligero, sinónimos del dominio),
+  TF-IDF + similitud de coseno, y señales de categoría/ubicación/fecha. Con pruebas.
+- **Búsqueda semántica** (`POST /api/ai/search`): el colaborador describe el objeto en
+  lenguaje natural y recibe los encontrados ordenados por relevancia (0–100%).
+- **Emparejado perdido↔encontrado** (`GET /api/ai/match/:lostReportId`): sugiere objetos
+  encontrados que podrían corresponder a un perdido, con porcentaje y motivos.
+- Frontend: caja de **Búsqueda inteligente** en el Muro y panel **"Ver posibles
+  coincidencias"** en cada objeto perdido de "Mis objetos".
+- Contratos en `@laf/shared`: `ScoredFoundItem`, `SemanticSearchRequest/Response`,
+  `MatchSuggestionsResponse`.
+
+### Notas
+- Toda la IA corre en el servidor; **no** se usan proveedores externos ni API keys, y no se
+  envían datos a terceros. La capa está aislada para poder migrar a embeddings más adelante.
+
+---
+
+
 Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).

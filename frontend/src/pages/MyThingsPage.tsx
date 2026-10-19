@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
+import { MatchSuggestions } from '../components/MatchSuggestions';
 import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
 import { api, ApiRequestError } from '../lib/api';
 
@@ -80,7 +81,13 @@ export function MyThingsPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {tab === 'found'
             ? found.map((i) => <FoundItemCard key={i.id} item={i} />)
-            : lost.map((i) => <LostReportCard key={i.id} item={i} />)}
+            : lost.map((i) => (
+                // Cada objeto perdido propio muestra sus posibles coincidencias (IA).
+                <div key={i.id} className="card overflow-hidden">
+                  <LostReportCard item={i} embedded />
+                  <MatchSuggestions lostReportId={i.id} />
+                </div>
+              ))}
         </div>
       )}
     </div>

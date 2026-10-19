@@ -197,3 +197,32 @@ export interface FoundItemsQuery {
   page?: number;
   pageSize?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Búsqueda inteligente y emparejado (IA local, sin servicios externos)
+// ---------------------------------------------------------------------------
+
+/** Un objeto encontrado acompañado de su puntaje de relevancia/coincidencia. */
+export interface ScoredFoundItem {
+  item: FoundItem;
+  score: number; // 0..100
+  reasons: string[]; // motivos legibles de la coincidencia (puede ir vacío en búsqueda)
+}
+
+/** Petición de búsqueda semántica en lenguaje natural. */
+export interface SemanticSearchRequest {
+  query: string;
+  limit?: number;
+}
+
+/** Respuesta de búsqueda semántica. */
+export interface SemanticSearchResponse {
+  query: string;
+  results: ScoredFoundItem[];
+}
+
+/** Respuesta de sugerencias de coincidencia para un objeto perdido. */
+export interface MatchSuggestionsResponse {
+  lostReportId: string;
+  suggestions: ScoredFoundItem[];
+}

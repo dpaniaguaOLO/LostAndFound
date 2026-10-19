@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
+import { SmartSearch } from '../components/SmartSearch';
 import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
 import { api, ApiRequestError } from '../lib/api';
 import { useDebounce } from '../lib/useDebounce';
@@ -70,6 +71,9 @@ export function WallPage() {
           Publicar
         </Link>
       </div>
+
+      {/* Búsqueda inteligente (IA local) sobre objetos encontrados */}
+      <SmartSearch />
 
       <Tabs<Tab>
         tabs={[
