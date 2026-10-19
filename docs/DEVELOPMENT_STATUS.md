@@ -2,9 +2,9 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.4.0
+- **Versión actual**: 0.4.1
 - **Fecha**: 2026-10-19
-- **Commit más reciente**: login por número de colaborador + mobile-first (ver `git log`)
+- **Commit más reciente**: barra de navegación rediseñada + menú de usuario (ver `git log`)
 - **Última funcionalidad completada**: modo oscuro con toggle (corregido), persistencia y
   preferencia del sistema; logo legible en oscuro; superficies oscuras con tinte de marca OLO.
 

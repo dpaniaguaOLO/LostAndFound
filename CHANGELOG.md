@@ -4,6 +4,18 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.4.1] - 2026-10-19
+
+### Cambiado
+- **Barra de navegación rediseñada**: etiquetas cortas de una palabra
+  (Encontrados · Perdidos · Publicar · Reclamaciones) para que no se partan ni se
+  desalineen. Se añadió un **menú de usuario** (avatar + nombre) que agrupa
+  "Mis publicaciones" y "Cerrar sesión".
+- Se elimina la redundancia: "Mis publicaciones" ya no ocupa un espacio en la barra
+  principal; se accede desde el menú de usuario (y desde el menú móvil).
+
+---
+
 ## [0.4.0] - 2026-10-19
 
 Login por número de colaborador, ajustes de navegación, cámara y mobile-first.
