@@ -50,7 +50,7 @@ export function ClaimsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Reclamaciones</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Reclamaciones</h1>
       <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
         Gestiona las solicitudes de objetos que publicaste y las que tú hiciste.
       </p>

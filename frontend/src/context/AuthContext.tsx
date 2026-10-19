@@ -12,8 +12,8 @@ import { api, tokenStore } from '../lib/api';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (body: LoginRequest) => Promise<void>;
-  register: (body: RegisterRequest) => Promise<void>;
+  login: (body: LoginRequest, remember?: boolean) => Promise<void>;
+  register: (body: RegisterRequest, remember?: boolean) => Promise<void>;
   logout: () => void;
   isAdmin: boolean;
 }
@@ -37,15 +37,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(body: LoginRequest) {
+  async function login(body: LoginRequest, remember = true) {
     const res = await api<AuthResponse>('/auth/login', { method: 'POST', body, auth: false });
-    tokenStore.set(res.token);
+    tokenStore.set(res.token, remember);
     setUser(res.user);
   }
 
-  async function register(body: RegisterRequest) {
+  async function register(body: RegisterRequest, remember = true) {
     const res = await api<AuthResponse>('/auth/register', { method: 'POST', body, auth: false });
-    tokenStore.set(res.token);
+    tokenStore.set(res.token, remember);
     setUser(res.user);
   }
 

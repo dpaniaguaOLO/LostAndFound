@@ -29,7 +29,7 @@ export function PublishPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Publicar objeto encontrado</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Publicar objeto encontrado</h1>
       <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
         Registra un objeto que encontraste para que su dueño pueda recuperarlo.
       </p>

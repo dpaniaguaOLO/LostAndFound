@@ -26,7 +26,7 @@ export const router = createBrowserRouter([
       { path: 'objetos/:id', element: <FoundItemDetailPage /> },
       { path: 'perdidos', element: <LostReportsPage /> },
       { path: 'publicar', element: <PublishPage /> },
-      { path: 'mis-cosas', element: <MyThingsPage /> },
+      { path: 'mis-publicaciones', element: <MyThingsPage /> },
       { path: 'reclamaciones', element: <ClaimsPage /> },
       { path: 'notificaciones', element: <NotificationsPage /> },
       {

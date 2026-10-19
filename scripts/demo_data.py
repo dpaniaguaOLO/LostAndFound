@@ -21,13 +21,13 @@ def req(method, path, token=None, body=None):
         return e.code, json.loads(e.read().decode())
 
 
-def login(email, pw):
-    _, d = req("POST", "/auth/login", body={"email": email, "password": pw})
+def login(employee_id, pw):
+    _, d = req("POST", "/auth/login", body={"employeeId": employee_id, "password": pw})
     return d["token"]
 
 
-emp = login("empleado@empresa.com", "password123")
-adm = login("admin@empresa.com", "password123")
+emp = login("2002", "password123")
+adm = login("1001", "password123")
 
 # Objeto publicado por el admin (llaves) para que el empleado lo reclame.
 _, items = req("GET", "/found-items", token=emp)

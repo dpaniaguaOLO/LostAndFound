@@ -14,13 +14,14 @@ authRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(registerSchema, req.body);
-    const existing = await prisma.user.findUnique({ where: { email: body.email } });
-    if (existing) throw conflict('Ya existe un usuario con ese email');
+    const existing = await prisma.user.findUnique({ where: { employeeId: body.employeeId } });
+    if (existing) throw conflict('Ya existe un usuario con ese número de colaborador');
 
     const user = await prisma.user.create({
       data: {
         name: body.name,
-        email: body.email,
+        employeeId: body.employeeId,
+        email: body.email ?? null,
         passwordHash: await hashPassword(body.password),
         role: 'EMPLOYEE',
       },
@@ -36,8 +37,8 @@ authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(loginSchema, req.body);
-    const user = await prisma.user.findUnique({ where: { email: body.email } });
-    // Mensaje genérico para no revelar si el email existe.
+    const user = await prisma.user.findUnique({ where: { employeeId: body.employeeId } });
+    // Mensaje genérico para no revelar si el número de colaborador existe.
     if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
       throw unauthorized('Credenciales incorrectas');
     }

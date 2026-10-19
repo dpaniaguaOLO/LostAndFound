@@ -49,7 +49,7 @@ export function NotificationsPage() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Notificaciones</h1>
+          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Notificaciones</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">{unread} sin leer</p>
         </div>
         {unread > 0 && (

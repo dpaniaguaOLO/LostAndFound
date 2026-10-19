@@ -16,14 +16,19 @@ export const ITEM_CATEGORIES = [
 const categorySchema = z.enum(ITEM_CATEGORIES);
 
 export const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
+  employeeId: z.string().min(1, 'El número de colaborador es obligatorio').max(50),
   password: z.string().min(1, 'La contraseña es obligatoria'),
 });
 
 export const registerSchema = z.object({
   name: z.string().min(2, 'El nombre es demasiado corto').max(120),
-  email: z.string().email('Email inválido'),
+  employeeId: z
+    .string()
+    .min(1, 'El número de colaborador es obligatorio')
+    .max(50)
+    .regex(/^[A-Za-z0-9._-]+$/, 'Número de colaborador con caracteres no válidos'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(200),
+  email: z.string().email('Email inválido').optional(),
 });
 
 export const createFoundItemSchema = z.object({

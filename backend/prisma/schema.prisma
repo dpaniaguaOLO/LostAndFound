@@ -14,7 +14,8 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   name         String
-  email        String   @unique
+  employeeId   String   @unique // número de colaborador (identificador de acceso)
+  email        String?  @unique // opcional; ya no se usa para iniciar sesión
   passwordHash String
   role         String   @default("EMPLOYEE") // EMPLOYEE | ADMIN
   createdAt    DateTime @default(now())

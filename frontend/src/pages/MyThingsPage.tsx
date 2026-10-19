@@ -37,9 +37,9 @@ export function MyThingsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Mis cosas</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Mis publicaciones</h1>
       <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-        Tus objetos publicados y tus reportes de objetos perdidos.
+        Tus objetos encontrados publicados y tus reportes de objetos perdidos.
       </p>
 
       <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-olo-dark-800 dark:bg-olo-dark-900">

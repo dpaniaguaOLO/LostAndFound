@@ -2,10 +2,24 @@ import type { ApiError } from '@laf/shared';
 
 const TOKEN_KEY = 'laf.token';
 
+/**
+ * Almacén del token de sesión.
+ * - "Recordar dispositivo" ON  -> localStorage (persiste al cerrar el navegador).
+ * - "Recordar dispositivo" OFF -> sessionStorage (se borra al cerrar la pestaña).
+ * Se lee de ambos para recuperar la sesión sin importar dónde quedó.
+ */
 export const tokenStore = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  get: () => localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY),
+  set: (t: string, remember = true) => {
+    // Limpia el otro almacén para no dejar copias obsoletas.
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    (remember ? localStorage : sessionStorage).setItem(TOKEN_KEY, t);
+  },
+  clear: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+  },
 };
 
 export class ApiRequestError extends Error {

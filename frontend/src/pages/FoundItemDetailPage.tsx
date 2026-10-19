@@ -92,7 +92,7 @@ export function FoundItemDetailPage() {
 
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.title}</h1>
+            <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">{item.title}</h1>
             <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
           </div>
 
@@ -120,7 +120,7 @@ export function FoundItemDetailPage() {
             <p className="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-3">
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {canClaim && (
               <button className="btn-primary" onClick={() => setClaimOpen(true)}>
                 Reclamar este objeto

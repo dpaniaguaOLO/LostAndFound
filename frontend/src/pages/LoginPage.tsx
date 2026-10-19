@@ -12,8 +12,10 @@ export function LoginPage() {
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   if (user) return <Navigate to="/" replace />;
@@ -23,9 +25,9 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       if (mode === 'login') {
-        await login({ email, password });
+        await login({ employeeId, password }, remember);
       } else {
-        await register({ name, email, password });
+        await register({ name, employeeId, password }, remember);
       }
       notify('Sesión iniciada', 'success');
       navigate('/');
@@ -39,8 +41,8 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4 dark:from-slate-900 dark:to-slate-950">
-      <div className="card w-full max-w-md p-8">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4 py-8 dark:from-slate-900 dark:to-slate-950">
+      <div className="card w-full max-w-md p-6 sm:p-8">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <Logo showWordmark={false} markClassName="h-11 w-auto" />
           <div>
@@ -51,8 +53,8 @@ export function LoginPage() {
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {mode === 'login'
-              ? 'Inicia sesión para acceder al muro de objetos'
-              : 'Crea tu cuenta de empleado'}
+              ? 'Ingresa con tu número de colaborador'
+              : 'Crea tu cuenta de colaborador'}
           </p>
         </div>
 
@@ -72,35 +74,81 @@ export function LoginPage() {
               />
             </div>
           )}
+
           <div>
-            <label className="label" htmlFor="email">
-              Correo electrónico
+            <label className="label" htmlFor="employeeId">
+              Número de colaborador
             </label>
             <input
-              id="email"
-              type="email"
+              id="employeeId"
               className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
               required
-              autoComplete="email"
+              inputMode="numeric"
+              autoComplete="username"
+              placeholder="Ej. 1001"
             />
           </div>
+
           <div>
             <label className="label" htmlFor="password">
               Contraseña
             </label>
-            <input
-              id="password"
-              type="password"
-              className="input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={mode === 'register' ? 8 : undefined}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                className="input pr-11"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={mode === 'register' ? 8 : undefined}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-olo-700 dark:text-slate-400 dark:hover:text-olo-400"
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? (
+                  // Ojo tachado
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A9.3 9.3 0 0 1 12 5c5 0 9 4.5 10 7a12.9 12.9 0 0 1-2.2 3.2M6.1 6.1C3.8 7.6 2.3 9.9 2 12c1 2.5 5 7 10 7a9.6 9.6 0 0 0 3.9-.8"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  // Ojo
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
+
+          {mode === 'login' && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-olo-600 focus:ring-olo-500 dark:border-slate-600 dark:bg-slate-800"
+              />
+              Recordar este dispositivo
+            </label>
+          )}
 
           <button className="btn-primary w-full" type="submit" disabled={submitting}>
             {submitting ? 'Procesando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
@@ -119,9 +167,9 @@ export function LoginPage() {
           )}
         </div>
 
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-olo-dark-800 dark:text-slate-400">
-          Cuentas de prueba: <strong>admin@empresa.com</strong> /{' '}
-          <strong>empleado@empresa.com</strong> — contraseña <strong>password123</strong>
+        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          Cuentas de prueba: colaborador <strong>1001</strong> (admin) /{' '}
+          <strong>2002</strong> (colaborador) — contraseña <strong>password123</strong>
         </div>
       </div>
     </div>

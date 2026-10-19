@@ -62,7 +62,7 @@ export function AdminPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-slate-800 dark:text-slate-100">Panel administrativo</h1>
+      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Panel administrativo</h1>
       <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Resumen del sistema y gestión de usuarios.</p>
 
       {/* Tarjetas de métricas inspiradas en cómo OLO presenta sus indicadores
@@ -72,8 +72,8 @@ export function AdminPage() {
           <div key={c.label} className="card overflow-hidden p-0">
             <div className="h-1 w-full bg-olo-500" />
             <div className="p-4">
-              <p className="text-3xl font-bold text-ink">{c.value}</p>
-              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+              <p className="text-3xl font-bold text-ink dark:text-slate-100">{c.value}</p>
+              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {c.label}
               </p>
             </div>

@@ -8,9 +8,9 @@ import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
   { to: '/', label: 'Muro', end: true },
-  { to: '/perdidos', label: 'Perdidos' },
+  { to: '/perdidos', label: 'Objetos perdidos' },
   { to: '/publicar', label: 'Publicar' },
-  { to: '/mis-cosas', label: 'Mis cosas' },
+  { to: '/mis-publicaciones', label: 'Mis publicaciones' },
   { to: '/reclamaciones', label: 'Reclamaciones' },
 ];
 

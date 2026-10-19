@@ -86,9 +86,11 @@ LostAndFound/
 **Base de datos**: SQLite en desarrollo (`backend/prisma/dev.db`, ignorado por git).
 Para producción se recomienda migrar a PostgreSQL (ver §G).
 
-**Autenticación**: JWT firmado con `JWT_SECRET`. El token se guarda en el frontend en
-`localStorage` (`laf.token`) y se envía en cada petición. Expiración configurable
-(`JWT_EXPIRES_IN`, por defecto 12h).
+**Autenticación**: JWT firmado con `JWT_SECRET`. El inicio de sesión es por **número de
+colaborador** (`employeeId`, único) + contraseña (el correo ya no se usa para entrar). El
+token se guarda en el frontend según "Recordar este dispositivo": `localStorage` (`laf.token`,
+persistente) si se marca, o `sessionStorage` si no. Expiración configurable (`JWT_EXPIRES_IN`,
+por defecto 12h).
 
 **Almacenamiento de imágenes**: disco local en `backend/uploads`, servido en
 `/uploads/<archivo>`. En producción debería moverse a almacenamiento privado (S3 o
@@ -138,8 +140,8 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | Método | Ruta | Auth | Cuerpo / Query | Respuesta |
 |--------|------|------|----------------|-----------|
 | GET | `/api/health` | no | — | `{ status, version }` |
-| POST | `/api/auth/register` | no | `{ name, email, password(≥8) }` | `201 { token, user }` |
-| POST | `/api/auth/login` | no | `{ email, password }` | `{ token, user }` |
+| POST | `/api/auth/register` | no | `{ name, employeeId, password(≥8), email? }` | `201 { token, user }` |
+| POST | `/api/auth/login` | no | `{ employeeId, password }` | `{ token, user }` |
 | GET | `/api/auth/me` | sí | — | `User` |
 | GET | `/api/found-items` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<FoundItem>` |
 | GET | `/api/found-items/:id` | sí | — | `FoundItem` |
@@ -176,7 +178,7 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `String`
 (SQLite no soporta enums nativos) y su conjunto de valores vive en `@laf/shared`.
 
-**User**: `id, name, email (único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
+**User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
 
 **FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, status, reporterId→User, createdAt, updatedAt`.
 - `status`: `PUBLISHED → CLAIMED → RETURNED`, o `ARCHIVED`.
@@ -303,8 +305,8 @@ npm run build:frontend       # incluye tsc --noEmit (typecheck estricto)
 npm run build:backend        # tsc
 ```
 
-**Cuentas demo** (tras el seed): `admin@empresa.com` (ADMIN) y `empleado@empresa.com`
-(EMPLOYEE), contraseña `password123`.
+**Cuentas demo** (tras el seed): número de colaborador `1001` (ADMIN) y `2002` (EMPLOYEE),
+contraseña `password123`.
 
 **Resetear la base de datos de desarrollo** (desde `backend/`):
 ```bash

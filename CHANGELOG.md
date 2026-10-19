@@ -4,6 +4,33 @@ Todas las versiones relevantes de Lost and Found se documentan en este archivo.
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y el proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## [0.4.0] - 2026-10-19
+
+Login por número de colaborador, ajustes de navegación, cámara y mobile-first.
+
+### Añadido
+- Inicio de sesión con **número de colaborador** en lugar de correo (campo `employeeId`,
+  único). El correo pasa a ser opcional.
+- En el login: **mostrar/ocultar contraseña** y **"Recordar este dispositivo"**
+  (sesión persistente en `localStorage` si se marca, en `sessionStorage` si no).
+- En "Publicar": botón **"Tomar foto"** (abre la cámara en móvil) además de "Elegir archivo",
+  con vista previa y opción de quitar la imagen.
+
+### Cambiado
+- Navegación: "Perdidos" → **"Objetos perdidos"** (muro general); se elimina "Mis cosas"
+  y se renombra a **"Mis publicaciones"** (encontrados + perdidos propios, en pestañas).
+- **Rediseño mobile-first**: cabeceras que se apilan en móvil, botones de ancho completo,
+  títulos adaptables y formularios en una columna.
+
+### Corregido
+- **Contraste del modo oscuro**: los números de las tarjetas del panel de administración
+  (y otros textos con la tinta de marca) ahora son legibles en tema oscuro.
+
+### Migración
+- `employee_id_login`: añade `employeeId` (único) y hace `email` opcional en `User`.
+
+---
+
 ## [0.3.2] - 2026-10-19
 
 ### Cambiado

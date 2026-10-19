@@ -65,7 +65,8 @@ export type ItemCategory = (typeof ITEM_CATEGORIES)[number];
 export interface User {
   id: string;
   name: string;
-  email: string;
+  employeeId: string; // número de colaborador (identificador de acceso)
+  email: string | null;
   role: UserRole;
   createdAt: string; // ISO 8601
 }
@@ -126,14 +127,15 @@ export interface Notification {
 // ---------------------------------------------------------------------------
 
 export interface LoginRequest {
-  email: string;
+  employeeId: string;
   password: string;
 }
 
 export interface RegisterRequest {
   name: string;
-  email: string;
+  employeeId: string;
   password: string;
+  email?: string;
 }
 
 export interface AuthResponse {

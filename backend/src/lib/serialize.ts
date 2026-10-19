@@ -9,7 +9,8 @@ export function serializeUser(u: AnyRecord) {
   return {
     id: u.id as string,
     name: u.name as string,
-    email: u.email as string,
+    employeeId: u.employeeId as string,
+    email: (u.email as string | null) ?? null,
     role: u.role as 'EMPLOYEE' | 'ADMIN',
     createdAt: iso(u.createdAt),
   };

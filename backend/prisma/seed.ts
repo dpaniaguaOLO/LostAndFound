@@ -8,10 +8,11 @@ async function main() {
   const passwordHash = await bcrypt.hash('password123', 12);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@empresa.com' },
+    where: { employeeId: '1001' },
     update: {},
     create: {
       name: 'Administradora Demo',
+      employeeId: '1001',
       email: 'admin@empresa.com',
       passwordHash,
       role: 'ADMIN',
@@ -19,10 +20,11 @@ async function main() {
   });
 
   const employee = await prisma.user.upsert({
-    where: { email: 'empleado@empresa.com' },
+    where: { employeeId: '2002' },
     update: {},
     create: {
       name: 'Empleado Demo',
+      employeeId: '2002',
       email: 'empleado@empresa.com',
       passwordHash,
       role: 'EMPLOYEE',
@@ -77,8 +79,8 @@ async function main() {
   }
 
   console.log('Seed completado.');
-  console.log('  admin@empresa.com / password123 (ADMIN)');
-  console.log('  empleado@empresa.com / password123 (EMPLOYEE)');
+  console.log('  N° colaborador 1001 / password123 (ADMIN)');
+  console.log('  N° colaborador 2002 / password123 (EMPLOYEE)');
 }
 
 main()

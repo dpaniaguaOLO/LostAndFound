@@ -48,14 +48,16 @@ export function WallPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800 dark:text-slate-100">Objetos encontrados</h1>
+          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
+            Objetos encontrados
+          </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Consulta lo que se ha encontrado en las instalaciones.
           </p>
         </div>
-        <Link to="/publicar" className="btn-primary">
+        <Link to="/publicar" className="btn-primary w-full sm:w-auto">
           Publicar objeto
         </Link>
       </div>

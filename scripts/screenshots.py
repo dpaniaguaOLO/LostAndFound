@@ -30,8 +30,8 @@ with sync_playwright() as p:
     time.sleep(1.5)  # deja cargar la fuente Open Sans y el logo
     shot(page, "01_login")
 
-    # Inicia sesión como admin.
-    page.fill("#email", "admin@empresa.com")
+    # Inicia sesión como admin (por número de colaborador).
+    page.fill("#employeeId", "1001")
     page.fill("#password", "password123")
     page.click("button[type=submit]")
     page.wait_for_url(BASE + "/", wait_until="networkidle")
