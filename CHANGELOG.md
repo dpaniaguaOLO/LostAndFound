@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.1] - 2026-10-19
+
+### Corregido
+- En las sugerencias de coincidencia, el nombre del objeto se cortaba cuando era largo (sobre
+  todo en las tarjetas angostas de "Mis objetos"). Se reorganizó la tarjeta: el título va
+  arriba, a todo el ancho, y la comparación de imágenes debajo. Ahora el nombre se ve completo.
+
+---
+
 ## [0.10.0] - 2026-10-19
 
 Mejoras de la vista de coincidencias y ubicación opcional.

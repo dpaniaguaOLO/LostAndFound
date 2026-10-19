@@ -148,41 +148,44 @@ export function MatchSuggestions({
                   key={s.item.id}
                   className="rounded-lg border border-slate-200 p-3 dark:border-olo-dark-800"
                 >
-                  {/* Comparación lado a lado: perdido vs encontrado */}
-                  <div className="flex items-center gap-3">
+                  {/* Título a ancho completo: así el nombre no compite con las imágenes */}
+                  <div className="flex items-start justify-between gap-2">
+                    <Link
+                      to={`/objetos/${s.item.id}`}
+                      className="block font-medium leading-snug text-slate-800 hover:text-olo-700 dark:text-slate-100 dark:hover:text-olo-400"
+                    >
+                      {s.item.title}
+                    </Link>
+                    <span className={`badge shrink-0 ${scoreClass(s.score)}`}>{s.score}%</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    {CATEGORY_LABELS[s.item.category]}
+                    {s.item.location ? ` · ${s.item.location}` : ''}
+                  </p>
+
+                  {/* Comparación de imágenes: perdido → encontrado */}
+                  <div className="mt-2 flex items-center gap-3">
                     <Thumb src={reference?.imageUrl ?? null} alt="Tu objeto" label="Perdido" />
-                    <div className="flex flex-col items-center text-slate-300 dark:text-slate-600">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                         <path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                      <span className={`badge mt-1 ${scoreClass(s.score)}`}>{s.score}%</span>
-                    </div>
+                    </span>
                     <Thumb src={s.item.imageUrl} alt={s.item.title} label="Encontrado" />
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/objetos/${s.item.id}`}
-                        className="truncate font-medium text-slate-800 hover:text-olo-700 dark:text-slate-100 dark:hover:text-olo-400"
-                      >
-                        {s.item.title}
-                      </Link>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {CATEGORY_LABELS[s.item.category]}
-                        {s.item.location ? ` · ${s.item.location}` : ''}
-                      </p>
-                      {s.reasons.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {s.reasons.map((reason) => (
-                            <span
-                              key={reason}
-                              className="badge bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300"
-                            >
-                              {reason}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
                   </div>
+
+                  {s.reasons.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {s.reasons.map((reason) => (
+                        <span
+                          key={reason}
+                          className="badge bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300"
+                        >
+                          {reason}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Desglose del % (expandible) */}
                   {s.breakdown && (
