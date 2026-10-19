@@ -55,6 +55,10 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
   - **Aviso automático**: al crear un reporte perdido (`POST /lost-reports`), se ejecuta el
     emparejado y, si la mejor coincidencia ≥55%, se notifica al dueño (`matchNotify.ts`).
   - **Asistente de búsqueda** (`assistant.ts`): intención por palabras clave, sin LLM.
+  - **Búsqueda visual ligera** (`visual.ts`, rama `feature/ia-visual`): firma de imagen
+    (dHash + histograma de color con `sharp`) guardada en `imageSignature`. Añade una señal
+    de similitud visual al emparejado cuando ambos objetos tienen foto. Sin modelos pesados
+    ni servicios externos; capa aislada para migrar a embeddings (CLIP) en el futuro.
 
 **Estructura de carpetas**
 ```
@@ -191,10 +195,11 @@ Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `S
 
 **User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
 
-**FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, status, reporterId→User, createdAt, updatedAt`.
+**FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, imageSignature?, status, reporterId→User, createdAt, updatedAt`.
 - `status`: `PUBLISHED → CLAIMED → RETURNED`, o `ARCHIVED`.
+- `imageSignature`: firma visual JSON (rama `feature/ia-visual`).
 
-**LostReport**: `id, title, description, category, location, lostAt, imageUrl?, status, reporterId→User, ...`.
+**LostReport**: `id, title, description, category, location, lostAt, imageUrl?, imageSignature?, status, reporterId→User, ...`.
 - `status`: `OPEN | MATCHED | RESOLVED | CLOSED`.
 
 **Claim**: `id, foundItemId→FoundItem, claimantId→User, message, status, reviewerId?→User, reviewNote?, ...`.

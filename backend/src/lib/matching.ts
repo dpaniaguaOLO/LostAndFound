@@ -5,6 +5,7 @@
  * motivos legibles de por qué dos objetos podrían coincidir.
  */
 import { TfIdfIndex, cosineSimilarity, tokenize } from './nlp.js';
+import { parseSignature, visualSimilarity, type VisualSignature } from './visual.js';
 
 export interface MatchableItem {
   id: string;
@@ -13,6 +14,7 @@ export interface MatchableItem {
   category: string;
   location: string;
   date: Date; // foundAt o lostAt
+  signature?: VisualSignature | null; // firma visual opcional (búsqueda por imagen)
 }
 
 export interface MatchResult<T> {
@@ -21,11 +23,14 @@ export interface MatchResult<T> {
   reasons: string[];
 }
 
-// Pesos de cada señal en el puntaje final (suman 1).
+// Pesos base (sin imagen). Suman 1.
 const W_TEXT = 0.6;
 const W_CATEGORY = 0.2;
 const W_LOCATION = 0.12;
 const W_DATE = 0.08;
+// Cuando ambos objetos tienen foto, la señal visual toma este peso y el resto
+// se reescala para seguir sumando 1. Así la imagen refuerza sin anular el texto.
+const W_VISUAL = 0.35;
 
 /** Similitud de ubicación por solapamiento de tokens (0..1). */
 function locationSim(a: string, b: string): number {
@@ -68,10 +73,24 @@ export function matchItems<T extends MatchableItem>(
     const locSim = locationSim(reference.location, c.location);
     const dSim = dateSim(reference.date, c.date);
 
-    const score01 = W_TEXT * textSim + W_CATEGORY * catSim + W_LOCATION * locSim + W_DATE * dSim;
+    // Señal visual solo si ambos tienen firma.
+    const bothHaveImage = !!reference.signature && !!c.signature;
+    const visSim = bothHaveImage ? visualSimilarity(reference.signature!, c.signature!) : 0;
+
+    let score01: number;
+    if (bothHaveImage) {
+      // Reescala los pesos base para dejar sitio a la señal visual.
+      const rest = 1 - W_VISUAL;
+      score01 =
+        W_VISUAL * visSim +
+        rest * (W_TEXT * textSim + W_CATEGORY * catSim + W_LOCATION * locSim + W_DATE * dSim);
+    } else {
+      score01 = W_TEXT * textSim + W_CATEGORY * catSim + W_LOCATION * locSim + W_DATE * dSim;
+    }
     const score = Math.round(score01 * 100);
 
     const reasons: string[] = [];
+    if (bothHaveImage && visSim > 0.72) reasons.push('Imagen parecida');
     if (textSim > 0.15) reasons.push('Descripción parecida');
     if (catSim === 1) reasons.push('Misma categoría');
     if (locSim > 0.3) reasons.push('Ubicación parecida');

@@ -6,7 +6,8 @@ import { serializeLostReport } from '../lib/serialize.js';
 import { createLostReportSchema, parseOrThrow } from '../lib/validation.js';
 import { notifyBestMatchForLost } from '../lib/matchNotify.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { computeSignature, serializeSignature } from '../lib/visual.js';
 
 export const lostReportsRouter = Router();
 
@@ -75,6 +76,16 @@ lostReportsRouter.post(
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(createLostReportSchema, req.body);
     const imageUrl = req.file ? publicUrlFor(req.file.filename) : null;
+
+    let imageSignature: string | null = null;
+    if (req.file) {
+      try {
+        imageSignature = serializeSignature(await computeSignature(diskPathFor(req.file.filename)));
+      } catch (e) {
+        console.error('[visual-signature]', e);
+      }
+    }
+
     const item = await prisma.lostReport.create({
       data: {
         title: body.title,
@@ -83,6 +94,7 @@ lostReportsRouter.post(
         location: body.location,
         lostAt: new Date(body.lostAt),
         imageUrl,
+        imageSignature,
         reporterId: req.auth!.sub,
       },
       include: reporterSelect,
@@ -98,6 +110,7 @@ lostReportsRouter.post(
       location: item.location,
       lostAt: item.lostAt,
       reporterId: item.reporterId,
+      imageSignature: item.imageSignature,
     }).catch((e) => console.error('[match-notify]', e));
 
     res.status(201).json(serializeLostReport(item));

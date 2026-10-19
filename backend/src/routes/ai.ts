@@ -4,6 +4,7 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { badRequest, notFound, forbidden } from '../lib/http.js';
 import { composeAnswer, parseIntent } from '../lib/assistant.js';
 import { matchItems, semanticSearch, type MatchableItem } from '../lib/matching.js';
+import { parseSignature } from '../lib/visual.js';
 import { serializeFoundItem, serializeLostReport } from '../lib/serialize.js';
 import { authenticate } from '../middleware/authenticate.js';
 
@@ -29,6 +30,7 @@ function toMatchable(r: {
   location: string;
   foundAt?: Date;
   lostAt?: Date;
+  imageSignature?: string | null;
 }): MatchableItem {
   return {
     id: r.id,
@@ -37,6 +39,7 @@ function toMatchable(r: {
     category: r.category,
     location: r.location,
     date: (r.foundAt ?? r.lostAt) as Date,
+    signature: parseSignature(r.imageSignature),
   };
 }
 

@@ -5,7 +5,8 @@ import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { serializeFoundItem } from '../lib/serialize.js';
 import { createFoundItemSchema, parseOrThrow } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
-import { publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { computeSignature, serializeSignature } from '../lib/visual.js';
 
 export const foundItemsRouter = Router();
 
@@ -76,6 +77,16 @@ foundItemsRouter.post(
     const body = parseOrThrow(createFoundItemSchema, req.body);
     const imageUrl = req.file ? publicUrlFor(req.file.filename) : null;
 
+    // Firma visual para la búsqueda por imagen (no bloquea si falla el cómputo).
+    let imageSignature: string | null = null;
+    if (req.file) {
+      try {
+        imageSignature = serializeSignature(await computeSignature(diskPathFor(req.file.filename)));
+      } catch (e) {
+        console.error('[visual-signature]', e);
+      }
+    }
+
     const item = await prisma.foundItem.create({
       data: {
         title: body.title,
@@ -84,6 +95,7 @@ foundItemsRouter.post(
         location: body.location,
         foundAt: new Date(body.foundAt),
         imageUrl,
+        imageSignature,
         reporterId: req.auth!.sub,
       },
       include: reporterSelect,

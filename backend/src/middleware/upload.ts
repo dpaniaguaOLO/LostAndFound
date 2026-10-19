@@ -32,3 +32,6 @@ export const uploadImage = multer({
 
 /** Devuelve la URL pública relativa de un archivo subido. */
 export const publicUrlFor = (filename: string) => `/uploads/${filename}`;
+
+/** Ruta absoluta en disco de un archivo subido (para procesarlo, p. ej. firma visual). */
+export const diskPathFor = (filename: string) => path.join(config.uploadDir, filename);
