@@ -1,0 +1,97 @@
+// Esquema de datos de Lost and Found.
+// Base de datos de desarrollo: SQLite. Para producción se recomienda PostgreSQL
+// (cambiar el provider y DATABASE_URL). Documentado en CLAUDE.md -> Decisiones técnicas.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("EMPLOYEE") // EMPLOYEE | ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  foundItems    FoundItem[]
+  lostReports   LostReport[]
+  claims        Claim[]        @relation("ClaimClaimant")
+  reviewedClaims Claim[]       @relation("ClaimReviewer")
+  notifications Notification[]
+}
+
+model FoundItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String   // ver ItemCategory en @laf/shared
+  location    String
+  foundAt     DateTime
+  imageUrl    String?
+  status      String   @default("PUBLISHED") // PUBLISHED | CLAIMED | RETURNED | ARCHIVED
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  claims      Claim[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+}
+
+model LostReport {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String
+  location    String
+  lostAt      DateTime
+  imageUrl    String?
+  status      String   @default("OPEN") // OPEN | MATCHED | RESOLVED | CLOSED
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+}
+
+model Claim {
+  id          String   @id @default(cuid())
+  foundItemId String
+  foundItem   FoundItem @relation(fields: [foundItemId], references: [id])
+  claimantId  String
+  claimant    User     @relation("ClaimClaimant", fields: [claimantId], references: [id])
+  message     String
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  reviewerId  String?
+  reviewer    User?    @relation("ClaimReviewer", fields: [reviewerId], references: [id])
+  reviewNote  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([foundItemId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  type          String   // ver NotificationType en @laf/shared
+  title         String
+  body          String
+  read          Boolean  @default(false)
+  relatedItemId String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, read])
+}

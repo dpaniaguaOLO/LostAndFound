@@ -1,0 +1,47 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Builds
+dist/
+build/
+**/dist/
+**/build/
+
+# Variables de entorno (NUNCA commitear secretos)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Base de datos local (SQLite dev)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/prisma/dev.db*
+
+# Archivos subidos por usuarios (fotografías) — se conserva la carpeta vacía
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Caché de herramientas
+.vite/
+.cache/
+coverage/
+.eslintcache
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json

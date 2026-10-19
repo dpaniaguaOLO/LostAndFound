@@ -1,0 +1,197 @@
+/**
+ * @laf/shared
+ * Fuente única de verdad para los tipos y contratos compartidos entre
+ * el frontend (Kiro) y el backend (Claude).
+ *
+ * Mantener sincronizado con:
+ *  - backend/prisma/schema.prisma (modelo de datos)
+ *  - CLAUDE.md (contratos de API)
+ */
+
+// ---------------------------------------------------------------------------
+// Enumeraciones / estados
+// ---------------------------------------------------------------------------
+
+/** Roles de usuario. Determinan permisos en el servidor. */
+export type UserRole = 'EMPLOYEE' | 'ADMIN';
+
+/** Estado de un objeto encontrado publicado en el muro. */
+export type FoundItemStatus =
+  | 'PUBLISHED' // visible en el muro, sin reclamaciones aprobadas
+  | 'CLAIMED' // una reclamación fue aprobada; pendiente de entrega
+  | 'RETURNED' // entregado a su dueño; archivado en el historial
+  | 'ARCHIVED'; // retirado del muro por un administrador
+
+/** Estado de un reporte de objeto perdido. */
+export type LostReportStatus =
+  | 'OPEN' // búsqueda activa
+  | 'MATCHED' // vinculado a un objeto encontrado
+  | 'RESOLVED' // el dueño recuperó el objeto
+  | 'CLOSED'; // cerrado sin resolución
+
+/** Estado de una solicitud de reclamación. */
+export type ClaimStatus =
+  | 'PENDING' // esperando revisión
+  | 'APPROVED' // aprobada; coordinar entrega
+  | 'REJECTED' // rechazada por el revisor
+  | 'CANCELLED'; // cancelada por quien reclamó
+
+/** Tipos de notificación en la interfaz. */
+export type NotificationType =
+  | 'CLAIM_REQUESTED'
+  | 'CLAIM_APPROVED'
+  | 'CLAIM_REJECTED'
+  | 'ITEM_RETURNED'
+  | 'SYSTEM';
+
+/** Categorías sugeridas para clasificar objetos. */
+export const ITEM_CATEGORIES = [
+  'ELECTRONICS',
+  'CLOTHING',
+  'ACCESSORIES',
+  'DOCUMENTS',
+  'KEYS',
+  'BAGS',
+  'WALLET',
+  'JEWELRY',
+  'OTHER',
+] as const;
+export type ItemCategory = (typeof ITEM_CATEGORIES)[number];
+
+// ---------------------------------------------------------------------------
+// Entidades (forma pública expuesta por la API, sin campos sensibles)
+// ---------------------------------------------------------------------------
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: string; // ISO 8601
+}
+
+export interface FoundItem {
+  id: string;
+  title: string;
+  description: string;
+  category: ItemCategory;
+  location: string;
+  foundAt: string; // ISO 8601 — fecha en que se encontró
+  imageUrl: string | null;
+  status: FoundItemStatus;
+  reporter: Pick<User, 'id' | 'name'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LostReport {
+  id: string;
+  title: string;
+  description: string;
+  category: ItemCategory;
+  location: string;
+  lostAt: string; // ISO 8601
+  imageUrl: string | null;
+  status: LostReportStatus;
+  reporter: Pick<User, 'id' | 'name'>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Claim {
+  id: string;
+  foundItemId: string;
+  foundItem?: Pick<FoundItem, 'id' | 'title' | 'imageUrl' | 'status'>;
+  claimant: Pick<User, 'id' | 'name'>;
+  message: string;
+  status: ClaimStatus;
+  reviewerId: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  read: boolean;
+  relatedItemId: string | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Contratos de petición (request bodies)
+// ---------------------------------------------------------------------------
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
+export interface CreateFoundItemRequest {
+  title: string;
+  description: string;
+  category: ItemCategory;
+  location: string;
+  foundAt: string; // ISO 8601
+  // La imagen se envía como multipart/form-data en el campo "image".
+}
+
+export interface CreateLostReportRequest {
+  title: string;
+  description: string;
+  category: ItemCategory;
+  location: string;
+  lostAt: string; // ISO 8601
+}
+
+export interface CreateClaimRequest {
+  foundItemId: string;
+  message: string;
+}
+
+export interface ReviewClaimRequest {
+  status: Extract<ClaimStatus, 'APPROVED' | 'REJECTED'>;
+  reviewNote?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Contratos de respuesta genéricos
+// ---------------------------------------------------------------------------
+
+export interface ApiError {
+  error: string;
+  message: string;
+  details?: unknown;
+}
+
+export interface Paginated<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/** Parámetros de consulta del muro de objetos encontrados. */
+export interface FoundItemsQuery {
+  search?: string;
+  category?: ItemCategory;
+  status?: FoundItemStatus;
+  location?: string;
+  page?: number;
+  pageSize?: number;
+}

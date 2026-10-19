@@ -1,0 +1,24 @@
+{
+  "name": "lost-and-found",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aplicación interna para la gestión de objetos perdidos y encontrados en una empresa.",
+  "workspaces": [
+    "packages/shared",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace packages/shared && npm run build --workspace backend && npm run build --workspace frontend",
+    "build:shared": "npm run build --workspace packages/shared",
+    "build:backend": "npm run build --workspace backend",
+    "build:frontend": "npm run build --workspace frontend",
+    "test": "npm run test --workspace backend --if-present && npm run test --workspace frontend --if-present",
+    "lint": "npm run lint --workspace backend --if-present && npm run lint --workspace frontend --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
