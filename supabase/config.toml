@@ -1,0 +1,17 @@
+# Configuración de Supabase CLI para Lost and Found.
+# Docs: https://supabase.com/docs/guides/cli/config
+project_id = "lost-and-found-olo"
+
+[db]
+major_version = 15
+
+[auth]
+# Solo correo/contraseña por ahora (ver SUPABASE_SETUP.md para dominio corporativo).
+enable_signup = true
+# Ajustar al dominio del frontend/app en cada entorno.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "capacitor://localhost", "http://localhost"]
+
+[storage]
+# Límite global; el bucket item-photos define su propio límite por archivo.
+file_size_limit = "5MiB"

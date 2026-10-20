@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.11.0] - 2026-10-20
+
+Preparación para **Supabase** y **Android** (rama `feature/supabase-android`). Cambios
+progresivos y reversibles: nada del comportamiento actual cambia por defecto.
+
+### Añadido
+- **Supabase preparado (no conectado).** Migraciones SQL versionadas en
+  `supabase/migrations/`: esquema (`profiles`, `found_items`, `lost_reports`, `claims`,
+  `notifications`, `audit_logs`), funciones helper (`is_admin()`, `handle_new_user()`),
+  **RLS en todas las tablas** y bucket privado de Storage `item-photos`. No se incluyen
+  credenciales reales.
+- **Capa de datos del frontend con feature flag `VITE_DATA_BACKEND`** (`rest` | `supabase`,
+  por defecto `rest`): interfaz común en `src/services/types.ts` con dos implementaciones.
+  Cliente Supabase en `src/lib/supabase.ts` y configuración en `src/lib/config.ts`.
+- **Android con Capacitor.** `frontend/capacitor.config.ts`, proyecto nativo
+  `frontend/android/`, puente nativo `src/lib/native.ts` (StatusBar, Keyboard, botón atrás)
+  y scripts npm (`build:mobile`, `cap:sync`, `cap:open`). Plugins: core, app, status-bar,
+  keyboard.
+- **Experiencia móvil**: `viewport-fit=cover` y utilidades CSS `safe-top`/`safe-bottom`/
+  `safe-x` basadas en `env(safe-area-inset-*)`.
+- **Documentación nueva**: `docs/ARCHITECTURE.md`, `docs/SUPABASE_SETUP.md`,
+  `docs/ANDROID_SETUP.md`. `frontend/.env.example` con las variables de Supabase/API.
+
+### Cambiado
+- `frontend/src/lib/api.ts` usa `config.apiBaseUrl` para que la app Android pueda apuntar a
+  un backend remoto (en web sigue usando el proxy de Vite `/api`).
+
+### Notas
+- El login sigue siendo por **número de colaborador**: en Supabase el cliente resuelve el
+  email desde `profiles.employee_id`.
+- La IA (NLP + firma visual + asistente) permanece en el backend Express.
+- La UI aún usa `api()` directo en varias páginas; migrarla a `services` es el siguiente paso.
+
+---
+
 ## [0.10.1] - 2026-10-19
 
 ### Corregido

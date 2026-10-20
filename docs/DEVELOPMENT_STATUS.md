@@ -2,11 +2,14 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.5.0
-- **Fecha**: 2026-10-19
-- **Commit más reciente**: reestructuración de módulos (Muro/Mis objetos/Publicar) (ver `git log`)
-- **Última funcionalidad completada**: modo oscuro con toggle (corregido), persistencia y
-  preferencia del sistema; logo legible en oscuro; superficies oscuras con tinte de marca OLO.
+- **Versión actual**: 0.11.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Fecha**: 2026-10-20
+- **Commit más reciente**: preparación para Supabase y Android (ver `git log`)
+- **Última funcionalidad completada**: preparación progresiva y reversible para **Supabase**
+  (PostgreSQL + Auth + Storage, *preparado pero no conectado*) y **Android** (Capacitor).
+  Migraciones SQL + RLS + Storage, capa de datos frontend con feature flag `VITE_DATA_BACKEND`,
+  proyecto nativo `android/`, puente nativo y safe-areas. Docs nuevas: `ARCHITECTURE.md`,
+  `SUPABASE_SETUP.md`, `ANDROID_SETUP.md`.
 
 ## Estado de las pruebas
 
@@ -47,9 +50,21 @@
 - [ ] Definir infraestructura y pipeline de despliegue.
 - [ ] Revisión de seguridad (tokens, cabeceras, auditoría de dependencias).
 
+## Pendiente de configuración del usuario (Supabase / Android)
+
+- [ ] **Supabase**: crear proyecto, copiar URL + anon key, aplicar las 4 migraciones,
+  decidir modelo de auth (email corporativo vs sintético), rellenar `frontend/.env` y
+  cambiar `VITE_DATA_BACKEND=supabase`. Ver `docs/SUPABASE_SETUP.md`.
+- [ ] **Android**: instalar Android Studio + SDK + JDK 17, compilar y probar en
+  emulador/teléfono. Ver `docs/ANDROID_SETUP.md`.
+- [ ] Migrar las páginas que aún usan `api()` directo a la capa `services` para completar
+  la abstracción del backend de datos.
+
 ## Bloqueos actuales
 
-- Ninguno. El entorno local está operativo (Node, npm y Git disponibles).
+- Ninguno técnico en el repo. Para avanzar en Supabase hacen falta credenciales del usuario;
+  para compilar Android hace falta Android Studio/JDK (no presentes en este entorno, por lo
+  que la app **no ha sido compilada ni probada en un dispositivo** desde aquí).
 
 ## Notas de entorno
 
@@ -57,4 +72,4 @@
   en el `PATH` de la terminal; añadirlo a la sesión si `git` no se reconoce.
 - Identidad de commits configurada **a nivel de repositorio** como
   `dpaniaguaOLO <dpaniagua@ologistics.com>` (la configuración global del equipo no se modificó).
-- El `push` a un remoto todavía no está configurado ni autorizado.
+- El `push` a un remoto todavía no está autorizado para esta tarea.

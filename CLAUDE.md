@@ -108,9 +108,33 @@ por defecto 12h).
 `/uploads/<archivo>`. En producción debería moverse a almacenamiento privado (S3 o
 equivalente) con URLs firmadas (ver §F y §G).
 
-**Servicios externos**: ninguno por ahora.
+**Servicios externos**: ninguno activo por ahora. **Supabase** está *preparado pero no
+conectado* (ver más abajo y `docs/SUPABASE_SETUP.md`).
 
 **Infraestructura / despliegue**: aún no definido.
+
+### Preparación para Supabase y Android (rama `feature/supabase-android`)
+
+El proyecto se ha preparado de forma **progresiva y reversible** para dos objetivos, sin
+romper ni eliminar nada de lo existente. Documentación completa en
+`docs/ARCHITECTURE.md`, `docs/SUPABASE_SETUP.md` y `docs/ANDROID_SETUP.md`.
+
+- **Supabase (PostgreSQL + Auth + Storage), preparado pero NO conectado.** No hay
+  credenciales reales en el repo. Piezas creadas:
+  - Migraciones SQL versionadas en `supabase/migrations/` (esquema, helpers, RLS, Storage).
+  - RLS en todas las tablas; `service_role` nunca en el cliente.
+  - Cliente JS (`frontend/src/lib/supabase.ts`) y capa de datos con interfaz común
+    (`frontend/src/services/`): implementaciones `rest` y `supabase`.
+  - Feature flag **`VITE_DATA_BACKEND`** (`rest` por defecto → no cambia nada).
+  - Login sigue por **número de colaborador**: el cliente resuelve el email desde
+    `profiles.employee_id`.
+- **Android con Capacitor** (elegido sobre React Native/Expo para reutilizar la web):
+  - `frontend/capacitor.config.ts`, proyecto nativo en `frontend/android/`.
+  - Puente nativo `frontend/src/lib/native.ts` (StatusBar, Keyboard, botón atrás); *no-op*
+    en web. Safe-areas vía `viewport-fit=cover` + utilidades CSS `safe-*`.
+  - Scripts: `build:mobile`, `cap:sync`, `cap:open`.
+- **La IA (NLP + firma visual + asistente) se queda en el backend Express.** Es cómputo,
+  no SQL; las operaciones con privilegios irían en Edge Functions (`service_role`).
 
 ---
 
@@ -284,7 +308,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.1.0 (ver `VERSION`).
+- **Versión**: 0.11.0 (ver `VERSION`). Rama `feature/supabase-android`: preparación para
+  Supabase (no conectado) y Android (Capacitor). La rama `main` iba por 0.10.1.
 - **Último commit relevante**: ver `git log` / `CHANGELOG.md` (primer release 0.1.0).
 - **Terminado**: monorepo, shared, backend completo (auth, found-items, lost-reports,
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
