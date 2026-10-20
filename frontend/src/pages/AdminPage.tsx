@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
+import { CreateUserCard } from '../components/CreateUserCard';
 import { PasswordResetCard } from '../components/PasswordResetCard';
 import { ErrorState, ItemImage, Spinner, StatusBadge, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
@@ -108,6 +109,7 @@ export function AdminPage() {
     return (
       <div>
         <ErrorState message={error} onRetry={loadOverview} />
+        <CreateUserCard />
         <PasswordResetCard />
       </div>
     );
@@ -198,6 +200,9 @@ export function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Alta de colaborador por el admin (no hay auto-registro) */}
+          <CreateUserCard onCreated={(u) => setUsers((prev) => [u, ...prev])} />
 
           {/* Restablecer contraseña de un colaborador (por número) */}
           <PasswordResetCard />

@@ -55,3 +55,11 @@ export function syntheticEmail(employeeId: string): string {
 
 /** ¿Debe la app usar Supabase como backend de datos? */
 export const useSupabase = config.dataBackend === 'supabase' && config.supabase.configured;
+
+/**
+ * ¿Se permite el auto-registro desde la pantalla de login?
+ * En modo Supabase (app interna, opción 2 con email sintético) las altas las hace
+ * un administrador, así que el auto-registro queda deshabilitado. En modo REST se
+ * mantiene el comportamiento original.
+ */
+export const allowSelfRegister = !useSupabase;

@@ -3,7 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { ApiRequestError } from '../lib/api';
+import { allowSelfRegister } from '../lib/config';
+import { getErrorMessage } from '../lib/errors';
 
 export function LoginPage() {
   const { user, login, register } = useAuth();
@@ -32,9 +33,7 @@ export function LoginPage() {
       notify('Sesión iniciada', 'success');
       navigate('/');
     } catch (err) {
-      const message =
-        err instanceof ApiRequestError ? err.message : 'No se pudo completar la operación';
-      notify(message, 'error');
+      notify(getErrorMessage(err, 'No se pudo completar la operación'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -155,17 +154,23 @@ export function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
-          {mode === 'login' ? (
-            <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('register')}>
-              ¿No tienes cuenta? Regístrate
-            </button>
-          ) : (
-            <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('login')}>
-              ¿Ya tienes cuenta? Inicia sesión
-            </button>
-          )}
-        </div>
+        {allowSelfRegister ? (
+          <div className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+            {mode === 'login' ? (
+              <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('register')}>
+                ¿No tienes cuenta? Regístrate
+              </button>
+            ) : (
+              <button className="text-olo-700 hover:underline dark:text-olo-400" onClick={() => setMode('login')}>
+                ¿Ya tienes cuenta? Inicia sesión
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
+            ¿Sin acceso? Pide a un administrador que cree tu cuenta.
+          </p>
+        )}
 
         <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           Cuentas de prueba: colaborador <strong>1001</strong> (admin) /{' '}

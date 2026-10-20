@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.18.0] - 2026-10-20
+
+Modelo de alta de usuarios por administrador (app interna): se quita el auto-registro en
+modo Supabase y el admin crea las cuentas.
+
+### Cambiado
+- **Sin auto-registro en modo Supabase.** La pantalla de login ya no ofrece "Regístrate"
+  cuando el backend es Supabase (flag `allowSelfRegister`, true solo en modo `rest`). Coherente
+  con la opción 2 (email sintético `@lostandfound.olo`, sin confirmación por correo): las altas
+  las hace un admin. En modo `rest` se conserva el registro.
+
+### Añadido
+- **Crear colaborador desde el panel admin.** Nuevo endpoint `POST /admin/users` en la Edge
+  Function `api` (usa la Auth Admin API con `service_role` y `email_confirm`, ajusta perfil y
+  rol, audita) y en el backend Express (paridad). Formulario `CreateUserCard` en el panel
+  (número, nombre, contraseña, rol), con alta inmediata usable para iniciar sesión.
+
+### Notas
+- Requiere **redesplegar** la Edge Function: `supabase functions deploy api` (ya desplegada).
+- Verificado end-to-end: el admin crea un colaborador y este inicia sesión de inmediato.
+
+---
+
 ## [0.17.0] - 2026-10-20
 
 Auditoría e implementación de seguridad (20 medidas). Detalle, verificación y pasos

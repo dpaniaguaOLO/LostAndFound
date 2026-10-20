@@ -28,6 +28,13 @@ export interface AdminService {
   resetUserPassword(employeeId: string, newPassword: string): Promise<void>;
   stats(): Promise<AdminStats>;
   users(): Promise<User[]>;
+  /** Crea un colaborador (alta por admin). */
+  createUser(input: {
+    employeeId: string;
+    name: string;
+    password: string;
+    role: 'ADMIN' | 'EMPLOYEE';
+  }): Promise<User>;
   setRole(userId: string, role: 'ADMIN' | 'EMPLOYEE'): Promise<User>;
   audit(limit?: number): Promise<AuditEntry[]>;
   allClaims(): Promise<Claim[]>;
@@ -90,6 +97,7 @@ const supabaseAdmin: AdminService = {
   },
   stats: () => invokeEdge<AdminStats>('GET', '/admin/stats'),
   users: () => invokeEdge<User[]>('GET', '/admin/users'),
+  createUser: (input) => invokeEdge<User>('POST', '/admin/users', { ...input }),
   setRole: (userId, role) =>
     invokeEdge<User>('PATCH', `/admin/users/${userId}/role`, { role }),
   audit: (limit = 100) => invokeEdge<AuditEntry[]>('GET', `/admin/audit?limit=${limit}`),
@@ -109,6 +117,7 @@ const restAdmin: AdminService = {
   },
   stats: () => api<AdminStats>('/admin/stats'),
   users: () => api<User[]>('/admin/users'),
+  createUser: (input) => api<User>('/admin/users', { method: 'POST', body: { ...input } }),
   setRole: (userId, role) =>
     api<User>(`/admin/users/${userId}/role`, { method: 'PATCH', body: { role } }),
   audit: (limit = 100) => api<AuditEntry[]>(`/admin/audit?limit=${limit}`),

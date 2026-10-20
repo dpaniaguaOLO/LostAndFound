@@ -162,3 +162,30 @@ adminRouter.post(
     res.json({ ok: true });
   }),
 );
+
+// POST /api/admin/users — alta de colaborador por un admin (modo REST).
+adminRouter.post(
+  '/users',
+  asyncHandler(async (req, res) => {
+    const employeeId = String(req.body?.employeeId ?? '').trim();
+    const name = String(req.body?.name ?? '').trim();
+    const password = String(req.body?.password ?? '');
+    const role = req.body?.role === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE';
+    if (!/^[A-Za-z0-9._-]{1,50}$/.test(employeeId) || name.length < 2 || password.length < 8) {
+      throw badRequest('Número, nombre (≥2) y contraseña (≥8) válidos requeridos');
+    }
+    const dup = await prisma.user.findUnique({ where: { employeeId } });
+    if (dup) throw badRequest('Ese número de colaborador ya existe');
+    const user = await prisma.user.create({
+      data: { employeeId, name, role, passwordHash: await hashPassword(password) },
+    });
+    await writeAudit(
+      req.auth!.sub,
+      'USER_ROLE_CHANGED',
+      'User',
+      user.id,
+      `Creó al colaborador ${name} (N° ${employeeId}) como ${role === 'ADMIN' ? 'administrador' : 'empleado'}`,
+    );
+    res.status(201).json(serializeUser(user));
+  }),
+);

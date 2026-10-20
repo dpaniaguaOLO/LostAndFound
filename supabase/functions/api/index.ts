@@ -379,6 +379,58 @@ Deno.serve(async (req: Request) => {
       return json((data ?? []).map(serializeUser));
     }
 
+    // POST /admin/users — alta de colaborador por un admin (opción 2: email sintético).
+    if (method === 'POST' && path === '/admin/users') {
+      const body = await req.json().catch(() => ({}));
+      const employeeId = String(body.employeeId ?? '').trim();
+      const name = String(body.name ?? '').trim();
+      const password = String(body.password ?? '');
+      const role = body.role === 'ADMIN' ? 'ADMIN' : 'EMPLOYEE';
+      if (!/^[A-Za-z0-9._-]{1,50}$/.test(employeeId) || name.length < 2 || password.length < 8) {
+        return json(
+          { error: 'BAD_REQUEST', message: 'Número, nombre (≥2) y contraseña (≥8) válidos requeridos' },
+          400,
+        );
+      }
+      // ¿Ya existe un colaborador con ese número?
+      const { data: dup } = await sb
+        .from('profiles')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .maybeSingle();
+      if (dup) return json({ error: 'CONFLICT', message: 'Ese número de colaborador ya existe' }, 409);
+
+      const email = `${employeeId}@${Deno.env.get('AUTH_EMAIL_DOMAIN') ?? 'lostandfound.olo'}`;
+      const { data: createdUser, error: createErr } = await sb.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, employee_id: employeeId },
+      });
+      if (createErr || !createdUser?.user) {
+        return json({ error: 'CREATE_FAILED', message: createErr?.message ?? 'No se pudo crear' }, 500);
+      }
+      // El trigger handle_new_user crea el perfil como EMPLOYEE; ajusta datos y rol.
+      await sb
+        .from('profiles')
+        .update({ name, employee_id: employeeId, role })
+        .eq('id', createdUser.user.id);
+      await writeAudit(
+        sb,
+        caller.id,
+        'USER_ROLE_CHANGED',
+        'User',
+        createdUser.user.id,
+        `Creó al colaborador ${name} (N° ${employeeId}) como ${role === 'ADMIN' ? 'administrador' : 'empleado'}`,
+      );
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('*')
+        .eq('id', createdUser.user.id)
+        .single();
+      return json(serializeUser(profile as Row), 201);
+    }
+
     // PATCH /admin/users/:id/role
     if (method === 'PATCH' && /^\/admin\/users\/[^/]+\/role$/.test(path)) {
       const id = path.split('/')[3];
