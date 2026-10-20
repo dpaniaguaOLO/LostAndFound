@@ -1,8 +1,9 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { AssistantResponse, FoundItem, LostReport } from '@laf/shared';
-import { api, ApiRequestError } from '../lib/api';
+import type { FoundItem, LostReport } from '@laf/shared';
+import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
+import { aiService } from '../services/ai';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -40,10 +41,7 @@ export function Assistant() {
     setInput('');
     setLoading(true);
     try {
-      const res = await api<AssistantResponse>('/ai/assistant', {
-        method: 'POST',
-        body: { question: q },
-      });
+      const res = await aiService.assistant(q);
       setMessages((m) => [
         ...m,
         {
@@ -58,7 +56,7 @@ export function Assistant() {
         ...m,
         {
           role: 'assistant',
-          text: err instanceof ApiRequestError ? err.message : 'No pude procesar la pregunta.',
+          text: getErrorMessage(err, 'No pude procesar la pregunta.'),
         },
       ]);
     } finally {

@@ -18,6 +18,8 @@ model User {
   email        String?  @unique // opcional; ya no se usa para iniciar sesión
   passwordHash String
   role         String   @default("EMPLOYEE") // EMPLOYEE | ADMIN
+  // Se incrementa al restablecer la contraseña: invalida todos los JWT emitidos antes.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -98,6 +100,15 @@ model Notification {
   createdAt     DateTime @default(now())
 
   @@index([userId, read])
+}
+
+// JWT revocados antes de caducar (cierre de sesión). Se guarda solo el `jti`
+// (identificador aleatorio del token), nunca el token. Se purgan al expirar.
+model RevokedToken {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 // Registro de auditoría: eventos clave para trazabilidad (devoluciones,

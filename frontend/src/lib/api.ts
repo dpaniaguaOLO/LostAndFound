@@ -1,4 +1,5 @@
 import type { ApiError } from '@laf/shared';
+import { config } from './config';
 
 const TOKEN_KEY = 'laf.token';
 
@@ -42,8 +43,9 @@ interface RequestOptions {
 }
 
 /**
- * Cliente HTTP único para hablar con el backend.
- * Usa el proxy de Vite (/api -> http://localhost:4000) en desarrollo.
+ * Cliente HTTP único para hablar con el backend REST.
+ * - Web/desarrollo: `config.apiBaseUrl` vacío -> usa el proxy de Vite (/api -> :4000).
+ * - Android (Capacitor): `config.apiBaseUrl` apunta a la URL real del backend.
  */
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, formData, auth = true } = options;
@@ -62,7 +64,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     payload = JSON.stringify(body);
   }
 
-  const res = await fetch(`/api${path}`, { method, headers, body: payload });
+  const res = await fetch(`${config.apiBaseUrl}/api${path}`, { method, headers, body: payload });
 
   if (res.status === 204) return undefined as T;
 

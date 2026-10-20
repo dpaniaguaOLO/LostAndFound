@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { Claim, FoundItem } from '@laf/shared';
+import type { FoundItem } from '@laf/shared';
 import { ConfirmDialog, ErrorState, ItemImage, Spinner, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS, FOUND_STATUS_LABELS, formatDate } from '../lib/format';
+import { services } from '../services';
 
 export function FoundItemDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,11 +29,10 @@ export function FoundItemDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    api<FoundItem>(`/found-items/${id}`)
+    services.foundItems
+      .get(id)
       .then(setItem)
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar el objeto'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar el objeto')))
       .finally(() => setLoading(false));
   }
 
@@ -51,15 +51,12 @@ export function FoundItemDetailPage() {
     if (!item) return;
     setSubmitting(true);
     try {
-      await api<Claim>('/claims', {
-        method: 'POST',
-        body: { foundItemId: item.id, message },
-      });
+      await services.claims.create(item.id, message);
       notify('Solicitud de reclamación enviada', 'success');
       setClaimOpen(false);
       setMessage('');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo enviar', 'error');
+      notify(getErrorMessage(err, 'No se pudo enviar'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -68,11 +65,11 @@ export function FoundItemDetailPage() {
   async function markReturned() {
     if (!item) return;
     try {
-      const updated = await api<FoundItem>(`/found-items/${item.id}/return`, { method: 'PATCH' });
+      const updated = await services.foundItems.markReturned(item.id);
       setItem(updated);
       notify('Objeto marcado como devuelto', 'success');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar', 'error');
+      notify(getErrorMessage(err, 'No se pudo actualizar'), 'error');
     } finally {
       setConfirmReturn(false);
     }
@@ -82,11 +79,11 @@ export function FoundItemDetailPage() {
   async function archiveItem() {
     if (!item) return;
     try {
-      const updated = await api<FoundItem>(`/found-items/${item.id}/archive`, { method: 'PATCH' });
+      const updated = await services.foundItems.archive(item.id);
       setItem(updated);
       notify('Objeto archivado', 'success');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo archivar', 'error');
+      notify(getErrorMessage(err, 'No se pudo archivar'), 'error');
     } finally {
       setConfirmArchive(false);
     }
@@ -95,11 +92,11 @@ export function FoundItemDetailPage() {
   async function deleteItem() {
     if (!item) return;
     try {
-      await api(`/found-items/${item.id}`, { method: 'DELETE' });
+      await services.foundItems.remove(item.id);
       notify('Objeto eliminado', 'success');
       navigate('/');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo eliminar', 'error');
+      notify(getErrorMessage(err, 'No se pudo eliminar'), 'error');
       setConfirmDelete(false);
     }
   }

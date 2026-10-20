@@ -1,6 +1,8 @@
 // Convierte registros de Prisma a la forma pública de la API (@laf/shared).
 // Centraliza el formateo de fechas (ISO) y evita exponer campos sensibles como passwordHash.
 
+import { signUploadUrl } from './fileUrls.js';
+
 type AnyRecord = Record<string, unknown>;
 
 const iso = (d: unknown) => (d instanceof Date ? d.toISOString() : (d as string));
@@ -12,6 +14,8 @@ export function serializeUser(u: AnyRecord) {
     employeeId: u.employeeId as string,
     email: (u.email as string | null) ?? null,
     role: u.role as 'EMPLOYEE' | 'ADMIN',
+    // El backend REST (Prisma) no modela desactivación; sus usuarios son siempre activos.
+    active: (u.active as boolean | undefined) ?? true,
     createdAt: iso(u.createdAt),
   };
 }
@@ -25,7 +29,7 @@ export function serializeFoundItem(i: AnyRecord) {
     category: i.category as string,
     location: i.location as string,
     foundAt: iso(i.foundAt),
-    imageUrl: (i.imageUrl as string | null) ?? null,
+    imageUrl: signUploadUrl(i.imageUrl as string | null),
     status: i.status as string,
     reporter: reporter
       ? { id: reporter.id as string, name: reporter.name as string }
@@ -44,7 +48,7 @@ export function serializeLostReport(i: AnyRecord) {
     category: i.category as string,
     location: i.location as string,
     lostAt: iso(i.lostAt),
-    imageUrl: (i.imageUrl as string | null) ?? null,
+    imageUrl: signUploadUrl(i.imageUrl as string | null),
     status: i.status as string,
     reporter: reporter
       ? { id: reporter.id as string, name: reporter.name as string }
@@ -64,7 +68,7 @@ export function serializeClaim(c: AnyRecord) {
       ? {
           id: foundItem.id as string,
           title: foundItem.title as string,
-          imageUrl: (foundItem.imageUrl as string | null) ?? null,
+          imageUrl: signUploadUrl(foundItem.imageUrl as string | null),
           status: foundItem.status as string,
         }
       : undefined,

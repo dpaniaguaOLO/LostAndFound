@@ -15,10 +15,16 @@
     "build:shared": "npm run build --workspace packages/shared",
     "build:backend": "npm run build --workspace backend",
     "build:frontend": "npm run build --workspace frontend",
-    "test": "npm run test --workspace backend --if-present && npm run test --workspace frontend --if-present",
+    "test": "npm run test --workspace backend --if-present && npm run test --workspace frontend --if-present && npm run test:db",
+    "test:db": "node --test supabase/tests/db.test.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "audit:prod": "npm audit --omit=dev",
     "lint": "npm run lint --workspace backend --if-present && npm run lint --workspace frontend --if-present"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17"
   }
 }

@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import type { Claim } from '@laf/shared';
 import { EmptyState, ErrorState, Spinner, StatusBadge } from '../components/ui';
 import { useToast } from '../context/ToastContext';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { CLAIM_STATUS_LABELS, formatDateTime } from '../lib/format';
+import { services } from '../services';
 
 type Tab = 'incoming' | 'mine';
 
@@ -18,11 +19,10 @@ export function ClaimsPage() {
   function load() {
     setLoading(true);
     setError(null);
-    api<Claim[]>(tab === 'incoming' ? '/claims/incoming' : '/claims/mine')
+    const request = tab === 'incoming' ? services.claims.incoming() : services.claims.mine();
+    request
       .then(setClaims)
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar reclamaciones'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar reclamaciones')))
       .finally(() => setLoading(false));
   }
 
@@ -30,21 +30,21 @@ export function ClaimsPage() {
 
   async function review(claim: Claim, status: 'APPROVED' | 'REJECTED') {
     try {
-      await api<Claim>(`/claims/${claim.id}/review`, { method: 'PATCH', body: { status } });
+      await services.claims.review(claim.id, status);
       notify(status === 'APPROVED' ? 'Reclamación aprobada' : 'Reclamación rechazada', 'success');
       load();
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo procesar', 'error');
+      notify(getErrorMessage(err, 'No se pudo procesar'), 'error');
     }
   }
 
   async function cancel(claim: Claim) {
     try {
-      await api<Claim>(`/claims/${claim.id}/cancel`, { method: 'PATCH' });
+      await services.claims.cancel(claim.id);
       notify('Reclamación cancelada', 'success');
       load();
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo cancelar', 'error');
+      notify(getErrorMessage(err, 'No se pudo cancelar'), 'error');
     }
   }
 

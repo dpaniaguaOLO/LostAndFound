@@ -1,0 +1,4 @@
+#!/bin/sh
+# Bloquea commits con secretos. Activar una vez por clon:
+#   git config core.hooksPath .githooks
+node scripts/check-secrets.mjs --staged

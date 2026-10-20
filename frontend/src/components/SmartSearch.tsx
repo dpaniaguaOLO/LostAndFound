@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { ScoredFoundItem, SemanticSearchResponse } from '@laf/shared';
-import { api, ApiRequestError } from '../lib/api';
+import type { ScoredFoundItem } from '@laf/shared';
+import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
+import { aiService } from '../services/ai';
 
 /** Color del porcentaje de relevancia según qué tan alto sea. */
 function scoreClass(score: number): string {
@@ -27,13 +28,10 @@ export function SmartSearch() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api<SemanticSearchResponse>('/ai/search', {
-        method: 'POST',
-        body: { query: query.trim() },
-      });
+      const res = await aiService.search(query.trim());
       setResults(res.results);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'No se pudo completar la búsqueda');
+      setError(getErrorMessage(err, 'No se pudo completar la búsqueda'));
     } finally {
       setLoading(false);
     }

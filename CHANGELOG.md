@@ -1,5 +1,317 @@
 # Changelog
 
+## [0.19.0] - 2026-10-20
+
+Desactivación de colaboradores por el administrador (en vez de borrado, para conservar el
+historial).
+
+### Añadido
+- **Desactivar / reactivar colaborador** desde el panel admin. Desactivar impide iniciar
+  sesión pero conserva sus datos, publicaciones e historial; es reversible.
+  - Nueva columna `profiles.active` (migración `20261020000008`) y `my_profile()` actualizada
+    para exponerla.
+  - Endpoint `PATCH /admin/users/:id/active` en la Edge Function `api` (revoca las sesiones
+    activas al desactivar y audita `USER_ACTIVATED`/`USER_DEACTIVATED`).
+  - El login rechaza a los colaboradores desactivados (cierra la sesión recién abierta); al
+    cargar la app, una cuenta desactivada tampoco se considera sesión válida.
+  - Panel admin: columna "Estado" (Activo/Desactivado) y botones Desactivar/Reactivar, con
+    confirmación. Un admin no puede desactivarse a sí mismo.
+
+### Notas
+- Elegido **desactivar** sobre **borrar**: en una app con auditoría, eliminar se llevaría el
+  historial del colaborador. La desactivación es reversible y segura.
+- El modo REST (Prisma) no modela desactivación; ese endpoint responde `501` en modo `rest`.
+- Requiere **redesplegar** la Edge Function y **aplicar la migración 008** (ambas hechas).
+
+---
+
+## [0.18.0] - 2026-10-20
+
+Modelo de alta de usuarios por administrador (app interna): se quita el auto-registro en
+modo Supabase y el admin crea las cuentas.
+
+### Cambiado
+- **Sin auto-registro en modo Supabase.** La pantalla de login ya no ofrece "Regístrate"
+  cuando el backend es Supabase (flag `allowSelfRegister`, true solo en modo `rest`). Coherente
+  con la opción 2 (email sintético `@lostandfound.olo`, sin confirmación por correo): las altas
+  las hace un admin. En modo `rest` se conserva el registro.
+
+### Añadido
+- **Crear colaborador desde el panel admin.** Nuevo endpoint `POST /admin/users` en la Edge
+  Function `api` (usa la Auth Admin API con `service_role` y `email_confirm`, ajusta perfil y
+  rol, audita) y en el backend Express (paridad). Formulario `CreateUserCard` en el panel
+  (número, nombre, contraseña, rol), con alta inmediata usable para iniciar sesión.
+
+### Notas
+- Requiere **redesplegar** la Edge Function: `supabase functions deploy api` (ya desplegada).
+- Verificado end-to-end: el admin crea un colaborador y este inicia sesión de inmediato.
+
+---
+
+## [0.17.0] - 2026-10-20
+
+Auditoría e implementación de seguridad (20 medidas). Detalle, verificación y pasos
+externos en `docs/SECURITY.md`.
+
+### Seguridad — vulnerabilidades corregidas
+- **Imágenes públicas sin autenticación** (Express): `/uploads` era accesible por URL sin
+  sesión. Ahora solo con URL firmada (HMAC) y caducidad, emitida por la API.
+- **Cerrar sesión no invalidaba el JWT** y **resetear la contraseña no cerraba las sesiones
+  abiertas** (Express y Supabase). Nuevo `POST /api/auth/logout` (revoca el `jti`),
+  `sessionVersion` por usuario y `revoke_user_sessions()` en Supabase.
+- **Supabase: datos de perfil expuestos** — cualquier usuario leía `employee_id` (identificador
+  de login) y `email` de todos. Ahora solo `id, name, role, created_at`; el propio vía `my_profile()`.
+- **Supabase: mass assignment** — el cliente podía crear objetos ya `ARCHIVED`/`CLAIMED`, escribir
+  `image_signature`, editar título/cuerpo de sus notificaciones. Privilegios por columna.
+- **Supabase: `anon`** tenía privilegios de tabla (solo los frenaba RLS): revocados.
+- **Inyección en filtros**: el texto de búsqueda se concatenaba en `.or()` de PostgREST; y `%`/`_`
+  actuaban como comodines en Express y Supabase (buscar `%` devolvía todo).
+- **Enumeración de usuarios por tiempo** en el login (sin usuario no se ejecutaba bcrypt).
+- **EXIF/GPS** de las fotos subidas se conservaba (Express): ahora se elimina.
+- Contraseñas > 72 bytes (bcrypt las truncaba en silencio) rechazadas.
+- Android: `allowBackup` desactivado (la sesión se podía extraer con `adb backup`).
+
+### Añadido
+- Rate limiting: registro, creación de contenido, IA, admin y global por IP (Express); tabla
+  compartida `rate_limits` + `rate_limit_hit()` para las Edge Functions (IA, reclamaciones,
+  reset de contraseña). Login: además, límite por IP.
+- Validación: zod en IA/admin, rangos de fechas, longitudes; CHECK en la BD (categoría,
+  ubicación, nombre, número de colaborador, foto en carpeta propia, nota de revisión); UUID en
+  rutas de la Edge Function.
+- Cabeceras: CSP estricta en la API y en el build del frontend (hash del script inline, sin
+  `unsafe-inline`), Permissions-Policy, Referrer-Policy, HSTS en producción, CORS sin credenciales.
+- HTTPS: `FORCE_HTTPS`, `TRUST_PROXY` (no se confía en `X-Forwarded-*` por defecto).
+- `ALLOW_SELF_REGISTRATION` para cerrar el registro abierto en Express.
+- Detección de secretos: `scripts/check-secrets.mjs` (+ hook `.githooks/pre-commit`), `.gitignore`
+  ampliado (keystores, certificados, service accounts).
+- Pruebas: `backend/src/security.e2e.test.ts` (13 escenarios) y `supabase/tests/db.test.mjs` (14).
+
+### Dependencias
+- `vite` 5 → 6.4.4 (+ `esbuild` 0.25): path traversal / `fs.deny` bypass en Windows del servidor dev.
+- `react-router-dom` 6 → 7.18.4: open redirect (CVE-2025-68470). Producción: 0 vulnerabilidades.
+- `supabase-js` fijado a versión exacta en las Edge Functions.
+
+### Migraciones
+- Supabase `20261020000007_security_hardening.sql`; Prisma `20261020150000_session_security`
+  (no destructivas).
+
+## [0.16.0] - 2026-10-20
+
+Revisión de backend y seguridad (Claude), incluida la revisión del flujo de reclamaciones
+de 0.15.0.
+
+### Seguridad
+- **Supabase: un reclamante podía autoaprobar su reclamación** con un `UPDATE` directo vía
+  PostgREST (la política `claims_update_involved` lo permitía). Nueva migración
+  `20261020000005_harden_rls.sql`: el cliente ya no escribe en `claims` (solo la Edge
+  Function `api`), un no-admin solo puede pasar su objeto a `RETURNED` (no des-archivar ni
+  marcar `CLAIMED`), y no puede cambiar su `employee_id`/`email`. Requiere desplegar antes la
+  Edge Function `api` con las rutas `/claims`.
+- **Express: XSS almacenado vía `/uploads`.** La extensión se tomaba del nombre original:
+  un `x.html` declarado como `image/png` se servía como HTML. Ahora la extensión sale del
+  MIME y el contenido se valida con `sharp`.
+- **Express: el rol venía del JWT** y un admin degradado conservaba permisos hasta 12 h.
+  `authenticate` relee el rol de la BD en cada petición.
+- **Express: límite de intentos de login** (10 fallos / 15 min por IP + colaborador → 429).
+- Nunca se puede quitar el rol al último administrador (Express y trigger en Supabase).
+
+### Corregido
+- Supabase: el trigger anti-escalada bloqueaba también los cambios de rol sin usuario
+  (`service_role` de la Edge Function y `seed_users.sql`), con lo que cambiar roles desde
+  el panel en modo Supabase fallaba.
+- REST: "Archivar" un reporte perdido siempre fallaba con 400 (llamaba a `PATCH /:id` sin
+  el cuerpo completo). Nuevo `PATCH /api/lost-reports/:id/close` (admin) + auditoría
+  `LOST_REPORT_CLOSED`. El listado de perdidos oculta `CLOSED` por defecto (como Supabase).
+- REST: "Restablecer contraseña" daba 404. Nuevo `POST /api/admin/users/reset-password`.
+- Aprobación de reclamaciones segura ante concurrencia (antes dos aprobaciones simultáneas
+  podían aprobar a dos reclamantes); no se aprueba si el objeto ya no está `PUBLISHED`; los
+  rechazados en cascada reciben notificación.
+- `?page=abc`, JSON mal formado, imagen > 5 MB: antes 500, ahora 200/400/413.
+- Las imágenes se borran del disco al eliminar el objeto o si la petición falla.
+- `/api/health` devolvía la versión fija `0.10.1`; ahora lee `VERSION`.
+
+### Revisión del flujo de reclamaciones de v0.15.0 (Supabase)
+- **Revisión atómica**: nueva función SQL `review_claim()` (migración
+  `20261020000006_review_claim_rpc.sql`), que la Edge Function llama por RPC. Antes eran
+  3 escrituras sueltas sin transacción ni condición de estado: dos aprobaciones simultáneas
+  prosperaban ambas y un fallo a mitad dejaba datos incoherentes. Ahora bloquea las filas,
+  exige objeto `PUBLISHED` para aprobar, prohíbe revisar la propia reclamación, notifica
+  también a los rechazados en cascada y audita. Solo `service_role` puede ejecutarla.
+- Crear: mensaje de 2 a 1000 caracteres; un duplicado concurrente devuelve 400 (antes 500).
+- Cancelar: condicionado a `PENDING` (no pisa una revisión concurrente).
+- Pantalla Reclamaciones en modo Supabase: `mine()`/`incoming()` devolvían filas sin
+  mapear (nombres vacíos, fechas inválidas, sin título). Ahora se mapean a `Claim`, e
+  `incoming()` se limita a objetos que publiqué (antes incluía las propias, con botones de
+  aprobar).
+- Edge Function: quitar el rol al último admin → 400; `/admin/restore` con id inexistente →
+  404 (antes 500); los errores 500 ya no exponen mensajes internos de la BD.
+- Express: un admin tampoco puede revisar su propia reclamación (paridad).
+
+### Rendimiento
+- Supabase: las URLs firmadas de imágenes se piden **en lote** (`createSignedUrls`) y se
+  cachean 1 h, en el frontend y en la Edge Function (antes: 1 petición por imagen, p. ej. 12
+  por página del muro y hasta 50 en búsqueda). El id de usuario sale de la sesión local en
+  lugar de `auth.getUser()` (una llamada de red menos por operación).
+- Frontend: rutas cargadas bajo demanda y dependencias (React, Supabase) en chunks
+  cacheables. JS propio inicial: 530 KB → 58 KB (las dependencias se cachean aparte).
+
+### Pruebas
+- Tests unitarios de `rateLimit`/`query` (15 en total). Smoke E2E de 28 escenarios contra el
+  backend y prueba de las políticas RLS sobre Postgres (PGlite) antes y después de la
+  migración.
+
+---
+
+## [0.15.0] - 2026-10-20
+
+Corrige el flujo de reclamaciones en modo Supabase: ahora genera notificaciones y aplica
+las transiciones de estado, igual que el backend Express.
+
+### Corregido
+- **Notificaciones de reclamaciones con fecha inválida / inexistentes.** En modo Supabase,
+  reclamar un objeto solo insertaba la fila de la reclamación: no avisaba al dueño, no
+  cambiaba el estado del objeto al aprobar, y las notificaciones que aparecían mostraban
+  "Invalid date". La causa: el flujo privilegiado (notificar a otro usuario, cambiar estado
+  de objetos ajenos) no puede hacerse desde el cliente por RLS.
+
+### Cambiado
+- El flujo de reclamaciones (`crear`, `revisar`, `cancelar`) en modo Supabase pasa ahora por
+  la Edge Function `api`, que corre con `service_role` y replica el comportamiento del
+  backend Express:
+  - Al **crear**: valida (objeto disponible, no propio, sin duplicados pendientes) y notifica
+    al dueño (`CLAIM_REQUESTED`).
+  - Al **aprobar**: marca el objeto como `CLAIMED`, rechaza en cascada las demás reclamaciones
+    pendientes y notifica al reclamante (`CLAIM_APPROVED`).
+  - Al **rechazar**: notifica al reclamante (`CLAIM_REJECTED`). Registra auditoría.
+- `frontend/src/services/supabase.ts`: `claims.create/review/cancel` invocan la Edge Function.
+
+### Notas
+- Requiere **redesplegar** la Edge Function: `supabase functions deploy api`.
+- Verificado end-to-end contra Supabase real: reclamar notifica al dueño, aprobar deja el
+  objeto `CLAIMED` y notifica al reclamante, con `created_at` válido en todas las notificaciones.
+
+---
+
+## [0.14.0] - 2026-10-20
+
+Moderación de admin más completa: paridad de acciones entre objetos encontrados y
+reportes perdidos, y una vista de archivados con restauración.
+
+### Añadido
+- **Archivar reportes perdidos** (admin): además de eliminar, el admin puede archivar un
+  reporte perdido, que pasa a estado `CLOSED` (equivalente a archivar un encontrado). Botones
+  Archivar/Eliminar en el detalle del reporte perdido.
+- **Pestaña "Archivados" en el panel admin**: lista los objetos encontrados `ARCHIVED` y los
+  reportes perdidos `CLOSED` de toda la organización, con botón **Restaurar** que los devuelve
+  al muro (encontrado → `PUBLISHED`, perdido → `OPEN`). Nuevos endpoints `GET /admin/archived`
+  y `POST /admin/restore` en la Edge Function `api` y en el backend Express.
+- Nuevas acciones de auditoría `FOUND_ITEM_RESTORED` y `LOST_REPORT_RESTORED`.
+
+### Cambiado
+- El **muro de perdidos** ahora oculta los reportes `CLOSED` (archivados), igual que el muro
+  de encontrados ya ocultaba los `ARCHIVED`. Los archivados siguen visibles para su dueño en
+  "Mis objetos" y en el detalle.
+
+### Notas
+- Requiere **redesplegar** la Edge Function tras actualizar: `supabase functions deploy api`.
+- Verificado: build completo (shared+backend+frontend) sin errores.
+
+---
+
+## [0.13.0] - 2026-10-20
+
+Supabase **Fase 2**: la IA y el panel de administración se portan a una Edge Function, de
+modo que en modo `supabase` la app funciona completa sin el backend Express.
+
+### Añadido
+- **Edge Function `api`** (`supabase/functions/api/`) con router interno:
+  - IA: `POST /ai/search`, `GET /ai/match/:lostReportId`, `POST /ai/assistant`.
+  - Admin: `GET /admin/stats`, `GET /admin/users`, `PATCH /admin/users/:id/role`,
+    `GET /admin/audit`, `GET /claims/all` (todas exigen rol ADMIN).
+  - Escribe `audit_logs` en el cambio de rol. Usa `service_role` solo en el servidor.
+- **Motor de IA portado a Deno** en `supabase/functions/_shared/` (nlp, matching, visual,
+  assistant, serialize, http). Pesos y fórmulas idénticos al backend; verificado por diff
+  que la lógica de puntuación no cambia.
+- **Capa de servicios de IA/admin en el frontend**: `services/ai.ts` y ampliación de
+  `services/admin.ts` (stats, users, setRole, audit, allClaims), que enrutan a la Edge
+  Function en modo Supabase o al backend Express en modo `rest`.
+- Cableado de `SmartSearch`, `MatchSuggestions`, `Assistant` y `AdminPage` a esa capa.
+
+### Notas
+- Con esto, en modo `supabase` la app cubre todas las funciones (CRUD + IA + admin). El
+  backend Express queda como alternativa (`VITE_DATA_BACKEND=rest`).
+- Verificado: build completo (shared+backend+frontend) y 11 tests del backend OK. Las Edge
+  Functions **no** se compilaron ni desplegaron desde este entorno (sin Deno ni Supabase CLI);
+  requieren `supabase functions deploy api` por parte del usuario.
+
+---
+
+## [0.12.0] - 2026-10-20
+
+Conexión real a **Supabase** (Fase 1) en la rama `feature/supabase-android`. La UI pasa a
+consumir la capa de datos `services`, de modo que con `VITE_DATA_BACKEND=supabase` el CRUD,
+la autenticación y las fotos funcionan contra Supabase. El modo `rest` sigue intacto.
+
+### Añadido
+- **La UI consume la capa `services`** (antes llamaba al backend REST directo). Migrados:
+  AuthContext, muro, publicar, mis objetos, detalle de encontrado/perdido, reclamaciones,
+  notificaciones y el contador de notificaciones del encabezado.
+- **Login por número de colaborador con email sintético** (opción 2): el email se deriva
+  como `<numero>@lostandfound.olo` (dominio configurable con `VITE_SUPABASE_EMAIL_DOMAIN`).
+  Helper `syntheticEmail()` en `lib/config.ts`.
+- **Restablecimiento de contraseña por administrador**: Edge Function
+  `supabase/functions/admin-reset-password` (verifica rol ADMIN y usa `service_role` solo en
+  el servidor; registra en `audit_logs`), servicio `services/admin.ts` y formulario
+  `components/PasswordResetCard.tsx` en el panel admin.
+- Utilidad `lib/errors.ts` (`getErrorMessage`) para mostrar errores de forma agnóstica del
+  backend (REST o Supabase).
+
+### Notas
+- **Fase 2 pendiente**: las funciones de IA (búsqueda, coincidencias, asistente) y el panel
+  admin (métricas, usuarios, auditoría, bandeja global) aún dependen del backend Express;
+  se portarán a Edge Functions. En modo Supabase esas vistas no cargan datos todavía.
+- Verificado contra el proyecto Supabase real: las 6 tablas existen y responden con la anon
+  key; build del frontend sin errores. La app Android no se recompiló en esta fase.
+- Pendiente del usuario: crear usuarios, confirmar el bucket `item-photos`, desplegar la
+  Edge Function y (antes de producción) rotar la anon key.
+
+---
+
+## [0.11.0] - 2026-10-20
+
+Preparación para **Supabase** y **Android** (rama `feature/supabase-android`). Cambios
+progresivos y reversibles: nada del comportamiento actual cambia por defecto.
+
+### Añadido
+- **Supabase preparado (no conectado).** Migraciones SQL versionadas en
+  `supabase/migrations/`: esquema (`profiles`, `found_items`, `lost_reports`, `claims`,
+  `notifications`, `audit_logs`), funciones helper (`is_admin()`, `handle_new_user()`),
+  **RLS en todas las tablas** y bucket privado de Storage `item-photos`. No se incluyen
+  credenciales reales.
+- **Capa de datos del frontend con feature flag `VITE_DATA_BACKEND`** (`rest` | `supabase`,
+  por defecto `rest`): interfaz común en `src/services/types.ts` con dos implementaciones.
+  Cliente Supabase en `src/lib/supabase.ts` y configuración en `src/lib/config.ts`.
+- **Android con Capacitor.** `frontend/capacitor.config.ts`, proyecto nativo
+  `frontend/android/`, puente nativo `src/lib/native.ts` (StatusBar, Keyboard, botón atrás)
+  y scripts npm (`build:mobile`, `cap:sync`, `cap:open`). Plugins: core, app, status-bar,
+  keyboard.
+- **Experiencia móvil**: `viewport-fit=cover` y utilidades CSS `safe-top`/`safe-bottom`/
+  `safe-x` basadas en `env(safe-area-inset-*)`.
+- **Documentación nueva**: `docs/ARCHITECTURE.md`, `docs/SUPABASE_SETUP.md`,
+  `docs/ANDROID_SETUP.md`. `frontend/.env.example` con las variables de Supabase/API.
+
+### Cambiado
+- `frontend/src/lib/api.ts` usa `config.apiBaseUrl` para que la app Android pueda apuntar a
+  un backend remoto (en web sigue usando el proxy de Vite `/api`).
+
+### Notas
+- El login sigue siendo por **número de colaborador**: en Supabase el cliente resuelve el
+  email desde `profiles.employee_id`.
+- La IA (NLP + firma visual + asistente) permanece en el backend Express.
+- La UI aún usa `api()` directo en varias páginas; migrarla a `services` es el siguiente paso.
+
+---
+
 ## [0.10.1] - 2026-10-19
 
 ### Corregido

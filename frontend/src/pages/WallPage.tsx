@@ -5,8 +5,9 @@ import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
 import { SmartSearch } from '../components/SmartSearch';
 import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { useDebounce } from '../lib/useDebounce';
+import { services } from '../services';
 
 type Tab = 'found' | 'lost';
 
@@ -32,14 +33,16 @@ export function WallPage() {
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (filters.category) params.set('category', filters.category);
-    if (debouncedLocation) params.set('location', debouncedLocation);
-    params.set('page', String(page));
+    const params = {
+      search: debouncedSearch || undefined,
+      category: filters.category || undefined,
+      location: debouncedLocation || undefined,
+      page,
+    };
 
-    const endpoint = tab === 'found' ? '/found-items' : '/lost-reports';
-    api<Paginated<FoundItem | LostReport>>(`${endpoint}?${params.toString()}`)
+    const request =
+      tab === 'found' ? services.foundItems.list(params) : services.lostReports.list(params);
+    request
       .then((data) => {
         if (!active) return;
         if (tab === 'found') setFound(data as Paginated<FoundItem>);
@@ -47,7 +50,7 @@ export function WallPage() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar el muro');
+        setError(getErrorMessage(err, 'Error al cargar el muro'));
       })
       .finally(() => active && setLoading(false));
 

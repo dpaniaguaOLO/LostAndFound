@@ -6,32 +6,41 @@ import { serializeLostReport } from '../lib/serialize.js';
 import { createLostReportSchema, parseOrThrow } from '../lib/validation.js';
 import { notifyBestMatchForLost } from '../lib/matchNotify.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
-import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
+import { likeSafe, pagination, queryString } from '../lib/query.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const lostReportsRouter = Router();
 
 const reporterSelect = { reporter: { select: { id: true, name: true } } };
+const LOST_STATUSES = new Set(['OPEN', 'MATCHED', 'RESOLVED', 'CLOSED']);
 
-// GET /api/lost-reports — listado con búsqueda y filtros.
+// GET /api/lost-reports â€” listado con bÃºsqueda y filtros.
 lostReportsRouter.get(
   '/',
   authenticate,
   asyncHandler(async (req, res) => {
-    const { search, category, status, location } = req.query as Record<string, string>;
-    const page = Math.max(1, Number(req.query.page ?? 1));
-    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize ?? 12)));
+    const search = queryString(req.query.search);
+    const category = queryString(req.query.category);
+    const status = queryString(req.query.status);
+    const location = queryString(req.query.location);
+    const { page, pageSize, skip } = pagination(req.query);
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (status) where.status = status;
-    if (location) where.location = { contains: location };
+    if (status && LOST_STATUSES.has(status)) where.status = status;
+    else where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
+    if (location) {
+      const term = likeSafe(location);
+      where.location = term ? { contains: term } : { in: [] };
+    }
     if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-      ];
+      const term = likeSafe(search);
+      where.OR = term
+        ? [{ title: { contains: term } }, { description: { contains: term } }]
+        : [{ id: { in: [] } }];
     }
 
     const [total, items] = await Promise.all([
@@ -40,7 +49,7 @@ lostReportsRouter.get(
         where,
         include: reporterSelect,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
+        skip,
         take: pageSize,
       }),
     ]);
@@ -55,7 +64,7 @@ lostReportsRouter.get(
   }),
 );
 
-// GET /api/lost-reports/:id — detalle.
+// GET /api/lost-reports/:id â€” detalle.
 lostReportsRouter.get(
   '/:id',
   authenticate,
@@ -69,10 +78,11 @@ lostReportsRouter.get(
   }),
 );
 
-// POST /api/lost-reports — reportar objeto perdido (imagen opcional).
+// POST /api/lost-reports â€” reportar objeto perdido (imagen opcional).
 lostReportsRouter.post(
   '/',
   authenticate,
+  rateLimit({ name: 'create-lost', max: 30, windowMs: 10 * 60_000, key: byUser }),
   uploadImage,
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(createLostReportSchema, req.body);
@@ -101,7 +111,7 @@ lostReportsRouter.post(
       include: reporterSelect,
     });
 
-    // IA: busca una coincidencia entre los encontrados y avisa al dueño si la hay.
+    // IA: busca una coincidencia entre los encontrados y avisa al dueÃ±o si la hay.
     // No bloquea la respuesta si algo falla en el emparejado.
     notifyBestMatchForLost({
       id: item.id,
@@ -118,7 +128,7 @@ lostReportsRouter.post(
   }),
 );
 
-// PATCH /api/lost-reports/:id/resolve — marcar como resuelto (autor o admin).
+// PATCH /api/lost-reports/:id/resolve â€” marcar como resuelto (autor o admin).
 lostReportsRouter.patch(
   '/:id/resolve',
   authenticate,
@@ -139,7 +149,26 @@ lostReportsRouter.patch(
   }),
 );
 
-// PATCH /api/lost-reports/:id — editar (autor o admin).
+// PATCH /api/lost-reports/:id/close â€” cerrar/archivar (solo admin). Lo retira del
+// listado pero lo conserva; se puede restaurar desde el panel (POST /admin/restore).
+lostReportsRouter.patch(
+  '/:id/close',
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
+    if (!item) throw notFound('Reporte no encontrado');
+    const updated = await prisma.lostReport.update({
+      where: { id: item.id },
+      data: { status: 'CLOSED' },
+      include: reporterSelect,
+    });
+    await writeAudit(req.auth!.sub, 'LOST_REPORT_CLOSED', 'LostReport', item.id, item.title);
+    res.json(serializeLostReport(updated));
+  }),
+);
+
+// PATCH /api/lost-reports/:id â€” editar (autor o admin).
 lostReportsRouter.patch(
   '/:id',
   authenticate,
@@ -166,7 +195,7 @@ lostReportsRouter.patch(
   }),
 );
 
-// DELETE /api/lost-reports/:id — eliminar (solo admin).
+// DELETE /api/lost-reports/:id â€” eliminar (solo admin).
 lostReportsRouter.delete(
   '/:id',
   authenticate,
@@ -175,12 +204,13 @@ lostReportsRouter.delete(
     const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Reporte no encontrado');
     await prisma.lostReport.delete({ where: { id: item.id } });
+    await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'LOST_REPORT_DELETED', 'LostReport', item.id, item.title);
     res.json({ ok: true });
   }),
 );
 
-// GET /api/lost-reports/mine/list — mis reportes.
+// GET /api/lost-reports/mine/list â€” mis reportes.
 lostReportsRouter.get(
   '/mine/list',
   authenticate,

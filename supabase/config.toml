@@ -1,0 +1,31 @@
+# Configuración de Supabase CLI para Lost and Found.
+# Docs: https://supabase.com/docs/guides/cli/config
+project_id = "lost-and-found-olo"
+
+[db]
+major_version = 15
+
+[auth]
+# Solo correo/contraseña por ahora (ver SUPABASE_SETUP.md para dominio corporativo).
+# App interna: en producción se recomienda false (alta de usuarios por admin). Ver docs/SECURITY.md.
+enable_signup = true
+# Política de contraseñas (alineada con el backend: mínimo 8).
+minimum_password_length = 8
+# Caducidad del access token (s). Al revocar sesiones, el token vigente expira como mucho en este plazo.
+jwt_expiry = 3600
+# Ajustar al dominio del frontend/app en cada entorno.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "capacitor://localhost", "http://localhost"]
+
+[storage]
+# Límite global; el bucket item-photos define su propio límite por archivo.
+file_size_limit = "5MiB"
+
+# --- Edge Functions ---------------------------------------------------------
+# verify_jwt = true: Supabase valida el JWT del llamador antes de ejecutar la
+# función (las funciones igualmente comprueban rol/propietario por dentro).
+[functions.api]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true

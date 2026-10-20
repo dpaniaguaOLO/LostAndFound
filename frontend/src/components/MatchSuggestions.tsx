@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { MatchBreakdown, MatchReference, MatchSuggestionsResponse, ScoredFoundItem } from '@laf/shared';
-import { api, ApiRequestError } from '../lib/api';
+import type { MatchBreakdown, MatchReference, ScoredFoundItem } from '@laf/shared';
+import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
+import { aiService } from '../services/ai';
 
 function scoreClass(score: number): string {
   if (score >= 60) return 'bg-olo-100 text-olo-800 dark:bg-olo-500/20 dark:text-olo-300';
@@ -84,11 +85,11 @@ export function MatchSuggestions({
     setLoading(true);
     setError(null);
     try {
-      const res = await api<MatchSuggestionsResponse>(`/ai/match/${lostReportId}`);
+      const res = await aiService.match(lostReportId);
       setReference(res.reference);
       setData(res.suggestions);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'No se pudieron cargar sugerencias');
+      setError(getErrorMessage(err, 'No se pudieron cargar sugerencias'));
     } finally {
       setLoading(false);
     }

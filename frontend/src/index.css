@@ -13,6 +13,24 @@
     /* Claro: tinta de marca sobre neutro claro.
        Oscuro: superficie con leve tinte verde de OLO (olo-dark) + texto claro. */
     @apply bg-slate-50 text-ink antialiased transition-colors dark:bg-olo-dark-950 dark:text-slate-100;
+    /* En Android (Capacitor) evita que el contenido quede bajo la barra de
+       estado / gestos. En web los insets valen 0, así que no afecta. */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@layer utilities {
+  /* Utilidades reutilizables para respetar las zonas seguras del dispositivo. */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
 

@@ -5,33 +5,41 @@ import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { serializeFoundItem } from '../lib/serialize.js';
 import { createFoundItemSchema, parseOrThrow } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
-import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
+import { likeSafe, pagination, queryString } from '../lib/query.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const foundItemsRouter = Router();
 
 const reporterSelect = { reporter: { select: { id: true, name: true } } };
+const FOUND_STATUSES = new Set(['PUBLISHED', 'CLAIMED', 'RETURNED', 'ARCHIVED']);
 
-// GET /api/found-items — muro con búsqueda, filtros y paginación.
+// GET /api/found-items â€” muro con bÃºsqueda, filtros y paginaciÃ³n.
 foundItemsRouter.get(
   '/',
   authenticate,
   asyncHandler(async (req, res) => {
-    const { search, category, status, location } = req.query as Record<string, string>;
-    const page = Math.max(1, Number(req.query.page ?? 1));
-    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize ?? 12)));
+    const search = queryString(req.query.search);
+    const category = queryString(req.query.category);
+    const status = queryString(req.query.status);
+    const location = queryString(req.query.location);
+    const { page, pageSize, skip } = pagination(req.query);
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (status) where.status = status;
+    if (status && FOUND_STATUSES.has(status)) where.status = status;
     else where.status = { in: ['PUBLISHED', 'CLAIMED'] }; // por defecto, ocultar archivados/devueltos
-    if (location) where.location = { contains: location };
+    if (location) {
+      const term = likeSafe(location);
+      where.location = term ? { contains: term } : { in: [] };
+    }
     if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-      ];
+      const term = likeSafe(search);
+      where.OR = term
+        ? [{ title: { contains: term } }, { description: { contains: term } }]
+        : [{ id: { in: [] } }];
     }
 
     const [total, items] = await Promise.all([
@@ -40,7 +48,7 @@ foundItemsRouter.get(
         where,
         include: reporterSelect,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
+        skip,
         take: pageSize,
       }),
     ]);
@@ -55,7 +63,7 @@ foundItemsRouter.get(
   }),
 );
 
-// GET /api/found-items/:id — detalle.
+// GET /api/found-items/:id â€” detalle.
 foundItemsRouter.get(
   '/:id',
   authenticate,
@@ -69,16 +77,17 @@ foundItemsRouter.get(
   }),
 );
 
-// POST /api/found-items — publicar objeto encontrado (con imagen opcional).
+// POST /api/found-items â€” publicar objeto encontrado (con imagen opcional).
 foundItemsRouter.post(
   '/',
   authenticate,
+  rateLimit({ name: 'create-found', max: 30, windowMs: 10 * 60_000, key: byUser }),
   uploadImage,
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(createFoundItemSchema, req.body);
     const imageUrl = req.file ? publicUrlFor(req.file.filename) : null;
 
-    // Firma visual para la búsqueda por imagen (no bloquea si falla el cómputo).
+    // Firma visual para la bÃºsqueda por imagen (no bloquea si falla el cÃ³mputo).
     let imageSignature: string | null = null;
     if (req.file) {
       try {
@@ -105,7 +114,7 @@ foundItemsRouter.post(
   }),
 );
 
-// PATCH /api/found-items/:id/return — marcar como devuelto.
+// PATCH /api/found-items/:id/return â€” marcar como devuelto.
 // Permitido al autor del hallazgo o a un administrador.
 foundItemsRouter.patch(
   '/:id/return',
@@ -115,7 +124,7 @@ foundItemsRouter.patch(
     if (!item) throw notFound('Objeto no encontrado');
     const isOwner = item.reporterId === req.auth!.sub;
     const isAdmin = req.auth!.role === 'ADMIN';
-    if (!isOwner && !isAdmin) throw forbidden('Solo el autor o un administrador puede marcar la devolución');
+    if (!isOwner && !isAdmin) throw forbidden('Solo el autor o un administrador puede marcar la devoluciÃ³n');
     if (item.status === 'RETURNED') throw badRequest('El objeto ya fue marcado como devuelto');
 
     const updated = await prisma.foundItem.update({
@@ -128,7 +137,7 @@ foundItemsRouter.patch(
   }),
 );
 
-// PATCH /api/found-items/:id — editar (autor o admin). Moderación de contenido.
+// PATCH /api/found-items/:id â€” editar (autor o admin). ModeraciÃ³n de contenido.
 foundItemsRouter.patch(
   '/:id',
   authenticate,
@@ -156,7 +165,7 @@ foundItemsRouter.patch(
   }),
 );
 
-// PATCH /api/found-items/:id/archive — archivar (solo admin).
+// PATCH /api/found-items/:id/archive â€” archivar (solo admin).
 foundItemsRouter.patch(
   '/:id/archive',
   authenticate,
@@ -174,28 +183,26 @@ foundItemsRouter.patch(
   }),
 );
 
-// DELETE /api/found-items/:id — eliminar (solo admin). Moderación destructiva.
+// DELETE /api/found-items/:id â€” eliminar (solo admin). ModeraciÃ³n destructiva.
 foundItemsRouter.delete(
   '/:id',
   authenticate,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const item = await prisma.foundItem.findUnique({
-      where: { id: req.params.id },
-      include: { claims: true },
-    });
+    const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
-    // Borra primero las reclamaciones asociadas para respetar la relación.
+    // Borra primero las reclamaciones asociadas para respetar la relaciÃ³n.
     await prisma.$transaction([
       prisma.claim.deleteMany({ where: { foundItemId: item.id } }),
       prisma.foundItem.delete({ where: { id: item.id } }),
     ]);
+    await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'FOUND_ITEM_DELETED', 'FoundItem', item.id, item.title);
     res.json({ ok: true });
   }),
 );
 
-// GET /api/found-items/mine/list — mis publicaciones.
+// GET /api/found-items/mine/list â€” mis publicaciones.
 foundItemsRouter.get(
   '/mine/list',
   authenticate,

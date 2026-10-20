@@ -1,0 +1,16 @@
+-- Seed de desarrollo para Supabase.
+-- NO contiene usuarios, contraseñas ni datos reales de empleados.
+--
+-- Los perfiles se crean automáticamente al registrarse en Supabase Auth
+-- (trigger handle_new_user). Para poblar datos de demostración en un entorno
+-- local, primero crea usuarios de prueba con `supabase auth` o el panel, y luego
+-- inserta objetos referenciando sus ids. Ejemplo (reemplaza los uuid):
+--
+--   insert into public.found_items (title, description, category, location, found_at, reporter_id)
+--   values ('Botella de agua azul', 'Botella térmica azul', 'OTHER', 'Sala de juntas 2',
+--           now(), '<uuid-del-colaborador>');
+--
+-- Se deja intencionalmente vacío de datos para no introducir identidades ficticias
+-- en la base. Ver docs/SUPABASE_SETUP.md para el procedimiento recomendado.
+
+-- (sin datos)

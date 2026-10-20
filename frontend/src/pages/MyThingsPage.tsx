@@ -4,7 +4,8 @@ import type { FoundItem, LostReport } from '@laf/shared';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
 import { MatchSuggestions } from '../components/MatchSuggestions';
 import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import { services } from '../services';
 
 type Tab = 'lost' | 'found';
 
@@ -22,17 +23,12 @@ export function MyThingsPage() {
   function load() {
     setLoading(true);
     setError(null);
-    Promise.all([
-      api<FoundItem[]>('/found-items/mine/list'),
-      api<LostReport[]>('/lost-reports/mine/list'),
-    ])
+    Promise.all([services.foundItems.mine(), services.lostReports.mine()])
       .then(([f, l]) => {
         setFound(f);
         setLost(l);
       })
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar tus objetos'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar tus objetos')))
       .finally(() => setLoading(false));
   }
 
