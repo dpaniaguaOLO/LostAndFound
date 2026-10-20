@@ -9,14 +9,15 @@ import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
-import { pagination, queryString } from '../lib/query.js';
+import { likeSafe, pagination, queryString } from '../lib/query.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const lostReportsRouter = Router();
 
 const reporterSelect = { reporter: { select: { id: true, name: true } } };
 const LOST_STATUSES = new Set(['OPEN', 'MATCHED', 'RESOLVED', 'CLOSED']);
 
-// GET /api/lost-reports — listado con búsqueda y filtros.
+// GET /api/lost-reports â€” listado con bÃºsqueda y filtros.
 lostReportsRouter.get(
   '/',
   authenticate,
@@ -31,12 +32,15 @@ lostReportsRouter.get(
     if (category) where.category = category;
     if (status && LOST_STATUSES.has(status)) where.status = status;
     else where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
-    if (location) where.location = { contains: location };
+    if (location) {
+      const term = likeSafe(location);
+      where.location = term ? { contains: term } : { in: [] };
+    }
     if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-      ];
+      const term = likeSafe(search);
+      where.OR = term
+        ? [{ title: { contains: term } }, { description: { contains: term } }]
+        : [{ id: { in: [] } }];
     }
 
     const [total, items] = await Promise.all([
@@ -60,7 +64,7 @@ lostReportsRouter.get(
   }),
 );
 
-// GET /api/lost-reports/:id — detalle.
+// GET /api/lost-reports/:id â€” detalle.
 lostReportsRouter.get(
   '/:id',
   authenticate,
@@ -74,10 +78,11 @@ lostReportsRouter.get(
   }),
 );
 
-// POST /api/lost-reports — reportar objeto perdido (imagen opcional).
+// POST /api/lost-reports â€” reportar objeto perdido (imagen opcional).
 lostReportsRouter.post(
   '/',
   authenticate,
+  rateLimit({ name: 'create-lost', max: 30, windowMs: 10 * 60_000, key: byUser }),
   uploadImage,
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(createLostReportSchema, req.body);
@@ -106,7 +111,7 @@ lostReportsRouter.post(
       include: reporterSelect,
     });
 
-    // IA: busca una coincidencia entre los encontrados y avisa al dueño si la hay.
+    // IA: busca una coincidencia entre los encontrados y avisa al dueÃ±o si la hay.
     // No bloquea la respuesta si algo falla en el emparejado.
     notifyBestMatchForLost({
       id: item.id,
@@ -123,7 +128,7 @@ lostReportsRouter.post(
   }),
 );
 
-// PATCH /api/lost-reports/:id/resolve — marcar como resuelto (autor o admin).
+// PATCH /api/lost-reports/:id/resolve â€” marcar como resuelto (autor o admin).
 lostReportsRouter.patch(
   '/:id/resolve',
   authenticate,
@@ -144,7 +149,7 @@ lostReportsRouter.patch(
   }),
 );
 
-// PATCH /api/lost-reports/:id/close — cerrar/archivar (solo admin). Lo retira del
+// PATCH /api/lost-reports/:id/close â€” cerrar/archivar (solo admin). Lo retira del
 // listado pero lo conserva; se puede restaurar desde el panel (POST /admin/restore).
 lostReportsRouter.patch(
   '/:id/close',
@@ -163,7 +168,7 @@ lostReportsRouter.patch(
   }),
 );
 
-// PATCH /api/lost-reports/:id — editar (autor o admin).
+// PATCH /api/lost-reports/:id â€” editar (autor o admin).
 lostReportsRouter.patch(
   '/:id',
   authenticate,
@@ -190,7 +195,7 @@ lostReportsRouter.patch(
   }),
 );
 
-// DELETE /api/lost-reports/:id — eliminar (solo admin).
+// DELETE /api/lost-reports/:id â€” eliminar (solo admin).
 lostReportsRouter.delete(
   '/:id',
   authenticate,
@@ -205,7 +210,7 @@ lostReportsRouter.delete(
   }),
 );
 
-// GET /api/lost-reports/mine/list — mis reportes.
+// GET /api/lost-reports/mine/list â€” mis reportes.
 lostReportsRouter.get(
   '/mine/list',
   authenticate,

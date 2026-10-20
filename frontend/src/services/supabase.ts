@@ -205,13 +205,12 @@ function readItemForm(form: FormData) {
 const auth: AuthService = {
   async getCurrentUser() {
     const sb = requireSupabase();
+    // getUser() valida la sesión contra el servidor de Auth (no solo la local).
     const { data } = await sb.auth.getUser();
     if (!data.user) return null;
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+    // employee_id/email no son legibles en `profiles` para el cliente (migración
+    // 007): el perfil propio completo se obtiene con la función my_profile().
+    const { data: profile } = await sb.rpc('my_profile').maybeSingle();
     return profile ? toUser(profile as ProfileRow) : null;
   },
 
@@ -252,6 +251,28 @@ const auth: AuthService = {
 
 const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
 
+/** Patrón ILIKE "contiene" con los comodines del usuario (% _ \) tratados como literales. */
+function containsPattern(text: string): string {
+  return `%${text.trim().slice(0, 200).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/**
+ * Filtros de búsqueda y ubicación. `.or()` recibe una cadena con la sintaxis de
+ * PostgREST: el valor va entre comillas dobles (escapando " y \) para que comas,
+ * paréntesis o puntos del usuario no puedan añadir condiciones al filtro.
+ */
+function applyTextFilters<Q extends { ilike: (c: string, p: string) => Q; or: (f: string) => Q }>(
+  q: Q,
+  params: FoundItemsQueryParams,
+): Q {
+  if (params.location) q = q.ilike('location', containsPattern(params.location));
+  if (params.search) {
+    const quoted = `"${containsPattern(params.search).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+    q = q.or(`title.ilike.${quoted},description.ilike.${quoted}`);
+  }
+  return q;
+}
+
 const foundItems: FoundItemsService = {
   async list(params: FoundItemsQueryParams): Promise<Paginated<FoundItem>> {
     const sb = requireSupabase();
@@ -264,8 +285,7 @@ const foundItems: FoundItemsService = {
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (params.category) q = q.eq('category', params.category);
-    if (params.location) q = q.ilike('location', `%${params.location}%`);
-    if (params.search) q = q.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+    q = applyTextFilters(q, params);
     const { data, count, error } = await q;
     if (error) throw error;
     const items = await mapWithImages(data ?? [], (r) => r.image_path, toFoundItem);
@@ -359,8 +379,7 @@ const lostReports: LostReportsService = {
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (params.category) q = q.eq('category', params.category);
-    if (params.location) q = q.ilike('location', `%${params.location}%`);
-    if (params.search) q = q.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+    q = applyTextFilters(q, params);
     const { data, count, error } = await q;
     if (error) throw error;
     const items = await mapWithImages(data ?? [], (r) => r.image_path, toLostReport);

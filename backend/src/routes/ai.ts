@@ -1,14 +1,21 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { badRequest, notFound, forbidden } from '../lib/http.js';
+import { notFound, forbidden } from '../lib/http.js';
 import { composeAnswer, parseIntent } from '../lib/assistant.js';
+import { signUploadUrl } from '../lib/fileUrls.js';
 import { matchItems, semanticSearch, type MatchableItem } from '../lib/matching.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 import { parseSignature } from '../lib/visual.js';
 import { serializeFoundItem, serializeLostReport } from '../lib/serialize.js';
+import { assistantSchema, parseOrThrow, semanticSearchSchema } from '../lib/validation.js';
 import { authenticate } from '../middleware/authenticate.js';
 
 export const aiRouter = Router();
+
+// Todas las rutas de IA requieren sesión y están limitadas por usuario: cada
+// llamada recorre y vectoriza todos los objetos (operación costosa).
+aiRouter.use(authenticate, rateLimit({ name: 'ai', max: 30, windowMs: 60_000, key: byUser }));
 
 const reporterSelect = { reporter: { select: { id: true, name: true } } };
 
@@ -48,9 +55,7 @@ aiRouter.post(
   '/search',
   authenticate,
   asyncHandler(async (req, res) => {
-    const query = String(req.body?.query ?? '').trim();
-    const limit = Math.min(50, Math.max(1, Number(req.body?.limit ?? 20)));
-    if (query.length < 2) throw badRequest('Escribe al menos 2 caracteres para buscar');
+    const { query, limit } = parseOrThrow(semanticSearchSchema, req.body);
 
     const items = await availableFoundItems();
     const byId = new Map(items.map((i) => [i.id, i]));
@@ -93,7 +98,7 @@ aiRouter.get(
         title: lost.title,
         category: lost.category,
         location: lost.location,
-        imageUrl: lost.imageUrl ?? null,
+        imageUrl: signUploadUrl(lost.imageUrl),
       },
       suggestions: suggestions.map((r) => ({
         item: serializeFoundItem(byId.get(r.item.id)!),
@@ -111,8 +116,7 @@ aiRouter.post(
   '/assistant',
   authenticate,
   asyncHandler(async (req, res) => {
-    const question = String(req.body?.question ?? '').trim();
-    if (question.length < 2) throw badRequest('Escribe una pregunta');
+    const { question } = parseOrThrow(assistantSchema, req.body);
 
     const intent = parseIntent(question);
 

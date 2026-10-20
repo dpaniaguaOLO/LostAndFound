@@ -53,6 +53,12 @@ const auth: AuthService = {
     return res.user;
   },
   async logout() {
+    // Revoca el token en el servidor (si falla, p. ej. sin red, se cierra igual en local).
+    try {
+      if (tokenStore.get()) await api('/auth/logout', { method: 'POST' });
+    } catch {
+      /* el token caducará igualmente */
+    }
     tokenStore.clear();
   },
 };

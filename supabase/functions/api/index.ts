@@ -18,7 +18,7 @@
 // pero NUNCA se exponen columnas sensibles y las rutas admin exigen rol ADMIN.
 // La service_role vive solo en los secrets del proyecto, jamás en el cliente.
 
-import { adminClient, cors, getCaller, json } from '../_shared/http.ts';
+import { adminClient, cors, getCaller, json, rateLimit } from '../_shared/http.ts';
 import { matchItems, type MatchableItem, semanticSearch } from '../_shared/matching.ts';
 import { parseSignature } from '../_shared/visual.ts';
 import { composeAnswer, parseIntent } from '../_shared/assistant.ts';
@@ -31,6 +31,9 @@ import {
 } from '../_shared/serialize.ts';
 
 const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Longitud máxima de consultas/preguntas en lenguaje natural (acota el coste del NLP).
+const MAX_QUERY = 300;
 
 type Row = Record<string, unknown>;
 
@@ -111,6 +114,24 @@ Deno.serve(async (req: Request) => {
 
   const sb = adminClient();
 
+  // Rate limiting por usuario con almacén compartido (tabla rate_limits). La IA
+  // recorre todos los objetos en cada llamada (coste alto); crear reclamaciones
+  // genera notificaciones a otros usuarios (spam).
+  if (path.startsWith('/ai/')) {
+    const limited = await rateLimit(sb, `ai:${caller.id}`, 30, 60);
+    if (limited) return limited;
+  } else if (method === 'POST' && path === '/claims') {
+    const limited = await rateLimit(sb, `claim:${caller.id}`, 10, 600);
+    if (limited) return limited;
+  }
+
+  // Los identificadores de la ruta son UUID: rechazar cualquier otra cosa pronto.
+  // (/ai/match/:id, /claims/:id/..., /admin/users/:id/role; /claims/all no es un id).
+  const idInPath = path.match(/^\/(?:ai\/match|claims|admin\/users)\/([^/]+)/)?.[1];
+  if (idInPath && idInPath !== 'all' && !UUID_RE.test(decodeURIComponent(idInPath))) {
+    return json({ error: 'BAD_REQUEST', message: 'Identificador inválido' }, 400);
+  }
+
   try {
     // ================= IA =================
 
@@ -118,9 +139,10 @@ Deno.serve(async (req: Request) => {
     if (method === 'POST' && path === '/ai/search') {
       const body = await req.json().catch(() => ({}));
       const query = String(body.query ?? '').trim();
-      const limit = Math.min(50, Math.max(1, Number(body.limit ?? 20)));
-      if (query.length < 2) {
-        return json({ error: 'BAD_REQUEST', message: 'Escribe al menos 2 caracteres' }, 400);
+      const rawLimit = Number(body.limit ?? 20);
+      const limit = Number.isFinite(rawLimit) ? Math.min(50, Math.max(1, Math.trunc(rawLimit))) : 20;
+      if (query.length < 2 || query.length > MAX_QUERY) {
+        return json({ error: 'BAD_REQUEST', message: `La búsqueda debe tener entre 2 y ${MAX_QUERY} caracteres` }, 400);
       }
       const items = await availableFoundItems(sb);
       const byId = new Map(items.map((i) => [i.id as string, i]));
@@ -176,8 +198,8 @@ Deno.serve(async (req: Request) => {
     if (method === 'POST' && path === '/ai/assistant') {
       const body = await req.json().catch(() => ({}));
       const question = String(body.question ?? '').trim();
-      if (question.length < 2) {
-        return json({ error: 'BAD_REQUEST', message: 'Escribe una pregunta' }, 400);
+      if (question.length < 2 || question.length > MAX_QUERY) {
+        return json({ error: 'BAD_REQUEST', message: `La pregunta debe tener entre 2 y ${MAX_QUERY} caracteres` }, 400);
       }
       const intent = parseIntent(question);
 
@@ -228,7 +250,7 @@ Deno.serve(async (req: Request) => {
       const body = await req.json().catch(() => ({}));
       const foundItemId = String(body.foundItemId ?? '');
       const message = String(body.message ?? '').trim();
-      if (!foundItemId || message.length < 2 || message.length > 1000) {
+      if (!UUID_RE.test(foundItemId) || message.length < 2 || message.length > 1000) {
         return json({ error: 'BAD_REQUEST', message: 'foundItemId y mensaje (2 a 1000 caracteres) requeridos' }, 400);
       }
       const { data: item } = await sb
@@ -335,9 +357,9 @@ Deno.serve(async (req: Request) => {
 
     // GET /admin/stats
     if (method === 'GET' && path === '/admin/stats') {
-      const countOf = async (table: string, filter?: (q: any) => any) => {
+      const countOf = async (table: string, status?: string) => {
         let q = sb.from(table).select('id', { count: 'exact', head: true });
-        if (filter) q = filter(q);
+        if (status) q = q.eq('status', status);
         const { count } = await q;
         return count ?? 0;
       };
@@ -345,8 +367,8 @@ Deno.serve(async (req: Request) => {
         countOf('profiles'),
         countOf('found_items'),
         countOf('lost_reports'),
-        countOf('claims', (q) => q.eq('status', 'PENDING')),
-        countOf('found_items', (q) => q.eq('status', 'RETURNED')),
+        countOf('claims', 'PENDING'),
+        countOf('found_items', 'RETURNED'),
       ]);
       return json({ users, foundItems, lostReports, claimsPending, returned });
     }
@@ -437,7 +459,7 @@ Deno.serve(async (req: Request) => {
       const body = await req.json().catch(() => ({}));
       const kind = body.kind;
       const id = String(body.id ?? '');
-      if ((kind !== 'found' && kind !== 'lost') || !id) {
+      if ((kind !== 'found' && kind !== 'lost') || !UUID_RE.test(id)) {
         return json({ error: 'BAD_REQUEST', message: 'kind (found|lost) e id requeridos' }, 400);
       }
       const table = kind === 'found' ? 'found_items' : 'lost_reports';

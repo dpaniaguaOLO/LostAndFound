@@ -2,7 +2,8 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.16.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Versión actual**: 0.17.0 (rama `feature/supabase-android`; `main` va por 0.10.1).
+  0.17.0 = auditoría de seguridad (ver `docs/SECURITY.md`).
 - **Fecha**: 2026-10-20
 - **Commit más reciente**: revisión de seguridad y robustez de backend + Supabase (ver `git log`
   y `CHANGELOG.md` 0.16.0): RLS endurecida, revisión de reclamaciones atómica (`review_claim`),
@@ -18,8 +19,9 @@
 
 ## Estado de las pruebas
 
-- **Automatizadas**: `npm test` en backend (node:test, 15 tests: NLP, matching, firma visual,
-  rate limit, query). Pendiente: integración (Supertest) y frontend (React Testing Library).
+- **Automatizadas**: `npm test` → backend (node:test: 15 unitarios + 13 de seguridad e2e contra
+  la app real con SQLite temporal) y BD (`npm run test:db`: 14 sobre Postgres/PGlite con todas las
+  migraciones de Supabase). Pendiente: pruebas de interfaz (React Testing Library).
 - **v0.16.0 (Claude)**: smoke E2E de 28 escenarios contra Express con BD temporal; políticas
   RLS y `review_claim()` probadas sobre Postgres (PGlite, 15 + 18 casos); `deno check` de las
   Edge Functions.

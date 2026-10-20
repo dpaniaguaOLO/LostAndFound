@@ -5,7 +5,7 @@
  * `imageUrl` se resuelve a una URL firmada a partir de `image_path` (Storage).
  * Nunca se exponen columnas sensibles (image_signature, etc.).
  */
-import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2.118.0';
 
 const PHOTO_BUCKET = 'item-photos';
 

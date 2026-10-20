@@ -4,14 +4,21 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { hashPassword } from '../lib/auth.js';
 import { badRequest, notFound } from '../lib/http.js';
 import { queryInt } from '../lib/query.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 import { serializeFoundItem, serializeLostReport, serializeUser } from '../lib/serialize.js';
-import { parseOrThrow, resetPasswordSchema, setRoleSchema } from '../lib/validation.js';
+import { parseOrThrow, resetPasswordSchema, restoreSchema, setRoleSchema } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { writeAudit } from '../lib/audit.js';
 
 export const adminRouter = Router();
 
 adminRouter.use(authenticate, requireAdmin);
+// Límite holgado para el panel, y uno estricto para restablecer contraseñas.
+adminRouter.use(rateLimit({ name: 'admin', max: 120, windowMs: 60_000, key: byUser }));
+adminRouter.use(
+  '/users/reset-password',
+  rateLimit({ name: 'reset-password', max: 10, windowMs: 10 * 60_000, key: byUser }),
+);
 
 // GET /api/admin/stats — métricas para el panel administrativo.
 adminRouter.get(
@@ -70,9 +77,14 @@ adminRouter.post(
     const body = parseOrThrow(resetPasswordSchema, req.body);
     const user = await prisma.user.findUnique({ where: { employeeId: body.employeeId } });
     if (!user) throw notFound('Colaborador no encontrado');
+    // Nueva contraseña + nueva versión de sesión: cualquier token emitido con la
+    // contraseña anterior deja de ser válido de inmediato.
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(body.newPassword) },
+      data: {
+        passwordHash: await hashPassword(body.newPassword),
+        sessionVersion: { increment: 1 },
+      },
     });
     await writeAudit(
       req.auth!.sub,
@@ -135,11 +147,7 @@ adminRouter.get(
 adminRouter.post(
   '/restore',
   asyncHandler(async (req, res) => {
-    const kind = req.body?.kind;
-    const id = String(req.body?.id ?? '');
-    if ((kind !== 'found' && kind !== 'lost') || !id) {
-      throw badRequest('kind (found|lost) e id requeridos');
-    }
+    const { kind, id } = parseOrThrow(restoreSchema, req.body);
     if (kind === 'found') {
       const item = await prisma.foundItem.findUnique({ where: { id } });
       if (!item) throw notFound('Objeto no encontrado');

@@ -194,6 +194,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | POST | `/api/auth/register` | no | `{ name, employeeId, password(≥8), email? }` | `201 { token, user }` |
 | POST | `/api/auth/login` | no | `{ employeeId, password }` | `{ token, user }` |
 | GET | `/api/auth/me` | sí | — | `User` |
+| POST | `/api/auth/logout` | sí | — | `{ ok }` (revoca el token en el servidor) |
 | GET | `/api/found-items` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<FoundItem>` |
 | GET | `/api/found-items/:id` | sí | — | `FoundItem` |
 | POST | `/api/found-items` | sí | `multipart/form-data`: `title, description, category, location, foundAt(ISO)`, `image?` | `201 FoundItem` |
@@ -285,6 +286,16 @@ prefiere archivar.
 
 ## F. Seguridad
 
+> Referencia completa (controles, verificación, pasos externos, riesgos): `docs/SECURITY.md`.
+> Pruebas: `npm test` (incluye `backend/src/security.e2e.test.ts` y `supabase/tests/db.test.mjs`).
+> Antes de commitear: `git config core.hooksPath .githooks` (detección de secretos).
+>
+> Reglas para cambios nuevos: cada endpoint/columna nueva necesita su autorización en
+> **ambos** backends (ruta Express + RLS/GRANT por columna en Supabase); las imágenes Express
+> se exponen siempre vía `signUploadUrl()`; nada de `select('*')` sobre `profiles` desde el
+> cliente (usar `my_profile()`); los filtros de texto pasan por `likeSafe()` (Express) o
+> `applyTextFilters()` (Supabase).
+
 - **Autenticación**: JWT firmado con `JWT_SECRET`; expiración `JWT_EXPIRES_IN` (12h).
   Contraseñas hasheadas con bcrypt (coste 12). Login devuelve mensaje genérico para no
   revelar si un email existe.
@@ -350,8 +361,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.16.0 (ver `VERSION`). 0.16.0: revisión de seguridad/robustez (Claude, ver
-  `CHANGELOG.md`). Rama `feature/supabase-android`: Supabase Fases 1 y 2
+- **Versión**: 0.17.0 (ver `VERSION`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
+  auditoría de seguridad completa (20 medidas, `docs/SECURITY.md`). Ambas de Claude. Rama `feature/supabase-android`: Supabase Fases 1 y 2
   completas (CRUD/auth/storage + IA/admin en Edge Functions) y Android (Capacitor) preparado.
   La rama `main` iba por 0.10.1.
 - **Último commit relevante**: ver `git log` / `CHANGELOG.md` (primer release 0.1.0).

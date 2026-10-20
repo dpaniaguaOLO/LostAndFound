@@ -7,6 +7,7 @@ import { serializeClaim } from '../lib/serialize.js';
 import { createClaimSchema, parseOrThrow, reviewClaimSchema } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { writeAudit } from '../lib/audit.js';
+import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const claimsRouter = Router();
 
@@ -19,6 +20,7 @@ const claimInclude = {
 claimsRouter.post(
   '/',
   authenticate,
+  rateLimit({ name: 'create-claim', max: 30, windowMs: 10 * 60_000, key: byUser }),
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(createClaimSchema, req.body);
     const item = await prisma.foundItem.findUnique({ where: { id: body.foundItemId } });

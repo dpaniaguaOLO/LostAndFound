@@ -16,6 +16,17 @@ build/
 **/.env.*
 !**/.env.example
 
+# Claves, certificados y firmas (Android release, TLS, service accounts)
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+service-account*.json
+
 # Base de datos local (SQLite dev)
 *.db
 *.db-journal

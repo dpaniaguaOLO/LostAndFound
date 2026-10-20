@@ -5,113 +5,90 @@
 // recuperación de contraseña por email, así que esta función la hace un admin.
 //
 // Seguridad (clave):
-//  - Verifica el JWT del llamador con un cliente "anon" + su token.
-//  - Comprueba en `profiles` que el llamador tiene role = 'ADMIN'.
+//  - Verifica el JWT del llamador y comprueba en `profiles` que es ADMIN.
 //  - Solo entonces usa la SERVICE_ROLE (secreta, solo en el servidor) para
 //    cambiar la contraseña del usuario destino vía la Auth Admin API.
-//  - Registra la acción en audit_logs.
+//  - Revoca las sesiones abiertas del usuario destino (revoke_user_sessions):
+//    quien tuviera su contraseña anterior pierde la sesión al caducar el token.
+//  - Rate limiting por admin y registro en audit_logs.
 //
 // La SERVICE_ROLE_KEY NUNCA se expone al cliente: vive solo en los secrets de
-// la Edge Function (supabase secrets set / variables del proyecto).
+// la Edge Function (Supabase la inyecta automáticamente).
 //
 // Despliegue:  supabase functions deploy admin-reset-password
-// Secrets:     SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY se inyectan por defecto
-//              en las Edge Functions del proyecto; no hace falta configurarlos.
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { adminClient, cors, getCaller, json, rateLimit } from '../_shared/http.ts';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  });
-}
+// bcrypt (usado por Supabase Auth) solo considera los primeros 72 bytes.
+const MAX_PASSWORD_BYTES = 72;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  if (req.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
+  if (req.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED', message: 'Método no permitido' }, 405);
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !anonKey || !serviceKey) {
-    return json({ error: 'SERVER_MISCONFIGURED' }, 500);
-  }
-
-  // 1) Identificar al llamador a partir de su token (Authorization: Bearer ...).
-  const authHeader = req.headers.get('Authorization') ?? '';
-  if (!authHeader.startsWith('Bearer ')) return json({ error: 'UNAUTHORIZED' }, 401);
-
-  const caller = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData, error: userErr } = await caller.auth.getUser();
-  if (userErr || !userData.user) return json({ error: 'UNAUTHORIZED' }, 401);
-  const callerId = userData.user.id;
-
-  // 2) Verificar que el llamador es ADMIN (consulta su propio perfil bajo RLS).
-  const { data: callerProfile } = await caller
-    .from('profiles')
-    .select('role, name')
-    .eq('id', callerId)
-    .single();
-  if (!callerProfile || callerProfile.role !== 'ADMIN') {
+  // 1) Identificar al llamador y exigir rol ADMIN.
+  const caller = await getCaller(req.headers.get('Authorization'));
+  if (!caller) return json({ error: 'UNAUTHORIZED', message: 'Sesión requerida' }, 401);
+  if (caller.role !== 'ADMIN') {
     return json({ error: 'FORBIDDEN', message: 'Solo un administrador puede hacer esto' }, 403);
   }
 
-  // 3) Leer el cuerpo: a quién y la nueva contraseña.
-  let payload: { employeeId?: string; newPassword?: string };
+  const admin = adminClient();
+  const limited = await rateLimit(admin, `reset-password:${caller.id}`, 10, 600);
+  if (limited) return limited;
+
+  // 2) Validar el cuerpo.
+  let payload: { employeeId?: unknown; newPassword?: unknown };
   try {
     payload = await req.json();
   } catch {
     return json({ error: 'BAD_REQUEST', message: 'JSON inválido' }, 400);
   }
-  const employeeId = (payload.employeeId ?? '').trim();
-  const newPassword = payload.newPassword ?? '';
-  if (!employeeId || newPassword.length < 8) {
+  const employeeId = typeof payload.employeeId === 'string' ? payload.employeeId.trim() : '';
+  const newPassword = typeof payload.newPassword === 'string' ? payload.newPassword : '';
+  if (!/^[A-Za-z0-9._-]{1,50}$/.test(employeeId)) {
+    return json({ error: 'BAD_REQUEST', message: 'Número de colaborador inválido' }, 400);
+  }
+  if (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > MAX_PASSWORD_BYTES) {
     return json(
-      { error: 'BAD_REQUEST', message: 'employeeId y newPassword (mín. 8) son obligatorios' },
+      { error: 'BAD_REQUEST', message: `La contraseña debe tener al menos 8 caracteres y como máximo ${MAX_PASSWORD_BYTES} bytes` },
       400,
     );
   }
 
-  // 4) Cliente con SERVICE_ROLE para operaciones privilegiadas.
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  try {
+    // 3) Localizar al usuario destino por su número de colaborador.
+    const { data: target } = await admin
+      .from('profiles')
+      .select('id, name')
+      .eq('employee_id', employeeId)
+      .maybeSingle();
+    if (!target) return json({ error: 'NOT_FOUND', message: 'Colaborador no encontrado' }, 404);
 
-  // Localizar al usuario destino por su número de colaborador.
-  const { data: target, error: targetErr } = await admin
-    .from('profiles')
-    .select('id, name')
-    .eq('employee_id', employeeId)
-    .single();
-  if (targetErr || !target) {
-    return json({ error: 'NOT_FOUND', message: 'Colaborador no encontrado' }, 404);
+    // 4) Cambiar la contraseña con la Auth Admin API.
+    const { error: updErr } = await admin.auth.admin.updateUserById(target.id, { password: newPassword });
+    if (updErr) {
+      // Supabase rechaza contraseñas débiles/filtradas según la política del proyecto.
+      if (updErr.status === 422) return json({ error: 'BAD_REQUEST', message: updErr.message }, 400);
+      throw updErr;
+    }
+
+    // 5) Cerrar las sesiones abiertas del usuario (best-effort, se registra si falla).
+    const { error: revokeErr } = await admin.rpc('revoke_user_sessions', { p_user_id: target.id });
+    if (revokeErr) console.error('[revoke-sessions]', revokeErr.message);
+
+    // 6) Auditoría (sin incluir la contraseña).
+    await admin.from('audit_logs').insert({
+      actor_id: caller.id,
+      action: 'USER_PASSWORD_RESET',
+      entity_type: 'User',
+      entity_id: target.id,
+      summary: `${caller.name} restableció la contraseña de ${target.name} (N° ${employeeId})`,
+    });
+
+    return json({ ok: true });
+  } catch (e) {
+    console.error('[admin-reset-password]', e instanceof Error ? e.message : e);
+    return json({ error: 'INTERNAL', message: 'Error interno del servidor' }, 500);
   }
-
-  // 5) Cambiar la contraseña con la Auth Admin API.
-  const { error: updErr } = await admin.auth.admin.updateUserById(target.id, {
-    password: newPassword,
-  });
-  if (updErr) {
-    return json({ error: 'UPDATE_FAILED', message: updErr.message }, 500);
-  }
-
-  // 6) Registrar en el historial de auditoría (best-effort).
-  await admin.from('audit_logs').insert({
-    actor_id: callerId,
-    action: 'USER_PASSWORD_RESET',
-    entity_type: 'User',
-    entity_id: target.id,
-    summary: `${callerProfile.name} restableció la contraseña de ${target.name} (N° ${employeeId})`,
-  });
-
-  return json({ ok: true });
 });

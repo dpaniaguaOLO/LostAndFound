@@ -18,8 +18,10 @@ declare global {
 
 /**
  * Exige un token JWT válido en el header Authorization: Bearer <token>.
- * El rol se relee de la base de datos en cada petición: así un cambio de rol
- * (o un usuario eliminado) surte efecto de inmediato y no al expirar el token.
+ * Además del firmado y la caducidad, en cada petición se comprueba en la BD:
+ *  - que el usuario exista y su rol actual (un cambio de rol surte efecto ya);
+ *  - que la versión de sesión coincida (restablecer la contraseña la invalida);
+ *  - que el token no se haya revocado (cierre de sesión).
  */
 export function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
@@ -33,11 +35,24 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   } catch {
     return sendError(res, unauthorized('Token inválido o expirado'));
   }
-  prisma.user
-    .findUnique({ where: { id: payload.sub }, select: { id: true, role: true } })
-    .then((user) => {
-      if (!user) return sendError(res, unauthorized('Usuario no encontrado'));
-      req.auth = { sub: user.id, role: user.role as JwtPayload['role'] };
+  Promise.all([
+    prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, role: true, sessionVersion: true },
+    }),
+    payload.jti ? prisma.revokedToken.findUnique({ where: { jti: payload.jti } }) : null,
+  ])
+    .then(([user, revoked]) => {
+      if (!user || revoked || (payload.sv ?? 0) !== user.sessionVersion) {
+        return sendError(res, unauthorized('Sesión no válida. Inicia sesión de nuevo.'));
+      }
+      req.auth = {
+        sub: user.id,
+        role: user.role as JwtPayload['role'],
+        sv: user.sessionVersion,
+        jti: payload.jti,
+        exp: payload.exp,
+      };
       next();
     })
     .catch(next);
@@ -71,6 +86,14 @@ function toHttpError(err: unknown): HttpError | null {
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
     return new HttpError(404, 'NOT_FOUND', 'Recurso no encontrado');
   }
+  // Violación de unicidad (p. ej. dos registros simultáneos con el mismo número).
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    return new HttpError(409, 'CONFLICT', 'El registro ya existe');
+  }
+  // Errores HTTP de Express/serve-static (archivo inexistente, ruta no permitida).
+  const status = (err as { status?: number; statusCode?: number } | null)?.status;
+  if (status === 404) return new HttpError(404, 'NOT_FOUND', 'Recurso no encontrado');
+  if (status === 403) return new HttpError(403, 'FORBIDDEN', 'No autorizado');
   return null;
 }
 
@@ -82,6 +105,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
 
   const httpErr = toHttpError(err);
   if (httpErr) return sendError(res, httpErr);
-  console.error('[error]', err);
+  // Al log va el error, nunca el cuerpo de la petición (podría contener contraseñas).
+  console.error('[error]', req.method, req.path, err);
   res.status(500).json({ error: 'INTERNAL', message: 'Error interno del servidor' });
 }

@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.17.0] - 2026-10-20
+
+Auditoría e implementación de seguridad (20 medidas). Detalle, verificación y pasos
+externos en `docs/SECURITY.md`.
+
+### Seguridad — vulnerabilidades corregidas
+- **Imágenes públicas sin autenticación** (Express): `/uploads` era accesible por URL sin
+  sesión. Ahora solo con URL firmada (HMAC) y caducidad, emitida por la API.
+- **Cerrar sesión no invalidaba el JWT** y **resetear la contraseña no cerraba las sesiones
+  abiertas** (Express y Supabase). Nuevo `POST /api/auth/logout` (revoca el `jti`),
+  `sessionVersion` por usuario y `revoke_user_sessions()` en Supabase.
+- **Supabase: datos de perfil expuestos** — cualquier usuario leía `employee_id` (identificador
+  de login) y `email` de todos. Ahora solo `id, name, role, created_at`; el propio vía `my_profile()`.
+- **Supabase: mass assignment** — el cliente podía crear objetos ya `ARCHIVED`/`CLAIMED`, escribir
+  `image_signature`, editar título/cuerpo de sus notificaciones. Privilegios por columna.
+- **Supabase: `anon`** tenía privilegios de tabla (solo los frenaba RLS): revocados.
+- **Inyección en filtros**: el texto de búsqueda se concatenaba en `.or()` de PostgREST; y `%`/`_`
+  actuaban como comodines en Express y Supabase (buscar `%` devolvía todo).
+- **Enumeración de usuarios por tiempo** en el login (sin usuario no se ejecutaba bcrypt).
+- **EXIF/GPS** de las fotos subidas se conservaba (Express): ahora se elimina.
+- Contraseñas > 72 bytes (bcrypt las truncaba en silencio) rechazadas.
+- Android: `allowBackup` desactivado (la sesión se podía extraer con `adb backup`).
+
+### Añadido
+- Rate limiting: registro, creación de contenido, IA, admin y global por IP (Express); tabla
+  compartida `rate_limits` + `rate_limit_hit()` para las Edge Functions (IA, reclamaciones,
+  reset de contraseña). Login: además, límite por IP.
+- Validación: zod en IA/admin, rangos de fechas, longitudes; CHECK en la BD (categoría,
+  ubicación, nombre, número de colaborador, foto en carpeta propia, nota de revisión); UUID en
+  rutas de la Edge Function.
+- Cabeceras: CSP estricta en la API y en el build del frontend (hash del script inline, sin
+  `unsafe-inline`), Permissions-Policy, Referrer-Policy, HSTS en producción, CORS sin credenciales.
+- HTTPS: `FORCE_HTTPS`, `TRUST_PROXY` (no se confía en `X-Forwarded-*` por defecto).
+- `ALLOW_SELF_REGISTRATION` para cerrar el registro abierto en Express.
+- Detección de secretos: `scripts/check-secrets.mjs` (+ hook `.githooks/pre-commit`), `.gitignore`
+  ampliado (keystores, certificados, service accounts).
+- Pruebas: `backend/src/security.e2e.test.ts` (13 escenarios) y `supabase/tests/db.test.mjs` (14).
+
+### Dependencias
+- `vite` 5 → 6.4.4 (+ `esbuild` 0.25): path traversal / `fs.deny` bypass en Windows del servidor dev.
+- `react-router-dom` 6 → 7.18.4: open redirect (CVE-2025-68470). Producción: 0 vulnerabilidades.
+- `supabase-js` fijado a versión exacta en las Edge Functions.
+
+### Migraciones
+- Supabase `20261020000007_security_hardening.sql`; Prisma `20261020150000_session_security`
+  (no destructivas).
+
 ## [0.16.0] - 2026-10-20
 
 Revisión de backend y seguridad (Claude), incluida la revisión del flujo de reclamaciones

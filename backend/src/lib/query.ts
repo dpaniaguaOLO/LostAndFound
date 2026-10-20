@@ -9,6 +9,17 @@ export function queryString(value: unknown): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
+/**
+ * Texto de búsqueda para filtros `contains` (LIKE). Prisma no escapa los
+ * comodines en SQLite, así que `%` y `_` del usuario actuarían como comodines
+ * (un "%" devolvería todo). Se eliminan; devuelve null si no queda texto útil,
+ * en cuyo caso no debe haber coincidencias.
+ */
+export function likeSafe(search: string): string | null {
+  const cleaned = search.replace(/[%_\\]/g, '').trim().slice(0, 200);
+  return cleaned === '' ? null : cleaned;
+}
+
 /** Entero acotado a [min, max]; usa `fallback` si no es un número válido. */
 export function queryInt(value: unknown, fallback: number, min: number, max: number): number {
   const n = Number.parseInt(queryString(value) ?? '', 10);
