@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AuditEntry, Claim, User } from '@laf/shared';
+import { PasswordResetCard } from '../components/PasswordResetCard';
 import { ErrorState, Spinner, StatusBadge, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { api, ApiRequestError } from '../lib/api';
@@ -81,7 +82,16 @@ export function AdminPage() {
   }
 
   if (loading) return <Spinner />;
-  if (error) return <ErrorState message={error} onRetry={loadOverview} />;
+  // El resumen/usuarios/historial dependen del backend REST (Express). Si no está
+  // disponible (p. ej. con Supabase como backend de datos), igual ofrecemos las
+  // acciones de admin que sí funcionan de forma autónoma, como restablecer contraseñas.
+  if (error)
+    return (
+      <div>
+        <ErrorState message={error} onRetry={loadOverview} />
+        <PasswordResetCard />
+      </div>
+    );
 
   const cards = [
     { label: 'Usuarios', value: stats?.users ?? 0 },
@@ -168,6 +178,9 @@ export function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Restablecer contraseña de un colaborador (por número) */}
+          <PasswordResetCard />
         </>
       )}
 

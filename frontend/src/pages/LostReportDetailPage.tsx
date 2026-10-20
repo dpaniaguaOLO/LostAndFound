@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { LostReport } from '@laf/shared';
 import { MatchSuggestions } from '../components/MatchSuggestions';
 import { ErrorState, ItemImage, Spinner, StatusBadge } from '../components/ui';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS, LOST_STATUS_LABELS, formatDate } from '../lib/format';
+import { services } from '../services';
 
 /**
  * Detalle de un objeto perdido con sus posibles coincidencias (IA) mostradas
@@ -21,11 +22,10 @@ export function LostReportDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    api<LostReport>(`/lost-reports/${id}`)
+    services.lostReports
+      .get(id)
       .then(setItem)
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar el reporte'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar el reporte')))
       .finally(() => setLoading(false));
   }
 

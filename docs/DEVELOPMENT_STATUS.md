@@ -2,14 +2,17 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.11.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Versión actual**: 0.12.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
 - **Fecha**: 2026-10-20
-- **Commit más reciente**: preparación para Supabase y Android (ver `git log`)
-- **Última funcionalidad completada**: preparación progresiva y reversible para **Supabase**
-  (PostgreSQL + Auth + Storage, *preparado pero no conectado*) y **Android** (Capacitor).
-  Migraciones SQL + RLS + Storage, capa de datos frontend con feature flag `VITE_DATA_BACKEND`,
-  proyecto nativo `android/`, puente nativo y safe-areas. Docs nuevas: `ARCHITECTURE.md`,
-  `SUPABASE_SETUP.md`, `ANDROID_SETUP.md`.
+- **Commit más reciente**: conexión real a Supabase, Fase 1 (ver `git log`)
+- **Última funcionalidad completada**: **Fase 1 de Supabase conectada**. La UI consume la
+  capa `services`; con `VITE_DATA_BACKEND=supabase` funcionan auth (login por número de
+  colaborador con email sintético `@lostandfound.olo`), muro, publicar con foto (Storage),
+  reclamaciones, notificaciones y restablecimiento de contraseña por admin (Edge Function
+  `admin-reset-password`). El modo `rest` sigue intacto.
+- **Pendiente (Fase 2)**: portar IA (búsqueda, coincidencias, asistente) y panel admin
+  (métricas, usuarios, auditoría, bandeja global) a Edge Functions; hoy dependen del backend
+  Express y no cargan en modo Supabase.
 
 ## Estado de las pruebas
 
@@ -52,13 +55,15 @@
 
 ## Pendiente de configuración del usuario (Supabase / Android)
 
-- [ ] **Supabase**: crear proyecto, copiar URL + anon key, aplicar las 4 migraciones,
-  decidir modelo de auth (email corporativo vs sintético), rellenar `frontend/.env` y
-  cambiar `VITE_DATA_BACKEND=supabase`. Ver `docs/SUPABASE_SETUP.md`.
+- [x] **Supabase**: proyecto creado, migraciones aplicadas, `.env` configurado con
+  `VITE_DATA_BACKEND=supabase`. Modelo de auth: email sintético `@lostandfound.olo`.
+- [ ] **Supabase (pendiente del usuario)**: crear usuarios (ADMIN + EMPLEADO), confirmar el
+  bucket `item-photos` en el panel, desplegar la Edge Function `admin-reset-password`, y
+  antes de producción rotar la anon key. Ver `docs/SUPABASE_SETUP.md`.
+- [x] Migradas a la capa `services` las páginas de CRUD/auth/notificaciones.
+- [ ] **Fase 2**: portar IA y panel admin a Edge Functions.
 - [ ] **Android**: instalar Android Studio + SDK + JDK 17, compilar y probar en
   emulador/teléfono. Ver `docs/ANDROID_SETUP.md`.
-- [ ] Migrar las páginas que aún usan `api()` directo a la capa `services` para completar
-  la abstracción del backend de datos.
 
 ## Bloqueos actuales
 

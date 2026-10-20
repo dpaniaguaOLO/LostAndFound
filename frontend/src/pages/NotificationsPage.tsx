@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { Notification } from '@laf/shared';
 import { EmptyState, ErrorState, Spinner } from '../components/ui';
 import { useToast } from '../context/ToastContext';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
+import { services } from '../services';
 
 export function NotificationsPage() {
   const { notify } = useToast();
@@ -16,11 +17,10 @@ export function NotificationsPage() {
   function load() {
     setLoading(true);
     setError(null);
-    api<Notification[]>('/notifications')
+    services.notifications
+      .list()
       .then(setItems)
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar notificaciones'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar notificaciones')))
       .finally(() => setLoading(false));
   }
 
@@ -28,7 +28,7 @@ export function NotificationsPage() {
 
   async function markOne(id: string) {
     try {
-      await api(`/notifications/${id}/read`, { method: 'PATCH' });
+      await services.notifications.markRead(id);
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     } catch {
       /* silencioso */
@@ -37,11 +37,11 @@ export function NotificationsPage() {
 
   async function markAll() {
     try {
-      await api('/notifications/read-all', { method: 'PATCH' });
+      await services.notifications.markAllRead();
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
       notify('Todas marcadas como leídas', 'success');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar', 'error');
+      notify(getErrorMessage(err, 'No se pudo actualizar'), 'error');
     }
   }
 

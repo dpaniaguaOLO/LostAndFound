@@ -6,8 +6,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { AuthResponse, LoginRequest, RegisterRequest, User } from '@laf/shared';
-import { api, tokenStore } from '../lib/api';
+import type { LoginRequest, RegisterRequest, User } from '@laf/shared';
+import { services } from '../services';
 
 interface AuthContextValue {
   user: User | null;
@@ -24,33 +24,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Al cargar, si hay token intenta recuperar el usuario actual.
+  // Al cargar, recupera la sesión actual desde la capa de datos activa
+  // (REST lee el token guardado; Supabase lee su propia sesión persistida).
   useEffect(() => {
-    const token = tokenStore.get();
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    api<User>('/auth/me')
-      .then(setUser)
-      .catch(() => tokenStore.clear())
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    services.auth
+      .getCurrentUser()
+      .then((u) => {
+        if (!cancelled) setUser(u);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function login(body: LoginRequest, remember = true) {
-    const res = await api<AuthResponse>('/auth/login', { method: 'POST', body, auth: false });
-    tokenStore.set(res.token, remember);
-    setUser(res.user);
+    const u = await services.auth.login(body.employeeId, body.password, remember);
+    setUser(u);
   }
 
   async function register(body: RegisterRequest, remember = true) {
-    const res = await api<AuthResponse>('/auth/register', { method: 'POST', body, auth: false });
-    tokenStore.set(res.token, remember);
-    setUser(res.user);
+    const u = await services.auth.register(
+      { name: body.name, employeeId: body.employeeId, password: body.password },
+      remember,
+    );
+    setUser(u);
   }
 
   function logout() {
-    tokenStore.clear();
+    // La implementación activa limpia su sesión (token REST o sesión Supabase).
+    void services.auth.logout();
     setUser(null);
   }
 

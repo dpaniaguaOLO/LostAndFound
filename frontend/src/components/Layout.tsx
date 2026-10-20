@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import type { Notification } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../lib/api';
+import { services } from '../services';
 import { Assistant } from './Assistant';
 import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
@@ -26,7 +25,8 @@ export function Layout() {
 
   useEffect(() => {
     let active = true;
-    api<Notification[]>('/notifications')
+    services.notifications
+      .list()
       .then((list) => active && setUnread(list.filter((n) => !n.read).length))
       .catch(() => void 0);
     return () => {

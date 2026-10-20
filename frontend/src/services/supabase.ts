@@ -22,6 +22,7 @@ import type {
   User,
   UserRole,
 } from '@laf/shared';
+import { syntheticEmail } from '../lib/config';
 import { requireSupabase } from '../lib/supabase';
 import type {
   AuthService,
@@ -140,16 +141,10 @@ const auth: AuthService = {
 
   async login(employeeId, password) {
     const sb = requireSupabase();
-    // Resolver el email a partir del número de colaborador. Esto requiere que el
-    // employee_id tenga un email asociado en el perfil. Si OLO usa correo
-    // corporativo, se puede derivar como `${employeeId}@dominio` (ver SETUP).
-    const { data: profile } = await sb
-      .from('profiles')
-      .select('email')
-      .eq('employee_id', employeeId)
-      .single();
-    const email = (profile as { email: string | null } | null)?.email;
-    if (!email) throw new Error('Credenciales incorrectas');
+    // Opción 2 (email sintético): el email se deriva del número de colaborador,
+    // así el login no depende de una consulta previa a profiles (que además
+    // estaría bloqueada por RLS antes de autenticar).
+    const email = syntheticEmail(employeeId);
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw new Error('Credenciales incorrectas');
     const user = await this.getCurrentUser();
@@ -159,8 +154,8 @@ const auth: AuthService = {
 
   async register(input) {
     const sb = requireSupabase();
-    // El email puede ser corporativo o derivado del número de colaborador.
-    const email = input.email ?? `${input.employeeId}@olo.local`;
+    // Email sintético derivado del número de colaborador (opción 2).
+    const email = syntheticEmail(input.employeeId);
     const { error } = await sb.auth.signUp({
       email,
       password: input.password,

@@ -60,17 +60,46 @@ Supabase Auth trabaja con email/contraseña, así que se resuelve así:
 - En el login, el frontend **resuelve el email a partir del `employee_id`** y luego llama
   a `signInWithPassword`. La implementación está en `frontend/src/services/supabase.ts`.
 
-Hay dos formas de dar de alta usuarios, a decidir según política de OLO:
-
-1. **Email corporativo real** (p. ej. `dpaniagua@ologistics.com`): el más simple y permite
-   recuperación de contraseña por correo.
-2. **Email sintético** derivado del número (p. ej. `1001@lostandfound.olo`): evita exponer
-   correos, pero inhabilita la recuperación por email.
+**Modelo elegido para este proyecto: email sintético (opción 2).** El email se deriva del
+número de colaborador con el dominio **`@lostandfound.olo`**, p. ej. el colaborador `1001`
+usa internamente `1001@lostandfound.olo`. El dominio es configurable con la variable
+`VITE_SUPABASE_EMAIL_DOMAIN` (por defecto `lostandfound.olo`). Como no hay correo real, la
+recuperación de contraseña la hace un **administrador** (ver §8).
 
 El trigger `handle_new_user()` crea automáticamente la fila en `profiles` cuando se registra
 un usuario en Auth, tomando `name` y `employee_id` de los metadatos del registro.
 
-> **Pendiente de decisión del usuario.** Esta guía no asume cuál se usará; documenta ambas.
+### 3.1 Crear usuarios (Paso 4 del alta)
+
+Al crear cada usuario, el email **debe** seguir el patrón `<numero>@lostandfound.olo` y hay
+que pasar `name` y `employee_id` en los metadatos para que el perfil se cree bien.
+
+**Opción recomendada — desde el SQL Editor** (crea usuario + confirma email + metadatos):
+
+```sql
+-- Crea un colaborador. Repite cambiando número, nombre y contraseña.
+select auth.admin_create_user(
+  '{
+     "email": "1001@lostandfound.olo",
+     "password": "password123",
+     "email_confirm": true,
+     "user_metadata": { "name": "Admin OLO", "employee_id": "1001" }
+   }'::jsonb
+);
+```
+
+> Si `auth.admin_create_user` no está disponible en tu plan, usa **Authentication → Users →
+> Add user** en el panel: pon el email `1001@lostandfound.olo`, marca *Auto Confirm User*, y
+> tras crearlo añade en *User Metadata* las claves `name` y `employee_id`. Si el perfil no se
+> crea con el employee_id correcto, ajústalo con un UPDATE sobre `public.profiles`.
+
+**Promover a administrador** (el trigger crea todos como `EMPLOYEE`):
+
+```sql
+update public.profiles set role = 'ADMIN' where employee_id = '1001';
+```
+
+Crea al menos uno de prueba de cada tipo, por ejemplo: `1001` (ADMIN) y `2002` (EMPLOYEE).
 
 ---
 
@@ -110,6 +139,26 @@ El emparejado por IA (NLP + firma visual) y el asistente **siguen en el backend 
 (crear notificaciones, escribir audit logs, aprobar reclamaciones con validación de flujo)
 deben ir en **Edge Functions** que usen `service_role`, nunca en el cliente.
 
+### Edge Function incluida: `admin-reset-password`
+
+Restablece la contraseña de un colaborador. Vive en
+`supabase/functions/admin-reset-password/`. Flujo de seguridad:
+
+1. Verifica el token del llamador y que su `profiles.role = 'ADMIN'`.
+2. Solo entonces usa la `service_role` (lado servidor) para cambiar la contraseña del
+   usuario destino vía la Auth Admin API.
+3. Registra la acción en `audit_logs`.
+
+Desplegar (requiere Supabase CLI y `supabase link` hecho):
+
+```bash
+supabase functions deploy admin-reset-password
+```
+
+La función usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, que
+Supabase **inyecta automáticamente** en las Edge Functions del proyecto; no hay que
+configurarlas a mano. La `service_role` nunca sale del servidor.
+
 ---
 
 ## 7. Activar Supabase en el frontend
@@ -120,18 +169,39 @@ En `frontend/.env` (copia de `.env.example`):
 VITE_DATA_BACKEND=supabase
 VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
 VITE_SUPABASE_ANON_KEY=tu-clave-anon-publica
+# Opcional: dominio del email sintético (por defecto lostandfound.olo)
+VITE_SUPABASE_EMAIL_DOMAIN=lostandfound.olo
 ```
 
 Reconstruye (`npm run build:frontend`). Con el flag en `rest` (por defecto) la app sigue
 usando el backend Express sin cambios.
 
+### Estado de la integración (Fase 1)
+
+Lo que **ya funciona** con Supabase como backend de datos (la UI consume la capa
+`frontend/src/services` en lugar del backend Express):
+
+- Autenticación (login/registro/logout) por número de colaborador.
+- Muro (objetos encontrados y perdidos), publicar con foto (Storage), detalle.
+- Reclamaciones (crear, revisar, cancelar) y notificaciones.
+- Restablecimiento de contraseña por admin (Edge Function).
+
+Lo que **todavía depende del backend Express** (Fase 2, pendiente de portar a Edge
+Functions): las funciones de IA (búsqueda semántica, coincidencias, asistente) y el panel
+de administración (métricas, lista de usuarios, historial de auditoría, bandeja global de
+reclamaciones). En modo Supabase esas vistas no cargarán datos hasta completar la Fase 2.
+
 ---
 
 ## Checklist de pasos manuales pendientes
 
-- [ ] Crear el proyecto en Supabase y copiar URL + anon key.
-- [ ] Aplicar las 4 migraciones (`supabase db push` o SQL Editor).
-- [ ] Decidir el modelo de auth (email corporativo vs sintético) y dar de alta usuarios.
-- [ ] Verificar que el bucket `item-photos` existe y es privado.
-- [ ] Rellenar `frontend/.env` y cambiar `VITE_DATA_BACKEND=supabase`.
-- [ ] Portar las operaciones sensibles a Edge Functions antes de producción.
+- [x] Crear el proyecto en Supabase y copiar URL + anon key.
+- [x] Aplicar las 4 migraciones (`supabase db push` o SQL Editor).
+- [x] Modelo de auth decidido: email sintético con dominio `@lostandfound.olo` (opción 2).
+- [x] Rellenar `frontend/.env` y cambiar `VITE_DATA_BACKEND=supabase`.
+- [ ] **Crear los usuarios** (al menos un ADMIN y un EMPLEADO) con email `<numero>@lostandfound.olo` (§3.1).
+- [ ] Verificar en el panel que el bucket `item-photos` existe y es privado (Storage).
+- [ ] Desplegar la Edge Function `admin-reset-password` (`supabase functions deploy admin-reset-password`).
+- [ ] Probar login + muro + publicar con foto end-to-end.
+- [ ] Fase 2: portar IA y panel admin a Edge Functions.
+- [ ] Antes de producción: rotar la anon key (se compartió en chat) y revisar políticas.

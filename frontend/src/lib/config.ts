@@ -34,8 +34,24 @@ export const config = {
     get configured() {
       return Boolean(this.url && this.anonKey);
     },
+    /**
+     * Dominio del email sintético derivado del número de colaborador (opción 2).
+     * El login es por employee_id; internamente Supabase Auth usa email, así que
+     * se construye `${employeeId}@${authEmailDomain}`. DEBE coincidir con el
+     * email usado al crear cada usuario en el panel de Supabase.
+     * Configurable con VITE_SUPABASE_EMAIL_DOMAIN.
+     */
+    authEmailDomain: readEnv('VITE_SUPABASE_EMAIL_DOMAIN') ?? 'lostandfound.olo',
   },
 };
+
+/**
+ * Construye el email sintético de un colaborador a partir de su número.
+ * Ej.: syntheticEmail('1001') -> '1001@lostandfound.olo'
+ */
+export function syntheticEmail(employeeId: string): string {
+  return `${employeeId.trim()}@${config.supabase.authEmailDomain}`;
+}
 
 /** ¿Debe la app usar Supabase como backend de datos? */
 export const useSupabase = config.dataBackend === 'supabase' && config.supabase.configured;

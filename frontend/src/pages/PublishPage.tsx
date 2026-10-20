@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { FoundItem, LostReport } from '@laf/shared';
 import { ItemForm, type ItemFormValues } from '../components/ItemForm';
 import { useToast } from '../context/ToastContext';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
+import { services } from '../services';
 
 type Mode = 'found' | 'lost';
 
@@ -24,17 +24,17 @@ export function PublishPage() {
     try {
       if (mode === 'found') {
         fd.set('foundAt', iso);
-        const created = await api<FoundItem>('/found-items', { method: 'POST', formData: fd });
+        const created = await services.foundItems.create(fd);
         notify('Objeto encontrado publicado', 'success');
         navigate(`/objetos/${created.id}`);
       } else {
         fd.set('lostAt', iso);
-        await api<LostReport>('/lost-reports', { method: 'POST', formData: fd });
+        await services.lostReports.create(fd);
         notify('Objeto perdido reportado', 'success');
         navigate('/mis-objetos?tab=lost');
       }
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo publicar', 'error');
+      notify(getErrorMessage(err, 'No se pudo publicar'), 'error');
     }
   }
 

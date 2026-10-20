@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.12.0] - 2026-10-20
+
+Conexión real a **Supabase** (Fase 1) en la rama `feature/supabase-android`. La UI pasa a
+consumir la capa de datos `services`, de modo que con `VITE_DATA_BACKEND=supabase` el CRUD,
+la autenticación y las fotos funcionan contra Supabase. El modo `rest` sigue intacto.
+
+### Añadido
+- **La UI consume la capa `services`** (antes llamaba al backend REST directo). Migrados:
+  AuthContext, muro, publicar, mis objetos, detalle de encontrado/perdido, reclamaciones,
+  notificaciones y el contador de notificaciones del encabezado.
+- **Login por número de colaborador con email sintético** (opción 2): el email se deriva
+  como `<numero>@lostandfound.olo` (dominio configurable con `VITE_SUPABASE_EMAIL_DOMAIN`).
+  Helper `syntheticEmail()` en `lib/config.ts`.
+- **Restablecimiento de contraseña por administrador**: Edge Function
+  `supabase/functions/admin-reset-password` (verifica rol ADMIN y usa `service_role` solo en
+  el servidor; registra en `audit_logs`), servicio `services/admin.ts` y formulario
+  `components/PasswordResetCard.tsx` en el panel admin.
+- Utilidad `lib/errors.ts` (`getErrorMessage`) para mostrar errores de forma agnóstica del
+  backend (REST o Supabase).
+
+### Notas
+- **Fase 2 pendiente**: las funciones de IA (búsqueda, coincidencias, asistente) y el panel
+  admin (métricas, usuarios, auditoría, bandeja global) aún dependen del backend Express;
+  se portarán a Edge Functions. En modo Supabase esas vistas no cargan datos todavía.
+- Verificado contra el proyecto Supabase real: las 6 tablas existen y responden con la anon
+  key; build del frontend sin errores. La app Android no se recompiló en esta fase.
+- Pendiente del usuario: crear usuarios, confirmar el bucket `item-photos`, desplegar la
+  Edge Function y (antes de producción) rotar la anon key.
+
+---
+
 ## [0.11.0] - 2026-10-20
 
 Preparación para **Supabase** y **Android** (rama `feature/supabase-android`). Cambios

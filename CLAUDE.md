@@ -119,15 +119,22 @@ El proyecto se ha preparado de forma **progresiva y reversible** para dos objeti
 romper ni eliminar nada de lo existente. Documentación completa en
 `docs/ARCHITECTURE.md`, `docs/SUPABASE_SETUP.md` y `docs/ANDROID_SETUP.md`.
 
-- **Supabase (PostgreSQL + Auth + Storage), preparado pero NO conectado.** No hay
-  credenciales reales en el repo. Piezas creadas:
+- **Supabase (PostgreSQL + Auth + Storage), Fase 1 CONECTADA.** El `.env` del repo NO se
+  versiona (credenciales fuera de git). Piezas:
   - Migraciones SQL versionadas en `supabase/migrations/` (esquema, helpers, RLS, Storage).
   - RLS en todas las tablas; `service_role` nunca en el cliente.
   - Cliente JS (`frontend/src/lib/supabase.ts`) y capa de datos con interfaz común
-    (`frontend/src/services/`): implementaciones `rest` y `supabase`.
-  - Feature flag **`VITE_DATA_BACKEND`** (`rest` por defecto → no cambia nada).
-  - Login sigue por **número de colaborador**: el cliente resuelve el email desde
-    `profiles.employee_id`.
+    (`frontend/src/services/`): implementaciones `rest` y `supabase`. **La UI ya consume
+    `services`** (AuthContext, muro, publicar, mis objetos, detalles, reclamaciones,
+    notificaciones).
+  - Feature flag **`VITE_DATA_BACKEND`** (`rest` por defecto → no cambia nada; `supabase`
+    activa el backend de Supabase para el CRUD).
+  - Login por **número de colaborador** con **email sintético** `<numero>@lostandfound.olo`
+    (opción 2; dominio en `VITE_SUPABASE_EMAIL_DOMAIN`). Helper `syntheticEmail()`.
+  - **Reset de contraseña por admin**: Edge Function `supabase/functions/admin-reset-password`
+    (verifica ADMIN + usa `service_role` en servidor), `services/admin.ts`, `PasswordResetCard`.
+  - **Fase 2 pendiente**: IA (`/ai/*`) y panel admin (`/admin/*`, `/claims/all`) siguen en el
+    backend Express; se portarán a Edge Functions. En modo Supabase esas vistas no cargan aún.
 - **Android con Capacitor** (elegido sobre React Native/Expo para reutilizar la web):
   - `frontend/capacitor.config.ts`, proyecto nativo en `frontend/android/`.
   - Puente nativo `frontend/src/lib/native.ts` (StatusBar, Keyboard, botón atrás); *no-op*
@@ -308,8 +315,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.11.0 (ver `VERSION`). Rama `feature/supabase-android`: preparación para
-  Supabase (no conectado) y Android (Capacitor). La rama `main` iba por 0.10.1.
+- **Versión**: 0.12.0 (ver `VERSION`). Rama `feature/supabase-android`: Supabase Fase 1
+  conectada (CRUD/auth/storage) y Android (Capacitor) preparado. La rama `main` iba por 0.10.1.
 - **Último commit relevante**: ver `git log` / `CHANGELOG.md` (primer release 0.1.0).
 - **Terminado**: monorepo, shared, backend completo (auth, found-items, lost-reports,
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
