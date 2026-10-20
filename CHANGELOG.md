@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.14.0] - 2026-10-20
+
+Moderación de admin más completa: paridad de acciones entre objetos encontrados y
+reportes perdidos, y una vista de archivados con restauración.
+
+### Añadido
+- **Archivar reportes perdidos** (admin): además de eliminar, el admin puede archivar un
+  reporte perdido, que pasa a estado `CLOSED` (equivalente a archivar un encontrado). Botones
+  Archivar/Eliminar en el detalle del reporte perdido.
+- **Pestaña "Archivados" en el panel admin**: lista los objetos encontrados `ARCHIVED` y los
+  reportes perdidos `CLOSED` de toda la organización, con botón **Restaurar** que los devuelve
+  al muro (encontrado → `PUBLISHED`, perdido → `OPEN`). Nuevos endpoints `GET /admin/archived`
+  y `POST /admin/restore` en la Edge Function `api` y en el backend Express.
+- Nuevas acciones de auditoría `FOUND_ITEM_RESTORED` y `LOST_REPORT_RESTORED`.
+
+### Cambiado
+- El **muro de perdidos** ahora oculta los reportes `CLOSED` (archivados), igual que el muro
+  de encontrados ya ocultaba los `ARCHIVED`. Los archivados siguen visibles para su dueño en
+  "Mis objetos" y en el detalle.
+
+### Notas
+- Requiere **redesplegar** la Edge Function tras actualizar: `supabase functions deploy api`.
+- Verificado: build completo (shared+backend+frontend) sin errores.
+
+---
+
 ## [0.13.0] - 2026-10-20
 
 Supabase **Fase 2**: la IA y el panel de administración se portan a una Edge Function, de

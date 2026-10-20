@@ -1,27 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { AuditEntry, Claim, User } from '@laf/shared';
+import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { PasswordResetCard } from '../components/PasswordResetCard';
-import { ErrorState, Spinner, StatusBadge, Tabs } from '../components/ui';
+import { ErrorState, ItemImage, Spinner, StatusBadge, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
-import { CLAIM_STATUS_LABELS, formatDate, formatDateTime } from '../lib/format';
+import { CATEGORY_LABELS, CLAIM_STATUS_LABELS, formatDate, formatDateTime } from '../lib/format';
 import { adminService, type AdminStats } from '../services/admin';
 
 type Stats = AdminStats;
 
-type Tab = 'overview' | 'claims' | 'audit';
+type Tab = 'overview' | 'claims' | 'audit' | 'archived';
 
 const ACTION_LABELS: Record<string, string> = {
   FOUND_ITEM_EDITED: 'Editó un objeto encontrado',
   FOUND_ITEM_ARCHIVED: 'Archivó un objeto',
   FOUND_ITEM_DELETED: 'Eliminó un objeto',
   FOUND_ITEM_RETURNED: 'Marcó un objeto como devuelto',
+  FOUND_ITEM_RESTORED: 'Restauró un objeto encontrado',
   LOST_REPORT_EDITED: 'Editó un reporte perdido',
   LOST_REPORT_DELETED: 'Eliminó un reporte perdido',
   LOST_REPORT_RESOLVED: 'Resolvió un reporte perdido',
+  LOST_REPORT_RESTORED: 'Restauró un reporte perdido',
   CLAIM_REVIEWED: 'Revisó una reclamación',
   USER_ROLE_CHANGED: 'Cambió el rol de un usuario',
+  USER_PASSWORD_RESET: 'Restableció una contraseña',
 };
 
 export function AdminPage() {
@@ -32,6 +35,7 @@ export function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [claims, setClaims] = useState<Claim[] | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
+  const [archived, setArchived] = useState<ArchivedResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +63,31 @@ export function AdminPage() {
     if (tab === 'audit' && audit === null) {
       adminService.audit().then(setAudit).catch(() => setAudit([]));
     }
-  }, [tab, claims, audit]);
+    if (tab === 'archived' && archived === null) {
+      adminService
+        .archived()
+        .then(setArchived)
+        .catch(() => setArchived({ found: [], lost: [] }));
+    }
+  }, [tab, claims, audit, archived]);
+
+  async function restore(kind: 'found' | 'lost', id: string) {
+    try {
+      await adminService.restore(kind, id);
+      notify('Objeto restaurado', 'success');
+      // Quita el elemento de la lista local sin recargar todo.
+      setArchived((prev) =>
+        prev
+          ? {
+              found: kind === 'found' ? prev.found.filter((i) => i.id !== id) : prev.found,
+              lost: kind === 'lost' ? prev.lost.filter((i) => i.id !== id) : prev.lost,
+            }
+          : prev,
+      );
+    } catch (err) {
+      notify(getErrorMessage(err, 'No se pudo restaurar'), 'error');
+    }
+  }
 
   async function changeRole(user: User, role: 'ADMIN' | 'EMPLOYEE') {
     try {
@@ -104,6 +132,7 @@ export function AdminPage() {
         tabs={[
           { key: 'overview', label: 'Resumen' },
           { key: 'claims', label: 'Reclamaciones' },
+          { key: 'archived', label: 'Archivados' },
           { key: 'audit', label: 'Historial' },
         ]}
         value={tab}
@@ -204,6 +233,56 @@ export function AdminPage() {
                       Reclama: {c.claimant.name} · {formatDateTime(c.createdAt)}
                     </p>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* --- ARCHIVADOS (moderación) --- */}
+      {tab === 'archived' && (
+        <div>
+          {archived === null ? (
+            <Spinner />
+          ) : archived.found.length === 0 && archived.lost.length === 0 ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              No hay objetos archivados. Los objetos encontrados que archives y los reportes
+              perdidos que cierres aparecerán aquí para revisarlos o restaurarlos.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {[
+                ...archived.found.map((i) => ({ kind: 'found' as const, item: i })),
+                ...archived.lost.map((i) => ({ kind: 'lost' as const, item: i })),
+              ].map(({ kind, item }) => (
+                <div
+                  key={`${kind}-${item.id}`}
+                  className="card flex items-center gap-3 p-3 sm:gap-4"
+                >
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
+                    <ItemImage src={item.imageUrl} alt={item.title} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">
+                        {item.title}
+                      </span>
+                      <span className="badge bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300">
+                        {kind === 'found' ? 'Encontrado' : 'Perdido'}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                      {CATEGORY_LABELS[item.category]}
+                      {item.location ? ` · ${item.location}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    className="btn-secondary shrink-0"
+                    onClick={() => restore(kind, item.id)}
+                  >
+                    Restaurar
+                  </button>
                 </div>
               ))}
             </div>

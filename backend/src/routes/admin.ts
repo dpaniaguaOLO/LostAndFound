@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { notFound } from '../lib/http.js';
-import { serializeUser } from '../lib/serialize.js';
+import { serializeFoundItem, serializeLostReport, serializeUser } from '../lib/serialize.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { writeAudit } from '../lib/audit.js';
 
@@ -77,5 +77,51 @@ adminRouter.get(
         createdAt: l.createdAt.toISOString(),
       })),
     );
+  }),
+);
+
+// GET /api/admin/archived — objetos retirados de circulación (moderación).
+// Encontrados en estado ARCHIVED + perdidos en estado CLOSED.
+adminRouter.get(
+  '/archived',
+  asyncHandler(async (_req, res) => {
+    const [found, lost] = await Promise.all([
+      prisma.foundItem.findMany({
+        where: { status: 'ARCHIVED' },
+        include: { reporter: { select: { id: true, name: true } } },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.lostReport.findMany({
+        where: { status: 'CLOSED' },
+        include: { reporter: { select: { id: true, name: true } } },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+    res.json({ found: found.map(serializeFoundItem), lost: lost.map(serializeLostReport) });
+  }),
+);
+
+// POST /api/admin/restore — devuelve un objeto archivado a circulación.
+// body: { kind: 'found'|'lost', id }. found => PUBLISHED, lost => OPEN.
+adminRouter.post(
+  '/restore',
+  asyncHandler(async (req, res) => {
+    const kind = req.body?.kind;
+    const id = String(req.body?.id ?? '');
+    if ((kind !== 'found' && kind !== 'lost') || !id) {
+      return res.status(400).json({ error: 'BAD_REQUEST', message: 'kind (found|lost) e id requeridos' });
+    }
+    if (kind === 'found') {
+      const item = await prisma.foundItem.findUnique({ where: { id } });
+      if (!item) throw notFound('Objeto no encontrado');
+      await prisma.foundItem.update({ where: { id }, data: { status: 'PUBLISHED' } });
+      await writeAudit(req.auth!.sub, 'FOUND_ITEM_RESTORED', 'FoundItem', id, `Restauró "${item.title}"`);
+    } else {
+      const item = await prisma.lostReport.findUnique({ where: { id } });
+      if (!item) throw notFound('Reporte no encontrado');
+      await prisma.lostReport.update({ where: { id }, data: { status: 'OPEN' } });
+      await writeAudit(req.auth!.sub, 'LOST_REPORT_RESTORED', 'LostReport', id, `Restauró "${item.title}"`);
+    }
+    res.json({ ok: true });
   }),
 );

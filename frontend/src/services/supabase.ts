@@ -278,6 +278,8 @@ const lostReports: LostReportsService = {
     let q = sb
       .from('lost_reports')
       .select(REPORTER_SELECT, { count: 'exact' })
+      // Oculta los archivados/cerrados del muro (equivale a excluir ARCHIVED en encontrados).
+      .in('status', ['OPEN', 'MATCHED', 'RESOLVED'])
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (params.category) q = q.eq('category', params.category);
@@ -329,6 +331,22 @@ const lostReports: LostReportsService = {
       .single();
     if (error) throw error;
     return toLostReport(data);
+  },
+
+  async close(id) {
+    const { data, error } = await requireSupabase()
+      .from('lost_reports')
+      .update({ status: 'CLOSED' })
+      .eq('id', id)
+      .select(REPORTER_SELECT)
+      .single();
+    if (error) throw error;
+    return toLostReport(data);
+  },
+
+  async remove(id) {
+    const { error } = await requireSupabase().from('lost_reports').delete().eq('id', id);
+    if (error) throw error;
   },
 };
 

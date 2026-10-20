@@ -47,6 +47,10 @@ export interface LostReportsService {
   get(id: string): Promise<LostReport>;
   mine(): Promise<LostReport[]>;
   create(form: FormData): Promise<LostReport>;
+  /** Cierra un reporte perdido (equivalente a "archivar": lo retira pero lo conserva). */
+  close(id: string): Promise<LostReport>;
+  /** Elimina un reporte perdido (moderación: solo admin). */
+  remove(id: string): Promise<void>;
 }
 
 export interface ClaimsService {

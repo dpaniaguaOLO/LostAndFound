@@ -147,6 +147,10 @@ supabase functions deploy api
 supabase functions deploy admin-reset-password
 ```
 
+> **Importante:** cada vez que cambie el código de una Edge Function (p. ej. al añadir
+> endpoints), hay que **volver a desplegarla** con el mismo comando para que el cambio surta
+> efecto en el proyecto.
+
 Ambas usan `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, que Supabase
 **inyecta automáticamente** en las Edge Functions del proyecto; no hay que configurarlas a
 mano. La `service_role` nunca sale del servidor.

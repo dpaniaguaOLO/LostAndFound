@@ -50,3 +50,7 @@ Thumbs.db
 *.swp
 .vscode/*
 !.vscode/extensions.json
+
+# Supabase CLI (artefactos locales; no versionar)
+supabase/.temp/
+supabase/.branches/

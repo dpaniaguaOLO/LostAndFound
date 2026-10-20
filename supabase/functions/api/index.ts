@@ -276,6 +276,50 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // GET /admin/archived — objetos retirados de circulación (moderación).
+    //   encontrados en estado ARCHIVED + perdidos en estado CLOSED.
+    if (method === 'GET' && path === '/admin/archived') {
+      const [{ data: fData }, { data: lData }] = await Promise.all([
+        sb.from('found_items').select(REPORTER_SELECT).eq('status', 'ARCHIVED')
+          .order('updated_at', { ascending: false }),
+        sb.from('lost_reports').select(REPORTER_SELECT).eq('status', 'CLOSED')
+          .order('updated_at', { ascending: false }),
+      ]);
+      const found = await Promise.all(((fData ?? []) as Row[]).map((r) => serializeFoundItem(sb, r)));
+      const lost = await Promise.all(((lData ?? []) as Row[]).map((r) => serializeLostReport(sb, r)));
+      return json({ found, lost });
+    }
+
+    // POST /admin/restore — devuelve un objeto archivado a circulación.
+    //   { kind: 'found'|'lost', id } -> found=>PUBLISHED, lost=>OPEN.
+    if (method === 'POST' && path === '/admin/restore') {
+      const body = await req.json().catch(() => ({}));
+      const kind = body.kind;
+      const id = String(body.id ?? '');
+      if ((kind !== 'found' && kind !== 'lost') || !id) {
+        return json({ error: 'BAD_REQUEST', message: 'kind (found|lost) e id requeridos' }, 400);
+      }
+      const table = kind === 'found' ? 'found_items' : 'lost_reports';
+      const newStatus = kind === 'found' ? 'PUBLISHED' : 'OPEN';
+      const { data, error } = await sb
+        .from(table)
+        .update({ status: newStatus })
+        .eq('id', id)
+        .select('id, title')
+        .single();
+      if (error) return json({ error: 'UPDATE_FAILED', message: error.message }, 500);
+      if (!data) return json({ error: 'NOT_FOUND', message: 'Objeto no encontrado' }, 404);
+      await writeAudit(
+        sb,
+        caller.id,
+        kind === 'found' ? 'FOUND_ITEM_RESTORED' : 'LOST_REPORT_RESTORED',
+        kind === 'found' ? 'FoundItem' : 'LostReport',
+        id,
+        `Restauró "${(data as Row).title}"`,
+      );
+      return json({ ok: true });
+    }
+
     // GET /claims/all
     if (method === 'GET' && path === '/claims/all') {
       const { data } = await sb

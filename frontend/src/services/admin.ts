@@ -10,7 +10,7 @@
  * Se mantiene fuera de `DataServices` porque es específica de administración y no
  * todos los backends la exponen igual.
  */
-import type { AuditEntry, Claim, User } from '@laf/shared';
+import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { config, useSupabase } from '../lib/config';
 import { requireSupabase } from '../lib/supabase';
 import { api } from '../lib/api';
@@ -31,6 +31,10 @@ export interface AdminService {
   setRole(userId: string, role: 'ADMIN' | 'EMPLOYEE'): Promise<User>;
   audit(limit?: number): Promise<AuditEntry[]>;
   allClaims(): Promise<Claim[]>;
+  /** Objetos retirados de circulación (encontrados ARCHIVED + perdidos CLOSED). */
+  archived(): Promise<ArchivedResponse>;
+  /** Devuelve un objeto archivado al muro (found→PUBLISHED, lost→OPEN). */
+  restore(kind: 'found' | 'lost', id: string): Promise<void>;
 }
 
 /** Invoca la Edge Function `api` (reutilizada para las rutas admin en Supabase). */
@@ -90,6 +94,10 @@ const supabaseAdmin: AdminService = {
     invokeEdge<User>('PATCH', `/admin/users/${userId}/role`, { role }),
   audit: (limit = 100) => invokeEdge<AuditEntry[]>('GET', `/admin/audit?limit=${limit}`),
   allClaims: () => invokeEdge<Claim[]>('GET', '/claims/all'),
+  archived: () => invokeEdge<ArchivedResponse>('GET', '/admin/archived'),
+  restore: async (kind, id) => {
+    await invokeEdge('POST', '/admin/restore', { kind, id });
+  },
 };
 
 const restAdmin: AdminService = {
@@ -105,6 +113,10 @@ const restAdmin: AdminService = {
     api<User>(`/admin/users/${userId}/role`, { method: 'PATCH', body: { role } }),
   audit: (limit = 100) => api<AuditEntry[]>(`/admin/audit?limit=${limit}`),
   allClaims: () => api<Claim[]>('/claims/all'),
+  archived: () => api<ArchivedResponse>('/admin/archived'),
+  restore: async (kind, id) => {
+    await api('/admin/restore', { method: 'POST', body: { kind, id } });
+  },
 };
 
 export const adminService: AdminService = useSupabase ? supabaseAdmin : restAdmin;

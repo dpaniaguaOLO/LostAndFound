@@ -270,11 +270,20 @@ export type AuditAction =
   | 'FOUND_ITEM_ARCHIVED'
   | 'FOUND_ITEM_DELETED'
   | 'FOUND_ITEM_RETURNED'
+  | 'FOUND_ITEM_RESTORED'
   | 'LOST_REPORT_EDITED'
   | 'LOST_REPORT_DELETED'
   | 'LOST_REPORT_RESOLVED'
+  | 'LOST_REPORT_RESTORED'
   | 'CLAIM_REVIEWED'
-  | 'USER_ROLE_CHANGED';
+  | 'USER_ROLE_CHANGED'
+  | 'USER_PASSWORD_RESET';
+
+/** Objetos retirados de circulación, para la vista de moderación del admin. */
+export interface ArchivedResponse {
+  found: FoundItem[]; // encontrados en estado ARCHIVED
+  lost: LostReport[]; // perdidos en estado CLOSED
+}
 
 export interface AuditEntry {
   id: string;
