@@ -56,6 +56,24 @@ async function availableFoundItems(sb: ReturnType<typeof adminClient>): Promise<
   return (data ?? []) as Row[];
 }
 
+/** Inserta una notificación in-app para un usuario (best-effort). */
+async function notify(
+  sb: ReturnType<typeof adminClient>,
+  n: { userId: string; type: string; title: string; body: string; relatedItemId?: string | null },
+): Promise<void> {
+  try {
+    await sb.from('notifications').insert({
+      user_id: n.userId,
+      type: n.type,
+      title: n.title,
+      body: n.body,
+      related_item_id: n.relatedItemId ?? null,
+    });
+  } catch (e) {
+    console.error('[notify]', e);
+  }
+}
+
 /** Registra un evento de auditoría (best-effort, nunca interrumpe). */
 async function writeAudit(
   sb: ReturnType<typeof adminClient>,
@@ -194,6 +212,130 @@ Deno.serve(async (req: Request) => {
       }
 
       return json({ answer: composeAnswer(intent, count), kind: intent.kind, foundItems, lostReports });
+    }
+
+    // ================= CLAIMS (flujo con notificaciones) =================
+    const CLAIM_SELECT =
+      '*, claimant:profiles!claimant_id (id, name), found_item:found_items!found_item_id (id, title, image_path, status, reporter_id)';
+
+    // POST /claims — crear una reclamación.
+    if (method === 'POST' && path === '/claims') {
+      const body = await req.json().catch(() => ({}));
+      const foundItemId = String(body.foundItemId ?? '');
+      const message = String(body.message ?? '');
+      if (!foundItemId || message.length < 2) {
+        return json({ error: 'BAD_REQUEST', message: 'foundItemId y mensaje (mín. 2) requeridos' }, 400);
+      }
+      const { data: item } = await sb
+        .from('found_items')
+        .select('id, title, status, reporter_id')
+        .eq('id', foundItemId)
+        .single();
+      if (!item) return json({ error: 'NOT_FOUND', message: 'Objeto no encontrado' }, 404);
+      if (item.status === 'RETURNED' || item.status === 'ARCHIVED') {
+        return json({ error: 'BAD_REQUEST', message: 'Este objeto ya no está disponible para reclamar' }, 400);
+      }
+      if (item.reporter_id === caller.id) {
+        return json({ error: 'BAD_REQUEST', message: 'No puedes reclamar un objeto que tú publicaste' }, 400);
+      }
+      const { data: existing } = await sb
+        .from('claims')
+        .select('id')
+        .eq('found_item_id', foundItemId)
+        .eq('claimant_id', caller.id)
+        .eq('status', 'PENDING')
+        .maybeSingle();
+      if (existing) {
+        return json({ error: 'BAD_REQUEST', message: 'Ya tienes una reclamación pendiente para este objeto' }, 400);
+      }
+      const { data: created, error } = await sb
+        .from('claims')
+        .insert({ found_item_id: foundItemId, claimant_id: caller.id, message })
+        .select(CLAIM_SELECT)
+        .single();
+      if (error) return json({ error: 'CREATE_FAILED', message: error.message }, 500);
+      await notify(sb, {
+        userId: item.reporter_id,
+        type: 'CLAIM_REQUESTED',
+        title: 'Nueva solicitud de reclamación',
+        body: `Alguien solicitó reclamar "${item.title}".`,
+        relatedItemId: item.id,
+      });
+      return json(await serializeClaim(sb, created as Row), 201);
+    }
+
+    // PATCH /claims/:id/review — aprobar/rechazar (autor del objeto o admin).
+    if (method === 'PATCH' && /^\/claims\/[^/]+\/review$/.test(path)) {
+      const claimId = path.split('/')[2];
+      const body = await req.json().catch(() => ({}));
+      const status = body.status;
+      const reviewNote = body.reviewNote ?? null;
+      if (status !== 'APPROVED' && status !== 'REJECTED') {
+        return json({ error: 'BAD_REQUEST', message: 'status debe ser APPROVED o REJECTED' }, 400);
+      }
+      const { data: claim } = await sb
+        .from('claims')
+        .select('*, found_item:found_items!found_item_id (id, title, reporter_id)')
+        .eq('id', claimId)
+        .single();
+      if (!claim) return json({ error: 'NOT_FOUND', message: 'Reclamación no encontrada' }, 404);
+      const fi = claim.found_item as Row;
+      const isOwner = fi?.reporter_id === caller.id;
+      if (!isOwner && caller.role !== 'ADMIN') {
+        return json({ error: 'FORBIDDEN', message: 'No puedes revisar esta reclamación' }, 403);
+      }
+      if (claim.status !== 'PENDING') {
+        return json({ error: 'BAD_REQUEST', message: 'La reclamación ya fue procesada' }, 400);
+      }
+      await sb
+        .from('claims')
+        .update({ status, reviewer_id: caller.id, review_note: reviewNote })
+        .eq('id', claimId);
+      if (status === 'APPROVED') {
+        await sb.from('found_items').update({ status: 'CLAIMED' }).eq('id', claim.found_item_id);
+        // Rechaza automáticamente otras reclamaciones pendientes del mismo objeto.
+        await sb
+          .from('claims')
+          .update({ status: 'REJECTED', review_note: 'Otra reclamación fue aprobada' })
+          .eq('found_item_id', claim.found_item_id)
+          .eq('status', 'PENDING')
+          .neq('id', claimId);
+      }
+      await notify(sb, {
+        userId: claim.claimant_id as string,
+        type: status === 'APPROVED' ? 'CLAIM_APPROVED' : 'CLAIM_REJECTED',
+        title: status === 'APPROVED' ? 'Reclamación aprobada' : 'Reclamación rechazada',
+        body:
+          status === 'APPROVED'
+            ? `Tu reclamación de "${fi?.title}" fue aprobada. Coordina la entrega.`
+            : `Tu reclamación de "${fi?.title}" fue rechazada.`,
+        relatedItemId: claim.found_item_id as string,
+      });
+      await writeAudit(
+        sb,
+        caller.id,
+        'CLAIM_REVIEWED',
+        'Claim',
+        claimId,
+        `Reclamación ${status === 'APPROVED' ? 'aprobada' : 'rechazada'} de "${fi?.title}"`,
+      );
+      const { data: fresh } = await sb.from('claims').select(CLAIM_SELECT).eq('id', claimId).single();
+      return json(await serializeClaim(sb, fresh as Row));
+    }
+
+    // PATCH /claims/:id/cancel — cancelar la propia reclamación pendiente.
+    if (method === 'PATCH' && /^\/claims\/[^/]+\/cancel$/.test(path)) {
+      const claimId = path.split('/')[2];
+      const { data: claim } = await sb.from('claims').select('*').eq('id', claimId).single();
+      if (!claim || claim.claimant_id !== caller.id) {
+        return json({ error: 'NOT_FOUND', message: 'Reclamación no encontrada' }, 404);
+      }
+      if (claim.status !== 'PENDING') {
+        return json({ error: 'BAD_REQUEST', message: 'Solo se pueden cancelar reclamaciones pendientes' }, 400);
+      }
+      await sb.from('claims').update({ status: 'CANCELLED' }).eq('id', claimId);
+      const { data: fresh } = await sb.from('claims').select(CLAIM_SELECT).eq('id', claimId).single();
+      return json(await serializeClaim(sb, fresh as Row));
     }
 
     // ================= ADMIN =================

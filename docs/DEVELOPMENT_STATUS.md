@@ -2,9 +2,9 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.14.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Versión actual**: 0.15.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
 - **Fecha**: 2026-10-20
-- **Commit más reciente**: moderación — archivar perdidos + vista de archivados (ver `git log`)
+- **Commit más reciente**: flujo de reclamaciones + notificaciones en Edge Function (ver `git log`)
 - **Última funcionalidad completada**: **Fase 2 de Supabase**. La IA (búsqueda, coincidencias,
   asistente) y el panel admin (métricas, usuarios, rol, auditoría, bandeja global) se portaron
   a la Edge Function `api` (motor NLP/matching/firma visual en `supabase/functions/_shared/`).

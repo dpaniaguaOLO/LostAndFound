@@ -37,6 +37,34 @@ import type {
 const PAGE_SIZE = 12;
 const PHOTO_BUCKET = 'item-photos';
 
+/**
+ * Invoca la Edge Function `api` para operaciones de reclamación que requieren
+ * privilegios de servidor (notificaciones, transición de estado). Devuelve el
+ * Claim serializado.
+ */
+async function edgeClaim(
+  method: 'POST' | 'PATCH',
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<Claim> {
+  const sb = requireSupabase();
+  const { data, error } = await sb.functions.invoke(`api${path}`, { method, body });
+  if (error) {
+    let message = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) {
+        const parsed = await ctx.json();
+        if (parsed?.message) message = parsed.message;
+      }
+    } catch {
+      /* usa mensaje por defecto */
+    }
+    throw new Error(message);
+  }
+  return data as Claim;
+}
+
 // --- Mapeo de filas Postgres -> tipos compartidos ---------------------------
 
 type ProfileRow = { id: string; name: string; employee_id: string; email: string | null; role: string; created_at: string };
@@ -376,39 +404,17 @@ const claims: ClaimsService = {
     if (error) throw error;
     return (data ?? []) as unknown as Claim[];
   },
+  // Las reclamaciones pasan por la Edge Function `api`: el flujo necesita
+  // privilegios (notificar al dueño/reclamante, cambiar el estado del objeto,
+  // rechazar en cascada), que no se pueden hacer con RLS desde el cliente.
   async create(foundItemId, message) {
-    const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
-    const { data, error } = await sb
-      .from('claims')
-      .insert({ found_item_id: foundItemId, claimant_id: u.user?.id, message })
-      .select()
-      .single();
-    if (error) throw error;
-    return data as unknown as Claim;
+    return edgeClaim('POST', '/claims', { foundItemId, message });
   },
   async review(id, status, reviewNote) {
-    const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
-    const { data, error } = await sb
-      .from('claims')
-      .update({ status, review_note: reviewNote ?? null, reviewer_id: u.user?.id })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as unknown as Claim;
+    return edgeClaim('PATCH', `/claims/${id}/review`, { status, reviewNote });
   },
   async cancel(id) {
-    const sb = requireSupabase();
-    const { data, error } = await sb
-      .from('claims')
-      .update({ status: 'CANCELLED' })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as unknown as Claim;
+    return edgeClaim('PATCH', `/claims/${id}/cancel`);
   },
 };
 

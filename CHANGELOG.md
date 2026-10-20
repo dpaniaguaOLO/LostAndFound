@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.15.0] - 2026-10-20
+
+Corrige el flujo de reclamaciones en modo Supabase: ahora genera notificaciones y aplica
+las transiciones de estado, igual que el backend Express.
+
+### Corregido
+- **Notificaciones de reclamaciones con fecha inválida / inexistentes.** En modo Supabase,
+  reclamar un objeto solo insertaba la fila de la reclamación: no avisaba al dueño, no
+  cambiaba el estado del objeto al aprobar, y las notificaciones que aparecían mostraban
+  "Invalid date". La causa: el flujo privilegiado (notificar a otro usuario, cambiar estado
+  de objetos ajenos) no puede hacerse desde el cliente por RLS.
+
+### Cambiado
+- El flujo de reclamaciones (`crear`, `revisar`, `cancelar`) en modo Supabase pasa ahora por
+  la Edge Function `api`, que corre con `service_role` y replica el comportamiento del
+  backend Express:
+  - Al **crear**: valida (objeto disponible, no propio, sin duplicados pendientes) y notifica
+    al dueño (`CLAIM_REQUESTED`).
+  - Al **aprobar**: marca el objeto como `CLAIMED`, rechaza en cascada las demás reclamaciones
+    pendientes y notifica al reclamante (`CLAIM_APPROVED`).
+  - Al **rechazar**: notifica al reclamante (`CLAIM_REJECTED`). Registra auditoría.
+- `frontend/src/services/supabase.ts`: `claims.create/review/cancel` invocan la Edge Function.
+
+### Notas
+- Requiere **redesplegar** la Edge Function: `supabase functions deploy api`.
+- Verificado end-to-end contra Supabase real: reclamar notifica al dueño, aprobar deja el
+  objeto `CLAIMED` y notifica al reclamante, con `created_at` válido en todas las notificaciones.
+
+---
+
 ## [0.14.0] - 2026-10-20
 
 Moderación de admin más completa: paridad de acciones entre objetos encontrados y
