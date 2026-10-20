@@ -36,6 +36,8 @@ export interface AdminService {
     role: 'ADMIN' | 'EMPLOYEE';
   }): Promise<User>;
   setRole(userId: string, role: 'ADMIN' | 'EMPLOYEE'): Promise<User>;
+  /** Activa o desactiva un colaborador (desactivar conserva su historial). */
+  setActive(userId: string, active: boolean): Promise<User>;
   audit(limit?: number): Promise<AuditEntry[]>;
   allClaims(): Promise<Claim[]>;
   /** Objetos retirados de circulación (encontrados ARCHIVED + perdidos CLOSED). */
@@ -100,6 +102,8 @@ const supabaseAdmin: AdminService = {
   createUser: (input) => invokeEdge<User>('POST', '/admin/users', { ...input }),
   setRole: (userId, role) =>
     invokeEdge<User>('PATCH', `/admin/users/${userId}/role`, { role }),
+  setActive: (userId, active) =>
+    invokeEdge<User>('PATCH', `/admin/users/${userId}/active`, { active }),
   audit: (limit = 100) => invokeEdge<AuditEntry[]>('GET', `/admin/audit?limit=${limit}`),
   allClaims: () => invokeEdge<Claim[]>('GET', '/claims/all'),
   archived: () => invokeEdge<ArchivedResponse>('GET', '/admin/archived'),
@@ -120,6 +124,8 @@ const restAdmin: AdminService = {
   createUser: (input) => api<User>('/admin/users', { method: 'POST', body: { ...input } }),
   setRole: (userId, role) =>
     api<User>(`/admin/users/${userId}/role`, { method: 'PATCH', body: { role } }),
+  setActive: (userId, active) =>
+    api<User>(`/admin/users/${userId}/active`, { method: 'PATCH', body: { active } }),
   audit: (limit = 100) => api<AuditEntry[]>(`/admin/audit?limit=${limit}`),
   allClaims: () => api<Claim[]>('/claims/all'),
   archived: () => api<ArchivedResponse>('/admin/archived'),

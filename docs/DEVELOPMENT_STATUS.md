@@ -2,9 +2,9 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.18.0 (rama `feature/supabase-android`; `main` va por 0.10.1).
-  0.18.0 = alta de usuarios por admin (sin auto-registro en Supabase); 0.17.0 = auditoría de
-  seguridad (ver `docs/SECURITY.md`).
+- **Versión actual**: 0.19.0 (rama `feature/supabase-android`; `main` va por 0.10.1).
+  0.19.0 = desactivar/reactivar colaboradores (admin); 0.18.0 = alta de usuarios por admin
+  (sin auto-registro en Supabase); 0.17.0 = auditoría de seguridad (ver `docs/SECURITY.md`).
 - **Fecha**: 2026-10-20
 - **Commit más reciente**: revisión de seguridad y robustez de backend + Supabase (ver `git log`
   y `CHANGELOG.md` 0.16.0): RLS endurecida, revisión de reclamaciones atómica (`review_claim`),

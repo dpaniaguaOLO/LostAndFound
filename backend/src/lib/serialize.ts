@@ -14,6 +14,8 @@ export function serializeUser(u: AnyRecord) {
     employeeId: u.employeeId as string,
     email: (u.email as string | null) ?? null,
     role: u.role as 'EMPLOYEE' | 'ADMIN',
+    // El backend REST (Prisma) no modela desactivación; sus usuarios son siempre activos.
+    active: (u.active as boolean | undefined) ?? true,
     createdAt: iso(u.createdAt),
   };
 }

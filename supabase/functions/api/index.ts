@@ -469,6 +469,47 @@ Deno.serve(async (req: Request) => {
       return json(serializeUser(updated as Row));
     }
 
+    // PATCH /admin/users/:id/active — activa o desactiva un colaborador.
+    // Desactivar conserva todos sus datos e historial; solo le impide iniciar sesión.
+    if (method === 'PATCH' && /^\/admin\/users\/[^/]+\/active$/.test(path)) {
+      const targetId = path.split('/')[3];
+      const body = await req.json().catch(() => ({}));
+      const active = body.active === true;
+      if (targetId === caller.id) {
+        return json({ error: 'BAD_REQUEST', message: 'No puedes desactivar tu propia cuenta' }, 400);
+      }
+      const { data: target } = await sb
+        .from('profiles')
+        .select('name, employee_id')
+        .eq('id', targetId)
+        .single();
+      if (!target) return json({ error: 'NOT_FOUND', message: 'Colaborador no encontrado' }, 404);
+      const { data: updated, error } = await sb
+        .from('profiles')
+        .update({ active })
+        .eq('id', targetId)
+        .select('*')
+        .single();
+      if (error) return json({ error: 'UPDATE_FAILED', message: error.message }, 500);
+      // Si se desactiva, revoca sus sesiones activas para que el cierre sea inmediato.
+      if (!active) {
+        try {
+          await sb.rpc('revoke_user_sessions', { p_user_id: targetId });
+        } catch (_e) {
+          /* best-effort: el token caduca solo en <=1h si la RPC no existe */
+        }
+      }
+      await writeAudit(
+        sb,
+        caller.id,
+        active ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        'User',
+        targetId,
+        `${active ? 'Reactivó' : 'Desactivó'} al colaborador ${target.name} (N° ${target.employee_id})`,
+      );
+      return json(serializeUser(updated as Row));
+    }
+
     // GET /admin/audit
     if (method === 'GET' && path === '/admin/audit') {
       const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit') ?? 100)));

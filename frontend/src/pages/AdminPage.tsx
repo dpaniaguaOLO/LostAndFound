@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { CreateUserCard } from '../components/CreateUserCard';
 import { PasswordResetCard } from '../components/PasswordResetCard';
-import { ErrorState, ItemImage, Spinner, StatusBadge, Tabs } from '../components/ui';
+import { ConfirmDialog, ErrorState, ItemImage, Spinner, StatusBadge, Tabs } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS, CLAIM_STATUS_LABELS, formatDate, formatDateTime } from '../lib/format';
@@ -27,10 +28,14 @@ const ACTION_LABELS: Record<string, string> = {
   CLAIM_REVIEWED: 'Revisó una reclamación',
   USER_ROLE_CHANGED: 'Cambió el rol de un usuario',
   USER_PASSWORD_RESET: 'Restableció una contraseña',
+  USER_CREATED: 'Creó un colaborador',
+  USER_ACTIVATED: 'Reactivó a un colaborador',
+  USER_DEACTIVATED: 'Desactivó a un colaborador',
 };
 
 export function AdminPage() {
   const { notify } = useToast();
+  const { user: currentUser } = useAuth();
   const [tab, setTab] = useState<Tab>('overview');
 
   const [stats, setStats] = useState<Stats | null>(null);
@@ -38,6 +43,7 @@ export function AdminPage() {
   const [claims, setClaims] = useState<Claim[] | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [archived, setArchived] = useState<ArchivedResponse | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +104,18 @@ export function AdminPage() {
       notify('Rol actualizado', 'success');
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo actualizar el rol'), 'error');
+    }
+  }
+
+  async function toggleActive(user: User) {
+    try {
+      const updated = await adminService.setActive(user.id, !user.active);
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      notify(updated.active ? 'Colaborador reactivado' : 'Colaborador desactivado', 'success');
+    } catch (err) {
+      notify(getErrorMessage(err, 'No se pudo cambiar el estado'), 'error');
+    } finally {
+      setConfirmDeactivate(null);
     }
   }
 
@@ -167,6 +185,7 @@ export function AdminPage() {
                   <th className="px-4 py-3 font-medium">Nombre</th>
                   <th className="px-4 py-3 font-medium">N° colaborador</th>
                   <th className="px-4 py-3 font-medium">Rol</th>
+                  <th className="px-4 py-3 font-medium">Estado</th>
                   <th className="px-4 py-3 font-medium">Registro</th>
                   <th className="px-4 py-3 font-medium">Acción</th>
                 </tr>
@@ -183,17 +202,41 @@ export function AdminPage() {
                         {u.role === 'ADMIN' ? 'Administrador' : 'Empleado'}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      {u.active ? (
+                        <span className="badge bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300">
+                          Activo
+                        </span>
+                      ) : (
+                        <span className="badge bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                          Desactivado
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(u.createdAt)}</td>
                     <td className="px-4 py-3">
-                      {u.role === 'ADMIN' ? (
-                        <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>
-                          Quitar admin
-                        </button>
-                      ) : (
-                        <button className="btn-secondary" onClick={() => changeRole(u, 'ADMIN')}>
-                          Hacer admin
-                        </button>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {u.role === 'ADMIN' ? (
+                          <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>
+                            Quitar admin
+                          </button>
+                        ) : (
+                          <button className="btn-secondary" onClick={() => changeRole(u, 'ADMIN')}>
+                            Hacer admin
+                          </button>
+                        )}
+                        {/* No permitir que un admin se desactive a sí mismo */}
+                        {currentUser?.id !== u.id &&
+                          (u.active ? (
+                            <button className="btn-danger" onClick={() => setConfirmDeactivate(u)}>
+                              Desactivar
+                            </button>
+                          ) : (
+                            <button className="btn-primary" onClick={() => toggleActive(u)}>
+                              Reactivar
+                            </button>
+                          ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -322,6 +365,20 @@ export function AdminPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeactivate !== null}
+        title="Desactivar colaborador"
+        message={
+          confirmDeactivate
+            ? `${confirmDeactivate.name} (N° ${confirmDeactivate.employeeId}) no podrá iniciar sesión. Su historial y publicaciones se conservan, y puedes reactivarlo cuando quieras.`
+            : ''
+        }
+        confirmLabel="Desactivar"
+        danger
+        onConfirm={() => confirmDeactivate && toggleActive(confirmDeactivate)}
+        onCancel={() => setConfirmDeactivate(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.19.0] - 2026-10-20
+
+Desactivación de colaboradores por el administrador (en vez de borrado, para conservar el
+historial).
+
+### Añadido
+- **Desactivar / reactivar colaborador** desde el panel admin. Desactivar impide iniciar
+  sesión pero conserva sus datos, publicaciones e historial; es reversible.
+  - Nueva columna `profiles.active` (migración `20261020000008`) y `my_profile()` actualizada
+    para exponerla.
+  - Endpoint `PATCH /admin/users/:id/active` en la Edge Function `api` (revoca las sesiones
+    activas al desactivar y audita `USER_ACTIVATED`/`USER_DEACTIVATED`).
+  - El login rechaza a los colaboradores desactivados (cierra la sesión recién abierta); al
+    cargar la app, una cuenta desactivada tampoco se considera sesión válida.
+  - Panel admin: columna "Estado" (Activo/Desactivado) y botones Desactivar/Reactivar, con
+    confirmación. Un admin no puede desactivarse a sí mismo.
+
+### Notas
+- Elegido **desactivar** sobre **borrar**: en una app con auditoría, eliminar se llevaría el
+  historial del colaborador. La desactivación es reversible y segura.
+- El modo REST (Prisma) no modela desactivación; ese endpoint responde `501` en modo `rest`.
+- Requiere **redesplegar** la Edge Function y **aplicar la migración 008** (ambas hechas).
+
+---
+
 ## [0.18.0] - 2026-10-20
 
 Modelo de alta de usuarios por administrador (app interna): se quita el auto-registro en

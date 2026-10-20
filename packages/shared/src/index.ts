@@ -69,6 +69,7 @@ export interface User {
   employeeId: string; // número de colaborador (identificador de acceso)
   email: string | null;
   role: UserRole;
+  active: boolean; // false = desactivado (no puede iniciar sesión; conserva su historial)
   createdAt: string; // ISO 8601
 }
 
@@ -278,7 +279,10 @@ export type AuditAction =
   | 'LOST_REPORT_RESTORED'
   | 'CLAIM_REVIEWED'
   | 'USER_ROLE_CHANGED'
-  | 'USER_PASSWORD_RESET';
+  | 'USER_PASSWORD_RESET'
+  | 'USER_CREATED'
+  | 'USER_ACTIVATED'
+  | 'USER_DEACTIVATED';
 
 /** Objetos retirados de circulación, para la vista de moderación del admin. */
 export interface ArchivedResponse {

@@ -67,6 +67,7 @@ export function serializeUser(u: Row) {
     employeeId: u.employee_id as string,
     email: (u.email as string | null) ?? null,
     role: u.role as 'EMPLOYEE' | 'ADMIN',
+    active: (u.active as boolean | null) ?? true,
     createdAt: iso(u.created_at),
   };
 }

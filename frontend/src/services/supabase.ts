@@ -67,7 +67,15 @@ async function edgeClaim(
 
 // --- Mapeo de filas Postgres -> tipos compartidos ---------------------------
 
-type ProfileRow = { id: string; name: string; employee_id: string; email: string | null; role: string; created_at: string };
+type ProfileRow = {
+  id: string;
+  name: string;
+  employee_id: string;
+  email: string | null;
+  role: string;
+  active?: boolean | null;
+  created_at: string;
+};
 
 function toUser(r: ProfileRow): User {
   return {
@@ -76,6 +84,7 @@ function toUser(r: ProfileRow): User {
     employeeId: r.employee_id,
     email: r.email,
     role: r.role as UserRole,
+    active: r.active ?? true,
     createdAt: r.created_at,
   };
 }
@@ -211,7 +220,14 @@ const auth: AuthService = {
     // employee_id/email no son legibles en `profiles` para el cliente (migración
     // 007): el perfil propio completo se obtiene con la función my_profile().
     const { data: profile } = await sb.rpc('my_profile').maybeSingle();
-    return profile ? toUser(profile as ProfileRow) : null;
+    if (!profile) return null;
+    const user = toUser(profile as ProfileRow);
+    // Si la cuenta fue desactivada, no se considera sesión válida.
+    if (!user.active) {
+      await sb.auth.signOut();
+      return null;
+    }
+    return user;
   },
 
   async login(employeeId, password) {
@@ -224,6 +240,11 @@ const auth: AuthService = {
     if (error) throw new Error('Credenciales incorrectas');
     const user = await this.getCurrentUser();
     if (!user) throw new Error('No se pudo cargar el perfil');
+    // Un colaborador desactivado no puede usar la app: cierra la sesión recién abierta.
+    if (!user.active) {
+      await sb.auth.signOut();
+      throw new Error('Tu cuenta está desactivada. Contacta a un administrador.');
+    }
     return user;
   },
 

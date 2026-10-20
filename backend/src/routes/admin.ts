@@ -189,3 +189,16 @@ adminRouter.post(
     res.status(201).json(serializeUser(user));
   }),
 );
+
+// PATCH /api/admin/users/:id/active — activar/desactivar colaborador.
+// El modelo REST (Prisma) no incluye el campo `active`; la desactivación solo
+// está soportada en modo Supabase. Se responde explícitamente para no fingir éxito.
+adminRouter.patch(
+  '/users/:id/active',
+  asyncHandler(async (_req, res) => {
+    res.status(501).json({
+      error: 'NOT_IMPLEMENTED',
+      message: 'La desactivación de colaboradores solo está disponible con Supabase.',
+    });
+  }),
+);
