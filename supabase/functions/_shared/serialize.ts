@@ -17,11 +17,40 @@ function iso(d: unknown): string {
 
 type Row = Record<string, unknown>;
 
-/** Genera una URL firmada (1h) para una ruta de Storage, o null. */
+// URLs firmadas válidas 2 h y reutilizadas durante 1 h: así toda URL devuelta sigue
+// siendo válida al menos 1 h. La caché vive mientras la instancia esté caliente y
+// evita una petición a Storage por imagen en cada listado.
+const SIGN_TTL_S = 7200;
+const CACHE_TTL_MS = 3600_000;
+const urlCache = new Map<string, { url: string; exp: number }>();
+
+function cached(path: string): string | null {
+  const hit = urlCache.get(path);
+  if (hit && hit.exp > Date.now()) return hit.url;
+  if (hit) urlCache.delete(path);
+  return null;
+}
+
+/** Firma en UNA sola petición todas las rutas aún no cacheadas. */
+export async function primeSignedUrls(sb: SupabaseClient, paths: unknown[]): Promise<void> {
+  const missing = [...new Set(paths.filter((p): p is string => typeof p === 'string' && !!p))]
+    .filter((p) => !cached(p));
+  if (missing.length === 0) return;
+  const { data } = await sb.storage.from(PHOTO_BUCKET).createSignedUrls(missing, SIGN_TTL_S);
+  const exp = Date.now() + CACHE_TTL_MS;
+  for (const r of data ?? []) {
+    if (r.path && r.signedUrl && !r.error) urlCache.set(r.path, { url: r.signedUrl, exp });
+  }
+  if (urlCache.size > 5000) urlCache.clear();
+}
+
+/** URL firmada para una ruta de Storage, o null. Usa la caché si está precargada. */
 export async function signedUrl(sb: SupabaseClient, path: unknown): Promise<string | null> {
   if (!path || typeof path !== 'string') return null;
-  const { data } = await sb.storage.from(PHOTO_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
+  const hit = cached(path);
+  if (hit) return hit;
+  await primeSignedUrls(sb, [path]);
+  return cached(path);
 }
 
 function reporterOf(r: Row): { id: string; name: string } {

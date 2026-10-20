@@ -1,5 +1,72 @@
 # Changelog
 
+## [0.16.0] - 2026-10-20
+
+Revisión de backend y seguridad (Claude), incluida la revisión del flujo de reclamaciones
+de 0.15.0.
+
+### Seguridad
+- **Supabase: un reclamante podía autoaprobar su reclamación** con un `UPDATE` directo vía
+  PostgREST (la política `claims_update_involved` lo permitía). Nueva migración
+  `20261020000005_harden_rls.sql`: el cliente ya no escribe en `claims` (solo la Edge
+  Function `api`), un no-admin solo puede pasar su objeto a `RETURNED` (no des-archivar ni
+  marcar `CLAIMED`), y no puede cambiar su `employee_id`/`email`. Requiere desplegar antes la
+  Edge Function `api` con las rutas `/claims`.
+- **Express: XSS almacenado vía `/uploads`.** La extensión se tomaba del nombre original:
+  un `x.html` declarado como `image/png` se servía como HTML. Ahora la extensión sale del
+  MIME y el contenido se valida con `sharp`.
+- **Express: el rol venía del JWT** y un admin degradado conservaba permisos hasta 12 h.
+  `authenticate` relee el rol de la BD en cada petición.
+- **Express: límite de intentos de login** (10 fallos / 15 min por IP + colaborador → 429).
+- Nunca se puede quitar el rol al último administrador (Express y trigger en Supabase).
+
+### Corregido
+- Supabase: el trigger anti-escalada bloqueaba también los cambios de rol sin usuario
+  (`service_role` de la Edge Function y `seed_users.sql`), con lo que cambiar roles desde
+  el panel en modo Supabase fallaba.
+- REST: "Archivar" un reporte perdido siempre fallaba con 400 (llamaba a `PATCH /:id` sin
+  el cuerpo completo). Nuevo `PATCH /api/lost-reports/:id/close` (admin) + auditoría
+  `LOST_REPORT_CLOSED`. El listado de perdidos oculta `CLOSED` por defecto (como Supabase).
+- REST: "Restablecer contraseña" daba 404. Nuevo `POST /api/admin/users/reset-password`.
+- Aprobación de reclamaciones segura ante concurrencia (antes dos aprobaciones simultáneas
+  podían aprobar a dos reclamantes); no se aprueba si el objeto ya no está `PUBLISHED`; los
+  rechazados en cascada reciben notificación.
+- `?page=abc`, JSON mal formado, imagen > 5 MB: antes 500, ahora 200/400/413.
+- Las imágenes se borran del disco al eliminar el objeto o si la petición falla.
+- `/api/health` devolvía la versión fija `0.10.1`; ahora lee `VERSION`.
+
+### Revisión del flujo de reclamaciones de v0.15.0 (Supabase)
+- **Revisión atómica**: nueva función SQL `review_claim()` (migración
+  `20261020000006_review_claim_rpc.sql`), que la Edge Function llama por RPC. Antes eran
+  3 escrituras sueltas sin transacción ni condición de estado: dos aprobaciones simultáneas
+  prosperaban ambas y un fallo a mitad dejaba datos incoherentes. Ahora bloquea las filas,
+  exige objeto `PUBLISHED` para aprobar, prohíbe revisar la propia reclamación, notifica
+  también a los rechazados en cascada y audita. Solo `service_role` puede ejecutarla.
+- Crear: mensaje de 2 a 1000 caracteres; un duplicado concurrente devuelve 400 (antes 500).
+- Cancelar: condicionado a `PENDING` (no pisa una revisión concurrente).
+- Pantalla Reclamaciones en modo Supabase: `mine()`/`incoming()` devolvían filas sin
+  mapear (nombres vacíos, fechas inválidas, sin título). Ahora se mapean a `Claim`, e
+  `incoming()` se limita a objetos que publiqué (antes incluía las propias, con botones de
+  aprobar).
+- Edge Function: quitar el rol al último admin → 400; `/admin/restore` con id inexistente →
+  404 (antes 500); los errores 500 ya no exponen mensajes internos de la BD.
+- Express: un admin tampoco puede revisar su propia reclamación (paridad).
+
+### Rendimiento
+- Supabase: las URLs firmadas de imágenes se piden **en lote** (`createSignedUrls`) y se
+  cachean 1 h, en el frontend y en la Edge Function (antes: 1 petición por imagen, p. ej. 12
+  por página del muro y hasta 50 en búsqueda). El id de usuario sale de la sesión local en
+  lugar de `auth.getUser()` (una llamada de red menos por operación).
+- Frontend: rutas cargadas bajo demanda y dependencias (React, Supabase) en chunks
+  cacheables. JS propio inicial: 530 KB → 58 KB (las dependencias se cachean aparte).
+
+### Pruebas
+- Tests unitarios de `rateLimit`/`query` (15 en total). Smoke E2E de 28 escenarios contra el
+  backend y prueba de las políticas RLS sobre Postgres (PGlite) antes y después de la
+  migración.
+
+---
+
 ## [0.15.0] - 2026-10-20
 
 Corrige el flujo de reclamaciones en modo Supabase: ahora genera notificaciones y aplica

@@ -1,4 +1,6 @@
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
@@ -12,6 +14,16 @@ import { foundItemsRouter } from './routes/foundItems.js';
 import { lostReportsRouter } from './routes/lostReports.js';
 import { notificationsRouter } from './routes/notifications.js';
 
+// Versión de la app desde el archivo VERSION de la raíz (válido desde src/ y dist/).
+const APP_VERSION = (() => {
+  try {
+    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../VERSION');
+    return fs.readFileSync(file, 'utf8').trim();
+  } catch {
+    return 'unknown';
+  }
+})();
+
 export function createApp() {
   const app = express();
 
@@ -24,7 +36,7 @@ export function createApp() {
   // Archivos subidos (imágenes). En producción conviene usar almacenamiento privado + URLs firmadas.
   app.use('/uploads', express.static(path.resolve(config.uploadDir)));
 
-  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: '0.10.1' }));
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', version: APP_VERSION }));
 
   app.use('/api/auth', authRouter);
   app.use('/api/found-items', foundItemsRouter);

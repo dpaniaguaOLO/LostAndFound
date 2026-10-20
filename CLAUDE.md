@@ -179,8 +179,12 @@ header `Authorization: Bearer <token>`. Rutas `/api/admin/*` requieren además r
 ```json
 { "error": "CODE", "message": "texto legible", "details": {} }
 ```
-Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
-404 (NOT_FOUND), 409 (CONFLICT), 500 (INTERNAL).
+Códigos HTTP usados: 400 (BAD_REQUEST, también JSON mal formado), 401 (UNAUTHORIZED),
+403 (FORBIDDEN), 404 (NOT_FOUND), 409 (CONFLICT), 413 (PAYLOAD_TOO_LARGE, imagen > límite),
+429 (TOO_MANY_REQUESTS, login bloqueado; incluye cabecera `Retry-After`), 500 (INTERNAL).
+
+Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor por defecto
+(no dan 500); parámetros repetidos toman el primero; `status` fuera del conjunto válido se ignora.
 
 ### Existentes (implementados y verificados)
 
@@ -198,7 +202,7 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | PATCH | `/api/found-items/:id/archive` | sí (admin) | — | `FoundItem` |
 | DELETE | `/api/found-items/:id` | sí (admin) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
-| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` |
+| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status` oculta `CLOSED`) |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
 | POST | `/api/lost-reports` | sí | `multipart/form-data`: `title, description, category, location, lostAt(ISO)`, `image?` | `201 LostReport` |
 | PATCH | `/api/lost-reports/:id/resolve` | sí (autor o admin) | — | `LostReport` |
@@ -220,7 +224,16 @@ Códigos HTTP usados: 400 (BAD_REQUEST), 401 (UNAUTHORIZED), 403 (FORBIDDEN),
 | GET | `/api/admin/audit` | admin | `limit?` | `AuditEntry[]` (historial) |
 | GET | `/api/claims/all` | admin | — | `Claim[]` (bandeja global) |
 | PATCH | `/api/lost-reports/:id` | sí (autor o admin) | cuerpo como POST | `LostReport` (editar) |
-| DELETE | `/api/lost-reports/:id` | sí (admin) | — | `{ ok }` |
+| PATCH | `/api/lost-reports/:id/close` | admin | — | `LostReport` (→ `CLOSED`, archivar) |
+| DELETE | `/api/lost-reports/:id` | sí (admin) | — | `{ ok }` (borra también la imagen) |
+| POST | `/api/admin/users/reset-password` | admin | `{ employeeId, newPassword(≥8) }` | `{ ok }` |
+| GET | `/api/admin/archived` | admin | — | `ArchivedResponse` |
+| POST | `/api/admin/restore` | admin | `{ kind: found\|lost, id }` | `{ ok }` |
+
+Reglas añadidas en v0.15.x: `PATCH /admin/users/:id/role` no permite dejar el sistema sin
+administradores (400). `PATCH /claims/:id/review` con `APPROVED` exige que el objeto siga
+`PUBLISHED` y es seguro ante revisiones concurrentes; las reclamaciones rechazadas en
+cascada reciben notificación `CLAIM_REJECTED`.
 
 ### Pendientes (NO implementados aún)
 - `POST /api/auth/forgot-password` / `reset-password` (recuperación de contraseña).
@@ -275,14 +288,28 @@ prefiere archivar.
 - **Autenticación**: JWT firmado con `JWT_SECRET`; expiración `JWT_EXPIRES_IN` (12h).
   Contraseñas hasheadas con bcrypt (coste 12). Login devuelve mensaje genérico para no
   revelar si un email existe.
-- **Autorización**: middleware `authenticate` (token válido) y `requireAdmin` (rol).
+- **Autorización**: middleware `authenticate` (token válido; el **rol se relee de la BD** en
+  cada petición, así degradar a un admin o borrar un usuario surte efecto al instante) y
+  `requireAdmin` (rol).
   La autorización se valida **en el servidor**, no en la UI. Permisos por recurso:
   reclamar/devolver/revisar comprueban propiedad o rol.
 - **Validación de entradas**: zod en todos los cuerpos de escritura.
 - **Prevención de inyección**: Prisma usa consultas parametrizadas.
 - **XSS**: React escapa por defecto; no se usa `dangerouslySetInnerHTML`.
 - **Subida de archivos**: lista blanca de MIME (jpg/png/webp/gif), límite de tamaño
-  (`MAX_UPLOAD_BYTES`, 5 MB), nombres aleatorios.
+  (`MAX_UPLOAD_BYTES`, 5 MB), nombres aleatorios. La **extensión se deriva del MIME**, nunca
+  del nombre original (evita servir `.html` desde `/uploads`), y el contenido se verifica
+  con `sharp` (debe ser realmente una imagen). Si la petición falla, el archivo se borra.
+- **Fuerza bruta**: `POST /auth/login` bloquea 15 min tras 10 fallos por IP + número de
+  colaborador (`lib/rateLimit.ts`, en memoria: no se comparte entre instancias).
+- **Supabase (RLS)**: el cliente no escribe en `claims` (solo la Edge Function `api` con
+  `service_role`); un no-admin solo puede pasar su objeto a `RETURNED`; un no-admin no
+  puede cambiar `role`, `employee_id` ni `email`; nunca se puede quitar el último ADMIN.
+  Ver `supabase/migrations/20261020000005_harden_rls.sql`. La revisión de reclamaciones
+  es la función transaccional `review_claim()` (migración 006), ejecutable solo por
+  `service_role`; la Edge Function traduce su `HINT` ('400'/'403'/'404') a código HTTP.
+  **Orden de despliegue**: `supabase db push` (migraciones 005 y 006) → `supabase functions
+  deploy api`.
 - **Cabeceras**: helmet. CORS restringido a `CORS_ORIGIN`.
 - **Gestión de secretos**: variables en `.env` (ignorado por git). `.env.example`
   documenta las claves sin valores reales.
@@ -290,7 +317,11 @@ prefiere archivar.
 **Riesgos conocidos / pendientes**
 - Imágenes servidas públicamente desde `/uploads` (no hay control de acceso por archivo).
   En producción: almacenamiento privado + URLs firmadas.
-- Sin rate limiting ni bloqueo por intentos fallidos de login.
+- Rate limiting solo en login y en memoria (si se escala a varias instancias, moverlo a
+  Redis o al proxy). Sin rate limiting general de la API.
+- Supabase: `enable_signup = true` y la anon key es pública → cualquiera con la URL puede
+  registrarse. Para una app interna conviene desactivar el registro abierto y dar de alta
+  usuarios desde el panel/Admin API.
 - Token en `localStorage` (considerar cookies httpOnly si se endurece el modelo).
 - Sin rotación/refresh de tokens.
 - `JWT_SECRET` por defecto solo para desarrollo; en producción es obligatorio definirlo.
@@ -319,7 +350,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.13.0 (ver `VERSION`). Rama `feature/supabase-android`: Supabase Fases 1 y 2
+- **Versión**: 0.16.0 (ver `VERSION`). 0.16.0: revisión de seguridad/robustez (Claude, ver
+  `CHANGELOG.md`). Rama `feature/supabase-android`: Supabase Fases 1 y 2
   completas (CRUD/auth/storage + IA/admin en Edge Functions) y Android (Capacitor) preparado.
   La rama `main` iba por 0.10.1.
 - **Último commit relevante**: ver `git log` / `CHANGELOG.md` (primer release 0.1.0).

@@ -2,9 +2,11 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.15.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Versión actual**: 0.16.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
 - **Fecha**: 2026-10-20
-- **Commit más reciente**: flujo de reclamaciones + notificaciones en Edge Function (ver `git log`)
+- **Commit más reciente**: revisión de seguridad y robustez de backend + Supabase (ver `git log`
+  y `CHANGELOG.md` 0.16.0): RLS endurecida, revisión de reclamaciones atómica (`review_claim`),
+  correcciones en Express, URLs firmadas en lote, code splitting.
 - **Última funcionalidad completada**: **Fase 2 de Supabase**. La IA (búsqueda, coincidencias,
   asistente) y el panel admin (métricas, usuarios, rol, auditoría, bandeja global) se portaron
   a la Edge Function `api` (motor NLP/matching/firma visual en `supabase/functions/_shared/`).
@@ -16,8 +18,11 @@
 
 ## Estado de las pruebas
 
-- **Automatizadas**: aún no hay suite. Pendiente (Vitest + Supertest para backend,
-  React Testing Library para frontend).
+- **Automatizadas**: `npm test` en backend (node:test, 15 tests: NLP, matching, firma visual,
+  rate limit, query). Pendiente: integración (Supertest) y frontend (React Testing Library).
+- **v0.16.0 (Claude)**: smoke E2E de 28 escenarios contra Express con BD temporal; políticas
+  RLS y `review_claim()` probadas sobre Postgres (PGlite, 15 + 18 casos); `deno check` de las
+  Edge Functions.
 - **Manuales (ejecutadas)**: verificación E2E a través del proxy de Vite:
   - `GET /api/health` → ok.
   - Login de empleado y de administradora.

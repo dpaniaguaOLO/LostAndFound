@@ -59,6 +59,15 @@ export const reviewClaimSchema = z.object({
   reviewNote: z.string().max(1000).optional(),
 });
 
+export const setRoleSchema = z.object({
+  role: z.enum(['ADMIN', 'EMPLOYEE']),
+});
+
+export const resetPasswordSchema = z.object({
+  employeeId: z.string().trim().min(1, 'El número de colaborador es obligatorio').max(50),
+  newPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(200),
+});
+
 /** Valida `data` con `schema` o lanza un HttpError 400 con los detalles. */
 export function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown): T {
   const result = schema.safeParse(data);

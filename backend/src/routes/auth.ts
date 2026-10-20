@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { hashPassword, signToken, verifyPassword } from '../lib/auth.js';
-import { conflict, unauthorized } from '../lib/http.js';
+import { conflict, tooManyRequests, unauthorized } from '../lib/http.js';
+import { AttemptLimiter } from '../lib/rateLimit.js';
 import { serializeUser } from '../lib/serialize.js';
 import { loginSchema, parseOrThrow, registerSchema } from '../lib/validation.js';
 import { authenticate } from '../middleware/authenticate.js';
@@ -32,16 +33,28 @@ authRouter.post(
   }),
 );
 
+// Freno a la fuerza bruta: 10 fallos por IP + número de colaborador cada 15 min.
+const loginLimiter = new AttemptLimiter(10, 15 * 60_000);
+
 // POST /api/auth/login — autentica y devuelve token + usuario.
 authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const body = parseOrThrow(loginSchema, req.body);
+    const limiterKey = `${req.ip}|${body.employeeId}`;
+    const wait = loginLimiter.retryAfter(limiterKey);
+    if (wait > 0) {
+      res.setHeader('Retry-After', String(wait));
+      throw tooManyRequests('Demasiados intentos fallidos. Inténtalo de nuevo en unos minutos.');
+    }
+
     const user = await prisma.user.findUnique({ where: { employeeId: body.employeeId } });
     // Mensaje genérico para no revelar si el número de colaborador existe.
     if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+      loginLimiter.fail(limiterKey);
       throw unauthorized('Credenciales incorrectas');
     }
+    loginLimiter.reset(limiterKey);
     const token = signToken({ sub: user.id, role: user.role as 'EMPLOYEE' | 'ADMIN' });
     res.json({ token, user: serializeUser(user) });
   }),

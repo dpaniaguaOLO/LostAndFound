@@ -21,6 +21,7 @@ export const forbidden = (msg = 'No autorizado') =>
 export const notFound = (msg = 'Recurso no encontrado') =>
   new HttpError(404, 'NOT_FOUND', msg);
 export const conflict = (msg: string) => new HttpError(409, 'CONFLICT', msg);
+export const tooManyRequests = (msg: string) => new HttpError(429, 'TOO_MANY_REQUESTS', msg);
 
 export function sendError(res: Response, err: HttpError) {
   res.status(err.status).json({

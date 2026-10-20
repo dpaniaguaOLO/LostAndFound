@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<string, string> = {
   LOST_REPORT_EDITED: 'Editó un reporte perdido',
   LOST_REPORT_DELETED: 'Eliminó un reporte perdido',
   LOST_REPORT_RESOLVED: 'Resolvió un reporte perdido',
+  LOST_REPORT_CLOSED: 'Archivó un reporte perdido',
   LOST_REPORT_RESTORED: 'Restauró un reporte perdido',
   CLAIM_REVIEWED: 'Revisó una reclamación',
   USER_ROLE_CHANGED: 'Cambió el rol de un usuario',

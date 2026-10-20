@@ -5,26 +5,30 @@ import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { serializeFoundItem } from '../lib/serialize.js';
 import { createFoundItemSchema, parseOrThrow } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
-import { diskPathFor, publicUrlFor, uploadImage } from '../middleware/upload.js';
+import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
+import { pagination, queryString } from '../lib/query.js';
 
 export const foundItemsRouter = Router();
 
 const reporterSelect = { reporter: { select: { id: true, name: true } } };
+const FOUND_STATUSES = new Set(['PUBLISHED', 'CLAIMED', 'RETURNED', 'ARCHIVED']);
 
 // GET /api/found-items — muro con búsqueda, filtros y paginación.
 foundItemsRouter.get(
   '/',
   authenticate,
   asyncHandler(async (req, res) => {
-    const { search, category, status, location } = req.query as Record<string, string>;
-    const page = Math.max(1, Number(req.query.page ?? 1));
-    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize ?? 12)));
+    const search = queryString(req.query.search);
+    const category = queryString(req.query.category);
+    const status = queryString(req.query.status);
+    const location = queryString(req.query.location);
+    const { page, pageSize, skip } = pagination(req.query);
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (status) where.status = status;
+    if (status && FOUND_STATUSES.has(status)) where.status = status;
     else where.status = { in: ['PUBLISHED', 'CLAIMED'] }; // por defecto, ocultar archivados/devueltos
     if (location) where.location = { contains: location };
     if (search) {
@@ -40,7 +44,7 @@ foundItemsRouter.get(
         where,
         include: reporterSelect,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
+        skip,
         take: pageSize,
       }),
     ]);
@@ -180,16 +184,14 @@ foundItemsRouter.delete(
   authenticate,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const item = await prisma.foundItem.findUnique({
-      where: { id: req.params.id },
-      include: { claims: true },
-    });
+    const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
     // Borra primero las reclamaciones asociadas para respetar la relación.
     await prisma.$transaction([
       prisma.claim.deleteMany({ where: { foundItemId: item.id } }),
       prisma.foundItem.delete({ where: { id: item.id } }),
     ]);
+    await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'FOUND_ITEM_DELETED', 'FoundItem', item.id, item.title);
     res.json({ ok: true });
   }),

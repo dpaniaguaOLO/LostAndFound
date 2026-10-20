@@ -80,12 +80,53 @@ function toUser(r: ProfileRow): User {
   };
 }
 
-/** Genera una URL firmada para una ruta de Storage (o null). */
+/**
+ * Id del usuario de la sesión actual. Usa la sesión local (sin ir a la red, a
+ * diferencia de auth.getUser()); la autorización real la impone RLS en el servidor.
+ */
+async function currentUserId(): Promise<string> {
+  const { data } = await requireSupabase().auth.getSession();
+  const uid = data.session?.user.id;
+  if (!uid) throw new Error('Sesión no válida');
+  return uid;
+}
+
+// URLs firmadas (válidas 2 h) reutilizadas durante 1 h: evita pedir una URL a
+// Storage por cada imagen cada vez que se recarga un listado.
+const SIGN_TTL_S = 7200;
+const CACHE_TTL_MS = 3600_000;
+const urlCache = new Map<string, { url: string; exp: number }>();
+
+function cachedUrl(path: string): string | null {
+  const hit = urlCache.get(path);
+  return hit && hit.exp > Date.now() ? hit.url : null;
+}
+
+/** Firma en una sola petición todas las rutas que aún no estén en caché. */
+async function primeSignedUrls(paths: unknown[]): Promise<void> {
+  const missing = [...new Set(paths.filter((p): p is string => typeof p === 'string' && !!p))]
+    .filter((p) => !cachedUrl(p));
+  if (missing.length === 0) return;
+  const { data } = await requireSupabase().storage.from(PHOTO_BUCKET).createSignedUrls(missing, SIGN_TTL_S);
+  const exp = Date.now() + CACHE_TTL_MS;
+  for (const r of data ?? []) {
+    if (r.path && r.signedUrl && !r.error) urlCache.set(r.path, { url: r.signedUrl, exp });
+  }
+}
+
+/** URL firmada para una ruta de Storage (o null). */
 async function signedUrl(path: string | null): Promise<string | null> {
   if (!path) return null;
-  const sb = requireSupabase();
-  const { data } = await sb.storage.from(PHOTO_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
+  await primeSignedUrls([path]);
+  return cachedUrl(path);
+}
+
+type Row = Record<string, unknown>;
+
+/** Mapea una lista de filas precargando antes todas sus URLs de imagen. */
+async function mapWithImages<T>(rows: Row[], pathOf: (r: Row) => unknown, map: (r: Row) => Promise<T>): Promise<T[]> {
+  await primeSignedUrls(rows.map(pathOf));
+  return Promise.all(rows.map(map));
 }
 
 async function toFoundItem(r: Record<string, unknown>): Promise<FoundItem> {
@@ -124,12 +165,19 @@ async function toLostReport(r: Record<string, unknown>): Promise<LostReport> {
 
 // --- Subida de imagen a Storage ---------------------------------------------
 
+// Extensión según el tipo real (no el nombre del archivo, que lo controla el usuario).
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
 async function uploadPhoto(file: File): Promise<string> {
   const sb = requireSupabase();
-  const { data: userData } = await sb.auth.getUser();
-  const uid = userData.user?.id;
-  if (!uid) throw new Error('Sesión no válida');
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const uid = await currentUserId();
+  const ext = EXT_BY_TYPE[file.type];
+  if (!ext) throw new Error('Formato de imagen no permitido. Usa JPG, PNG, WEBP o GIF.');
   const path = `${uid}/${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, file, {
     contentType: file.type,
@@ -220,7 +268,7 @@ const foundItems: FoundItemsService = {
     if (params.search) q = q.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
     const { data, count, error } = await q;
     if (error) throw error;
-    const items = await Promise.all((data ?? []).map(toFoundItem));
+    const items = await mapWithImages(data ?? [], (r) => r.image_path, toFoundItem);
     const total = count ?? items.length;
     return { data: items, page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) || 1 };
   },
@@ -234,20 +282,20 @@ const foundItems: FoundItemsService = {
 
   async mine() {
     const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const { data, error } = await sb
       .from('found_items')
       .select(REPORTER_SELECT)
-      .eq('reporter_id', u.user?.id ?? '')
+      .eq('reporter_id', uid)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return Promise.all((data ?? []).map(toFoundItem));
+    return mapWithImages(data ?? [], (r) => r.image_path, toFoundItem);
   },
 
   async create(form) {
     const sb = requireSupabase();
     const f = readItemForm(form);
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const imagePath = f.image ? await uploadPhoto(f.image) : null;
     const { data, error } = await sb
       .from('found_items')
@@ -258,7 +306,7 @@ const foundItems: FoundItemsService = {
         location: f.location,
         found_at: f.foundAt ?? new Date().toISOString(),
         image_path: imagePath,
-        reporter_id: u.user?.id,
+        reporter_id: uid,
       })
       .select(REPORTER_SELECT)
       .single();
@@ -315,7 +363,7 @@ const lostReports: LostReportsService = {
     if (params.search) q = q.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
     const { data, count, error } = await q;
     if (error) throw error;
-    const items = await Promise.all((data ?? []).map(toLostReport));
+    const items = await mapWithImages(data ?? [], (r) => r.image_path, toLostReport);
     const total = count ?? items.length;
     return { data: items, page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) || 1 };
   },
@@ -329,20 +377,20 @@ const lostReports: LostReportsService = {
 
   async mine() {
     const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const { data, error } = await sb
       .from('lost_reports')
       .select(REPORTER_SELECT)
-      .eq('reporter_id', u.user?.id ?? '')
+      .eq('reporter_id', uid)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return Promise.all((data ?? []).map(toLostReport));
+    return mapWithImages(data ?? [], (r) => r.image_path, toLostReport);
   },
 
   async create(form) {
     const sb = requireSupabase();
     const f = readItemForm(form);
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const imagePath = f.image ? await uploadPhoto(f.image) : null;
     const { data, error } = await sb
       .from('lost_reports')
@@ -353,7 +401,7 @@ const lostReports: LostReportsService = {
         location: f.location,
         lost_at: f.lostAt ?? new Date().toISOString(),
         image_path: imagePath,
-        reporter_id: u.user?.id,
+        reporter_id: uid,
       })
       .select(REPORTER_SELECT)
       .single();
@@ -378,31 +426,60 @@ const lostReports: LostReportsService = {
   },
 };
 
-// --- Claims / Notifications (núcleo CRUD) ------------------------------------
-// Nota: las transiciones complejas (aprobar => objeto CLAIMED + rechazar otras,
-// y la notificación asociada) deberían ejecutarse en una Edge Function para
-// garantizar atomicidad y permisos. Aquí se deja la operación base.
+// --- Claims / Notifications ----------------------------------------------------
+
+async function toClaim(c: Row): Promise<Claim> {
+  const fi = c.found_item as Row | null;
+  const claimant = c.claimant as Row | null;
+  return {
+    id: c.id as string,
+    foundItemId: c.found_item_id as string,
+    foundItem: fi
+      ? {
+          id: fi.id as string,
+          title: fi.title as string,
+          imageUrl: await signedUrl((fi.image_path as string | null) ?? null),
+          status: fi.status as FoundItemStatus,
+        }
+      : undefined,
+    claimant: { id: (claimant?.id ?? c.claimant_id) as string, name: (claimant?.name as string) ?? '' },
+    message: c.message as string,
+    status: c.status as Claim['status'],
+    reviewerId: (c.reviewer_id as string | null) ?? null,
+    reviewNote: (c.review_note as string | null) ?? null,
+    createdAt: c.created_at as string,
+    updatedAt: c.updated_at as string,
+  };
+}
+
+const CLAIM_SELECT =
+  '*, found_item:found_items!inner (id, title, image_path, status, reporter_id), claimant:profiles!claimant_id (id, name)';
+const claimImage = (c: Row) => (c.found_item as Row | null)?.image_path;
 
 const claims: ClaimsService = {
   async mine() {
     const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const { data, error } = await sb
       .from('claims')
-      .select('*, found_item:found_items (id, title, image_path, status), claimant:profiles!claimant_id (id, name)')
-      .eq('claimant_id', u.user?.id ?? '')
+      .select(CLAIM_SELECT)
+      .eq('claimant_id', uid)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as unknown as Claim[];
+    return mapWithImages(data ?? [], claimImage, toClaim);
   },
   async incoming() {
+    // Solo las reclamaciones sobre objetos que publiqué (RLS también deja ver las
+    // propias como reclamante, y a un admin todas: aquí se acota como en REST).
     const sb = requireSupabase();
+    const uid = await currentUserId();
     const { data, error } = await sb
       .from('claims')
-      .select('*, found_item:found_items!inner (id, title, image_path, status, reporter_id), claimant:profiles!claimant_id (id, name)')
+      .select(CLAIM_SELECT)
+      .eq('found_item.reporter_id', uid)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as unknown as Claim[];
+    return mapWithImages(data ?? [], claimImage, toClaim);
   },
   // Las reclamaciones pasan por la Edge Function `api`: el flujo necesita
   // privilegios (notificar al dueño/reclamante, cambiar el estado del objeto,
@@ -443,11 +520,11 @@ const notifications: NotificationsService = {
   },
   async markAllRead() {
     const sb = requireSupabase();
-    const { data: u } = await sb.auth.getUser();
+    const uid = await currentUserId();
     const { error } = await sb
       .from('notifications')
       .update({ read: true })
-      .eq('user_id', u.user?.id ?? '')
+      .eq('user_id', uid)
       .eq('read', false);
     if (error) throw error;
   },

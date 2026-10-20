@@ -74,8 +74,7 @@ const lostReports: LostReportsService = {
   get: (id) => api<LostReport>(`/lost-reports/${id}`),
   mine: () => api<LostReport[]>('/lost-reports/mine/list'),
   create: (form) => api<LostReport>('/lost-reports', { method: 'POST', formData: form }),
-  close: (id) =>
-    api<LostReport>(`/lost-reports/${id}`, { method: 'PATCH', body: { status: 'CLOSED' } }),
+  close: (id) => api<LostReport>(`/lost-reports/${id}/close`, { method: 'PATCH' }),
   remove: async (id) => {
     await api(`/lost-reports/${id}`, { method: 'DELETE' });
   },

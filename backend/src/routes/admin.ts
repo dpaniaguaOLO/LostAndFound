@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { notFound } from '../lib/http.js';
+import { hashPassword } from '../lib/auth.js';
+import { badRequest, notFound } from '../lib/http.js';
+import { queryInt } from '../lib/query.js';
 import { serializeFoundItem, serializeLostReport, serializeUser } from '../lib/serialize.js';
+import { parseOrThrow, resetPasswordSchema, setRoleSchema } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { writeAudit } from '../lib/audit.js';
 
@@ -38,12 +41,14 @@ adminRouter.get(
 adminRouter.patch(
   '/users/:id/role',
   asyncHandler(async (req, res) => {
-    const role = req.body?.role;
-    if (role !== 'ADMIN' && role !== 'EMPLOYEE') {
-      return res.status(400).json({ error: 'BAD_REQUEST', message: 'Rol inválido' });
-    }
+    const { role } = parseOrThrow(setRoleSchema, req.body);
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) throw notFound('Usuario no encontrado');
+    // Nunca dejar el sistema sin administradores.
+    if (user.role === 'ADMIN' && role !== 'ADMIN') {
+      const admins = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (admins <= 1) throw badRequest('No se puede quitar el rol al último administrador');
+    }
     const updated = await prisma.user.update({ where: { id: user.id }, data: { role } });
     await writeAudit(
       req.auth!.sub,
@@ -56,11 +61,35 @@ adminRouter.patch(
   }),
 );
 
+// POST /api/admin/users/reset-password — un admin fija una nueva contraseña a un
+// colaborador (no hay recuperación por email). Equivale a la Edge Function
+// admin-reset-password del modo Supabase.
+adminRouter.post(
+  '/users/reset-password',
+  asyncHandler(async (req, res) => {
+    const body = parseOrThrow(resetPasswordSchema, req.body);
+    const user = await prisma.user.findUnique({ where: { employeeId: body.employeeId } });
+    if (!user) throw notFound('Colaborador no encontrado');
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await hashPassword(body.newPassword) },
+    });
+    await writeAudit(
+      req.auth!.sub,
+      'USER_PASSWORD_RESET',
+      'User',
+      user.id,
+      `Restableció la contraseña de ${user.name} (N° ${user.employeeId})`,
+    );
+    res.json({ ok: true });
+  }),
+);
+
 // GET /api/admin/audit — historial de eventos (trazabilidad). Solo admin.
 adminRouter.get(
   '/audit',
   asyncHandler(async (req, res) => {
-    const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 100)));
+    const limit = queryInt(req.query.limit, 100, 1, 200);
     const logs = await prisma.auditLog.findMany({
       include: { actor: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
@@ -109,7 +138,7 @@ adminRouter.post(
     const kind = req.body?.kind;
     const id = String(req.body?.id ?? '');
     if ((kind !== 'found' && kind !== 'lost') || !id) {
-      return res.status(400).json({ error: 'BAD_REQUEST', message: 'kind (found|lost) e id requeridos' });
+      throw badRequest('kind (found|lost) e id requeridos');
     }
     if (kind === 'found') {
       const item = await prisma.foundItem.findUnique({ where: { id } });

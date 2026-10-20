@@ -100,32 +100,57 @@ claimsRouter.patch(
     const isOwner = claim.foundItem.reporterId === req.auth!.sub;
     const isAdmin = req.auth!.role === 'ADMIN';
     if (!isOwner && !isAdmin) throw forbidden('No puedes revisar esta reclamación');
+    if (claim.claimantId === req.auth!.sub) throw forbidden('No puedes revisar tu propia reclamación');
     if (claim.status !== 'PENDING') throw badRequest('La reclamación ya fue procesada');
+    if (body.status === 'APPROVED' && claim.foundItem.status !== 'PUBLISHED') {
+      throw badRequest('El objeto ya no está disponible para aprobar reclamaciones');
+    }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const c = await tx.claim.update({
-        where: { id: claim.id },
+    const AUTO_REJECT_NOTE = 'Otra reclamación fue aprobada';
+    const { updated, autoRejected } = await prisma.$transaction(async (tx) => {
+      // Actualizaciones condicionadas al estado leído: si otra petición concurrente
+      // ya procesó la reclamación o el objeto, count = 0 y se aborta la transacción.
+      const claimed = await tx.claim.updateMany({
+        where: { id: claim.id, status: 'PENDING' },
         data: {
           status: body.status,
           reviewerId: req.auth!.sub,
           reviewNote: body.reviewNote ?? null,
         },
-        include: claimInclude,
       });
+      if (claimed.count === 0) throw badRequest('La reclamación ya fue procesada');
 
+      let rejected: { id: string; claimantId: string }[] = [];
       if (body.status === 'APPROVED') {
-        await tx.foundItem.update({
-          where: { id: claim.foundItemId },
+        const item = await tx.foundItem.updateMany({
+          where: { id: claim.foundItemId, status: 'PUBLISHED' },
           data: { status: 'CLAIMED' },
         });
+        if (item.count === 0) {
+          throw badRequest('El objeto ya no está disponible para aprobar reclamaciones');
+        }
         // Rechaza automáticamente otras reclamaciones pendientes del mismo objeto.
+        const others = { foundItemId: claim.foundItemId, status: 'PENDING', id: { not: claim.id } };
+        rejected = await tx.claim.findMany({ where: others, select: { id: true, claimantId: true } });
         await tx.claim.updateMany({
-          where: { foundItemId: claim.foundItemId, status: 'PENDING', id: { not: claim.id } },
-          data: { status: 'REJECTED', reviewNote: 'Otra reclamación fue aprobada' },
+          where: others,
+          data: { status: 'REJECTED', reviewerId: req.auth!.sub, reviewNote: AUTO_REJECT_NOTE },
         });
       }
-      return c;
+      const c = await tx.claim.findUniqueOrThrow({ where: { id: claim.id }, include: claimInclude });
+      return { updated: c, autoRejected: rejected };
     });
+
+    // Avisa a quienes perdieron la reclamación por aprobarse otra.
+    for (const r of autoRejected) {
+      await notify({
+        userId: r.claimantId,
+        type: 'CLAIM_REJECTED',
+        title: 'Reclamación rechazada',
+        body: `Tu reclamación de "${claim.foundItem.title}" fue rechazada: ${AUTO_REJECT_NOTE.toLowerCase()}.`,
+        relatedItemId: claim.foundItemId,
+      });
+    }
 
     await notify({
       userId: claim.claimantId,
@@ -172,12 +197,13 @@ claimsRouter.patch(
   asyncHandler(async (req, res) => {
     const claim = await prisma.claim.findUnique({ where: { id: req.params.id } });
     if (!claim || claim.claimantId !== req.auth!.sub) throw notFound('Reclamación no encontrada');
-    if (claim.status !== 'PENDING') throw badRequest('Solo se pueden cancelar reclamaciones pendientes');
-    const updated = await prisma.claim.update({
-      where: { id: claim.id },
+    // Condicionado a PENDING para no pisar una revisión concurrente.
+    const { count } = await prisma.claim.updateMany({
+      where: { id: claim.id, status: 'PENDING' },
       data: { status: 'CANCELLED' },
-      include: claimInclude,
     });
+    if (count === 0) throw badRequest('Solo se pueden cancelar reclamaciones pendientes');
+    const updated = await prisma.claim.findUniqueOrThrow({ where: { id: claim.id }, include: claimInclude });
     res.json(serializeClaim(updated));
   }),
 );
