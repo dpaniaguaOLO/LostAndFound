@@ -15,3 +15,12 @@ additional_redirect_urls = ["http://localhost:5173", "capacitor://localhost", "h
 [storage]
 # Límite global; el bucket item-photos define su propio límite por archivo.
 file_size_limit = "5MiB"
+
+# --- Edge Functions ---------------------------------------------------------
+# verify_jwt = true: Supabase valida el JWT del llamador antes de ejecutar la
+# función (las funciones igualmente comprueban rol/propietario por dentro).
+[functions.api]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true

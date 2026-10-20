@@ -133,8 +133,12 @@ romper ni eliminar nada de lo existente. Documentación completa en
     (opción 2; dominio en `VITE_SUPABASE_EMAIL_DOMAIN`). Helper `syntheticEmail()`.
   - **Reset de contraseña por admin**: Edge Function `supabase/functions/admin-reset-password`
     (verifica ADMIN + usa `service_role` en servidor), `services/admin.ts`, `PasswordResetCard`.
-  - **Fase 2 pendiente**: IA (`/ai/*`) y panel admin (`/admin/*`, `/claims/all`) siguen en el
-    backend Express; se portarán a Edge Functions. En modo Supabase esas vistas no cargan aún.
+  - **Fase 2 COMPLETA**: IA (`/ai/*`) y panel admin (`/admin/*`, `/claims/all`) portados a la
+    Edge Function `api` (`supabase/functions/api/`), con el motor NLP/matching/firma visual en
+    `supabase/functions/_shared/` (port verbatim de `backend/src/lib/`). El frontend los consume
+    vía `services/ai.ts` y `services/admin.ts` (enrutan Edge Function o Express según el flag).
+    En modo `supabase` la app funciona completa sin el backend Express. Requiere desplegar la
+    Edge Function (`supabase functions deploy api`).
 - **Android con Capacitor** (elegido sobre React Native/Expo para reutilizar la web):
   - `frontend/capacitor.config.ts`, proyecto nativo en `frontend/android/`.
   - Puente nativo `frontend/src/lib/native.ts` (StatusBar, Keyboard, botón atrás); *no-op*
@@ -315,8 +319,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.12.0 (ver `VERSION`). Rama `feature/supabase-android`: Supabase Fase 1
-  conectada (CRUD/auth/storage) y Android (Capacitor) preparado. La rama `main` iba por 0.10.1.
+- **Versión**: 0.13.0 (ver `VERSION`). Rama `feature/supabase-android`: Supabase Fases 1 y 2
+  completas (CRUD/auth/storage + IA/admin en Edge Functions) y Android (Capacitor) preparado.
+  La rama `main` iba por 0.10.1.
 - **Último commit relevante**: ver `git log` / `CHANGELOG.md` (primer release 0.1.0).
 - **Terminado**: monorepo, shared, backend completo (auth, found-items, lost-reports,
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),

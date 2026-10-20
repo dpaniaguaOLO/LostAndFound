@@ -2,17 +2,17 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.12.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
+- **Versión actual**: 0.13.0 (rama `feature/supabase-android`; `main` va por 0.10.1)
 - **Fecha**: 2026-10-20
-- **Commit más reciente**: conexión real a Supabase, Fase 1 (ver `git log`)
-- **Última funcionalidad completada**: **Fase 1 de Supabase conectada**. La UI consume la
-  capa `services`; con `VITE_DATA_BACKEND=supabase` funcionan auth (login por número de
-  colaborador con email sintético `@lostandfound.olo`), muro, publicar con foto (Storage),
-  reclamaciones, notificaciones y restablecimiento de contraseña por admin (Edge Function
-  `admin-reset-password`). El modo `rest` sigue intacto.
-- **Pendiente (Fase 2)**: portar IA (búsqueda, coincidencias, asistente) y panel admin
-  (métricas, usuarios, auditoría, bandeja global) a Edge Functions; hoy dependen del backend
-  Express y no cargan en modo Supabase.
+- **Commit más reciente**: Supabase Fase 2 — IA y admin en Edge Function (ver `git log`)
+- **Última funcionalidad completada**: **Fase 2 de Supabase**. La IA (búsqueda, coincidencias,
+  asistente) y el panel admin (métricas, usuarios, rol, auditoría, bandeja global) se portaron
+  a la Edge Function `api` (motor NLP/matching/firma visual en `supabase/functions/_shared/`).
+  Con `VITE_DATA_BACKEND=supabase` la app funciona completa sin el backend Express. Fase 1
+  (auth/CRUD/storage/reset-password) sigue operativa.
+- **Pendiente del usuario**: desplegar las Edge Functions (`supabase functions deploy api` y
+  `admin-reset-password`); crear usuarios; probar end-to-end. Edge Functions no compiladas ni
+  desplegadas desde el entorno de desarrollo (sin Deno/Supabase CLI).
 
 ## Estado de las pruebas
 
@@ -61,7 +61,7 @@
   bucket `item-photos` en el panel, desplegar la Edge Function `admin-reset-password`, y
   antes de producción rotar la anon key. Ver `docs/SUPABASE_SETUP.md`.
 - [x] Migradas a la capa `services` las páginas de CRUD/auth/notificaciones.
-- [ ] **Fase 2**: portar IA y panel admin a Edge Functions.
+- [x] **Fase 2**: IA y panel admin portados a la Edge Function `api`.
 - [ ] **Android**: instalar Android Studio + SDK + JDK 17, compilar y probar en
   emulador/teléfono. Ver `docs/ANDROID_SETUP.md`.
 

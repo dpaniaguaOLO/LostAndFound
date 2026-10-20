@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.13.0] - 2026-10-20
+
+Supabase **Fase 2**: la IA y el panel de administración se portan a una Edge Function, de
+modo que en modo `supabase` la app funciona completa sin el backend Express.
+
+### Añadido
+- **Edge Function `api`** (`supabase/functions/api/`) con router interno:
+  - IA: `POST /ai/search`, `GET /ai/match/:lostReportId`, `POST /ai/assistant`.
+  - Admin: `GET /admin/stats`, `GET /admin/users`, `PATCH /admin/users/:id/role`,
+    `GET /admin/audit`, `GET /claims/all` (todas exigen rol ADMIN).
+  - Escribe `audit_logs` en el cambio de rol. Usa `service_role` solo en el servidor.
+- **Motor de IA portado a Deno** en `supabase/functions/_shared/` (nlp, matching, visual,
+  assistant, serialize, http). Pesos y fórmulas idénticos al backend; verificado por diff
+  que la lógica de puntuación no cambia.
+- **Capa de servicios de IA/admin en el frontend**: `services/ai.ts` y ampliación de
+  `services/admin.ts` (stats, users, setRole, audit, allClaims), que enrutan a la Edge
+  Function en modo Supabase o al backend Express en modo `rest`.
+- Cableado de `SmartSearch`, `MatchSuggestions`, `Assistant` y `AdminPage` a esa capa.
+
+### Notas
+- Con esto, en modo `supabase` la app cubre todas las funciones (CRUD + IA + admin). El
+  backend Express queda como alternativa (`VITE_DATA_BACKEND=rest`).
+- Verificado: build completo (shared+backend+frontend) y 11 tests del backend OK. Las Edge
+  Functions **no** se compilaron ni desplegaron desde este entorno (sin Deno ni Supabase CLI);
+  requieren `supabase functions deploy api` por parte del usuario.
+
+---
+
 ## [0.12.0] - 2026-10-20
 
 Conexión real a **Supabase** (Fase 1) en la rama `feature/supabase-android`. La UI pasa a

@@ -94,13 +94,21 @@ services/rest.ts (Express)                     services/supabase.ts (Supabase)
 
 ---
 
-## La IA se queda en el backend (no en Supabase)
+## La IA y el admin: backend Express o Edge Functions
 
-El motor de emparejado (NLP semántico + firma visual con `sharp`) y el asistente son
-**cómputo, no SQL**. Viven en el backend Express (`backend/src/lib/`) y seguirán ahí.
-Cuando se adopte Supabase, las operaciones con privilegios (crear notificaciones, escribir
-audit logs, aprobar claims con validación de flujo) irán en **Edge Functions** que usen
-`service_role` — nunca en el cliente.
+El motor de emparejado (NLP semántico + firma visual) y el asistente son **cómputo, no SQL**.
+
+- En modo **`rest`** viven en el backend Express (`backend/src/lib/`).
+- En modo **`supabase`** (Fase 2) se sirven desde la **Edge Function `api`**
+  (`supabase/functions/api/`), que reutiliza el motor portado a Deno en
+  `supabase/functions/_shared/` (NLP, matching, firma visual). Los pesos y fórmulas son
+  idénticos a los del backend. Las rutas de administración y el restablecimiento de
+  contraseña usan la `service_role` **solo en el servidor** (Edge Functions), nunca en el
+  cliente.
+
+Detalle importante de la firma visual: la **comparación** de dos firmas es aritmética pura
+sobre el JSON guardado y corre en la Edge Function sin problema; la **generación** de la
+firma (que usa `sharp`) ocurre al subir la imagen, fuera de la Edge Function.
 
 ---
 
@@ -125,6 +133,7 @@ compilar con Android Studio / Gradle.
 1. **Capacitor** sobre React Native/Expo: reutiliza el frontend web sin reescribir.
 2. **Supabase preparado pero no conectado**: sin credenciales no se simula conexión; se
    dejan migraciones, RLS, cliente y docs listos para enchufar.
-3. **IA en backend REST/Edge Function**, no en Supabase directo.
+3. **IA y admin** como Edge Function `api` en modo Supabase (motor portado a Deno), o backend
+   Express en modo `rest`. No se consulta IA directamente desde el cliente.
 4. **Feature flag `VITE_DATA_BACKEND`** (default `rest`) para no romper nada.
 5. **Login por `employee_id`** conservado también en el flujo de Supabase.

@@ -139,25 +139,40 @@ El emparejado por IA (NLP + firma visual) y el asistente **siguen en el backend 
 (crear notificaciones, escribir audit logs, aprobar reclamaciones con validación de flujo)
 deben ir en **Edge Functions** que usen `service_role`, nunca en el cliente.
 
-### Edge Function incluida: `admin-reset-password`
-
-Restablece la contraseña de un colaborador. Vive en
-`supabase/functions/admin-reset-password/`. Flujo de seguridad:
-
-1. Verifica el token del llamador y que su `profiles.role = 'ADMIN'`.
-2. Solo entonces usa la `service_role` (lado servidor) para cambiar la contraseña del
-   usuario destino vía la Auth Admin API.
-3. Registra la acción en `audit_logs`.
-
-Desplegar (requiere Supabase CLI y `supabase link` hecho):
+Hay **dos Edge Functions** en `supabase/functions/`. Ambas se despliegan con la Supabase
+CLI (tras `supabase login` y `supabase link`):
 
 ```bash
+supabase functions deploy api
 supabase functions deploy admin-reset-password
 ```
 
-La función usa `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, que
-Supabase **inyecta automáticamente** en las Edge Functions del proyecto; no hay que
-configurarlas a mano. La `service_role` nunca sale del servidor.
+Ambas usan `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, que Supabase
+**inyecta automáticamente** en las Edge Functions del proyecto; no hay que configurarlas a
+mano. La `service_role` nunca sale del servidor.
+
+#### `api` — IA y administración (Fase 2)
+
+Reimplementa en Supabase la lógica que antes vivía en el backend Express. Un único endpoint
+con router interno:
+
+- `POST /ai/search` — búsqueda semántica (NLP: TF-IDF + coseno).
+- `GET /ai/match/:lostReportId` — coincidencias perdido↔encontrado (texto + categoría +
+  ubicación + fecha + firma visual). Solo el autor del reporte o un admin.
+- `POST /ai/assistant` — asistente por intención (sin LLM).
+- `GET /admin/stats`, `GET /admin/users`, `PATCH /admin/users/:id/role`, `GET /admin/audit`,
+  `GET /claims/all` — todas exigen rol ADMIN.
+
+El motor NLP/matching/firma visual se portó **verbatim** desde el backend
+(`supabase/functions/_shared/`); los pesos y fórmulas son idénticos. La comparación de firmas
+visuales es aritmética pura sobre el JSON guardado (no necesita `sharp`). La **generación** de
+la firma al subir una foto sigue haciéndose fuera de la Edge Function.
+
+#### `admin-reset-password` — restablecer contraseña
+
+1. Verifica el token del llamador y que su `profiles.role = 'ADMIN'`.
+2. Usa la `service_role` para cambiar la contraseña del usuario destino (Auth Admin API).
+3. Registra la acción en `audit_logs`.
 
 ---
 
@@ -176,20 +191,20 @@ VITE_SUPABASE_EMAIL_DOMAIN=lostandfound.olo
 Reconstruye (`npm run build:frontend`). Con el flag en `rest` (por defecto) la app sigue
 usando el backend Express sin cambios.
 
-### Estado de la integración (Fase 1)
+### Estado de la integración (Fases 1 y 2 completas)
 
-Lo que **ya funciona** con Supabase como backend de datos (la UI consume la capa
-`frontend/src/services` en lugar del backend Express):
+Con Supabase como backend de datos, la UI consume la capa `frontend/src/services` y **toda
+la funcionalidad** está cubierta, sin depender del backend Express:
 
-- Autenticación (login/registro/logout) por número de colaborador.
-- Muro (objetos encontrados y perdidos), publicar con foto (Storage), detalle.
-- Reclamaciones (crear, revisar, cancelar) y notificaciones.
-- Restablecimiento de contraseña por admin (Edge Function).
+- **Fase 1** — Autenticación (login/registro/logout) por número de colaborador; muro
+  (encontrados y perdidos); publicar con foto (Storage); detalle; reclamaciones; notificaciones;
+  restablecimiento de contraseña por admin.
+- **Fase 2** — IA (búsqueda semántica, coincidencias perdido↔encontrado, asistente) y panel
+  de administración (métricas, usuarios, cambio de rol, auditoría, bandeja global de
+  reclamaciones), servidos por la Edge Function `api`.
 
-Lo que **todavía depende del backend Express** (Fase 2, pendiente de portar a Edge
-Functions): las funciones de IA (búsqueda semántica, coincidencias, asistente) y el panel
-de administración (métricas, lista de usuarios, historial de auditoría, bandeja global de
-reclamaciones). En modo Supabase esas vistas no cargarán datos hasta completar la Fase 2.
+Para que la IA y el admin funcionen hay que **desplegar la Edge Function `api`** (ver arriba).
+El backend Express queda como alternativa (modo `rest`); ya no es necesario con Supabase.
 
 ---
 
@@ -201,7 +216,7 @@ reclamaciones). En modo Supabase esas vistas no cargarán datos hasta completar 
 - [x] Rellenar `frontend/.env` y cambiar `VITE_DATA_BACKEND=supabase`.
 - [ ] **Crear los usuarios** (al menos un ADMIN y un EMPLEADO) con email `<numero>@lostandfound.olo` (§3.1).
 - [ ] Verificar en el panel que el bucket `item-photos` existe y es privado (Storage).
-- [ ] Desplegar la Edge Function `admin-reset-password` (`supabase functions deploy admin-reset-password`).
-- [ ] Probar login + muro + publicar con foto end-to-end.
-- [ ] Fase 2: portar IA y panel admin a Edge Functions.
+- [ ] Desplegar las Edge Functions: `supabase functions deploy api` y `supabase functions deploy admin-reset-password`.
+- [ ] Probar end-to-end: login, muro, publicar con foto, búsqueda inteligente, coincidencias, asistente y panel admin.
+- [x] Fase 2: IA y panel admin portados a la Edge Function `api`.
 - [ ] Antes de producción: rotar la anon key (se compartió en chat) y revisar políticas.

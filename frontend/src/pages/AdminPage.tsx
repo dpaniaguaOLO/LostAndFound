@@ -4,16 +4,11 @@ import type { AuditEntry, Claim, User } from '@laf/shared';
 import { PasswordResetCard } from '../components/PasswordResetCard';
 import { ErrorState, Spinner, StatusBadge, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
-import { api, ApiRequestError } from '../lib/api';
+import { getErrorMessage } from '../lib/errors';
 import { CLAIM_STATUS_LABELS, formatDate, formatDateTime } from '../lib/format';
+import { adminService, type AdminStats } from '../services/admin';
 
-interface Stats {
-  users: number;
-  foundItems: number;
-  lostReports: number;
-  claimsPending: number;
-  returned: number;
-}
+type Stats = AdminStats;
 
 type Tab = 'overview' | 'claims' | 'audit';
 
@@ -45,14 +40,12 @@ export function AdminPage() {
   function loadOverview() {
     setLoading(true);
     setError(null);
-    Promise.all([api<Stats>('/admin/stats'), api<User[]>('/admin/users')])
+    Promise.all([adminService.stats(), adminService.users()])
       .then(([s, u]) => {
         setStats(s);
         setUsers(u);
       })
-      .catch((err) =>
-        setError(err instanceof ApiRequestError ? err.message : 'Error al cargar el panel'),
-      )
+      .catch((err) => setError(getErrorMessage(err, 'Error al cargar el panel')))
       .finally(() => setLoading(false));
   }
 
@@ -61,23 +54,20 @@ export function AdminPage() {
   // Carga perezosa de reclamaciones / historial al abrir su pestaña.
   useEffect(() => {
     if (tab === 'claims' && claims === null) {
-      api<Claim[]>('/claims/all').then(setClaims).catch(() => setClaims([]));
+      adminService.allClaims().then(setClaims).catch(() => setClaims([]));
     }
     if (tab === 'audit' && audit === null) {
-      api<AuditEntry[]>('/admin/audit').then(setAudit).catch(() => setAudit([]));
+      adminService.audit().then(setAudit).catch(() => setAudit([]));
     }
   }, [tab, claims, audit]);
 
   async function changeRole(user: User, role: 'ADMIN' | 'EMPLOYEE') {
     try {
-      const updated = await api<User>(`/admin/users/${user.id}/role`, {
-        method: 'PATCH',
-        body: { role },
-      });
+      const updated = await adminService.setRole(user.id, role);
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
       notify('Rol actualizado', 'success');
     } catch (err) {
-      notify(err instanceof ApiRequestError ? err.message : 'No se pudo actualizar el rol', 'error');
+      notify(getErrorMessage(err, 'No se pudo actualizar el rol'), 'error');
     }
   }
 
