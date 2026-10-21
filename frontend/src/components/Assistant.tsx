@@ -4,6 +4,7 @@ import type { FoundItem, LostReport } from '@laf/shared';
 import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
 import { aiService } from '../services/ai';
+import { OliviaAvatar } from './OliviaAvatar';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -18,20 +19,19 @@ const SUGGESTIONS = [
   '¿Qué se encontró esta semana?',
 ];
 
+const WELCOME =
+  'Hola, soy Olivia 👋 tu asistente aquí en OLO. Pregúntame por objetos encontrados o ' +
+  'perdidos, por ejemplo: «¿se han encontrado botellas hoy?» y te ayudo a buscarlos.';
+
 /**
- * Asistente de búsqueda (sin LLM): botón flotante que abre un panel de chat.
- * Interpreta preguntas frecuentes y responde con datos reales de la app.
+ * Olivia: la asistente de Lost & Found (OLO). Botón flotante que abre un panel
+ * de chat. Responde con datos reales de la app (vía LLM, con respaldo clásico).
  */
 export function Assistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: 'assistant',
-      text: 'Hola, soy el asistente de Lost & Found. Pregúntame por objetos encontrados o perdidos, por ejemplo: “¿se han encontrado botellas hoy?”.',
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: 'assistant', text: WELCOME }]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   async function ask(question: string) {
@@ -73,45 +73,40 @@ export function Assistant() {
 
   return (
     <>
-      {/* Botón flotante */}
+      {/* Botón flotante: muestra a Olivia (o una X al estar abierto) */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-olo-600 text-white shadow-lg transition hover:bg-olo-700 dark:bg-olo-500 dark:text-slate-950 dark:hover:bg-olo-400"
-        aria-label={open ? 'Cerrar asistente' : 'Abrir asistente de búsqueda'}
+        className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-olo-500 focus:ring-offset-2 dark:focus:ring-offset-olo-dark-950"
+        aria-label={open ? 'Cerrar a Olivia' : 'Hablar con Olivia, la asistente'}
       >
         {open ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M12 3c4.97 0 9 3.36 9 7.5S16.97 18 12 18c-.7 0-1.38-.07-2.03-.2L5 19l1.1-3.3C4.78 14.4 3 12.6 3 10.5 3 6.36 7.03 3 12 3Z"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-            <path d="M9 10h6M9 13h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
+          <OliviaAvatar className="h-14 w-14" />
         )}
       </button>
 
       {/* Panel */}
       {open && (
         <div className="card fixed bottom-20 right-4 z-40 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
-          <div className="flex items-center gap-2 border-b border-slate-200 bg-olo-600 px-4 py-3 text-white dark:border-olo-dark-800 dark:bg-olo-500 dark:text-slate-950">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z" fill="currentColor" />
-            </svg>
+          <div className="flex items-center gap-3 border-b border-slate-200 bg-olo-600 px-4 py-3 text-white dark:border-olo-dark-800 dark:bg-olo-500 dark:text-slate-950">
+            <OliviaAvatar className="h-9 w-9 shrink-0 rounded-full ring-2 ring-white/40" />
             <div>
-              <p className="text-sm font-semibold leading-none">Asistente de búsqueda</p>
-              <p className="text-[11px] opacity-90">Responde con datos de la app</p>
+              <p className="text-sm font-semibold leading-none">Olivia</p>
+              <p className="text-[11px] opacity-90">Asistente de OLO · Lost &amp; Found</p>
             </div>
           </div>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
             {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex items-end gap-2 justify-start'}>
+                {m.role === 'assistant' && (
+                  <OliviaAvatar className="h-7 w-7 shrink-0 self-start" />
+                )}
                 <div
                   className={
                     'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +

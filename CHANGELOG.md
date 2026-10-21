@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.21.0] - 2026-10-20
+
+Olivia: identidad del asistente, y se retira la barra de búsqueda inteligente.
+
+### Añadido
+- **Olivia**, la asistente de OLO: nombre, avatar propio (SVG en el verde de marca,
+  `components/OliviaAvatar.tsx`) y voz cálida en primera persona. Aparece en el botón
+  flotante, la cabecera del chat y junto a cada respuesta. El prompt del LLM se ajustó para
+  que responda como Olivia.
+
+### Cambiado / Eliminado
+- **Se quita la barra de "Búsqueda inteligente"** del muro: Olivia cubre esa función. Se
+  elimina el componente `SmartSearch`.
+
+### Notas
+- Requiere redesplegar la Edge Function (hecho) para el nuevo prompt.
+- Versión de desarrollo (sin APK).
+
+---
+
 ## [0.20.0] - 2026-10-20
 
 Asistente con LLM (Fase 1, solo lectura) — rama `feature/llm`.

@@ -1,9 +1,15 @@
-# LLM — Asistente con IA (Fase 1)
+# Olivia — Asistente con IA (Fase 1)
 
-El asistente de Lost & Found puede usar un modelo de lenguaje (OpenAI) para responder
-preguntas en lenguaje natural. Esta es la **Fase 1: solo lectura** — el LLM no accede a la
-base de datos ni ejecuta acciones; solo redacta una respuesta a partir de datos que el
-servidor ya seleccionó y filtró por permisos.
+**Olivia** es la asistente de Lost & Found (OLO). Usa un modelo de lenguaje (OpenAI) para
+responder preguntas en lenguaje natural con un tono cálido y cercano, tuteando al
+colaborador. Esta es la **Fase 1: solo lectura** — el LLM no accede a la base de datos ni
+ejecuta acciones; solo redacta una respuesta a partir de datos que el servidor ya seleccionó
+y filtró por permisos.
+
+Identidad: nombre **Olivia**, avatar SVG propio en `frontend/src/components/OliviaAvatar.tsx`
+(verde de marca OLO), personalidad definida en el *system prompt* de
+`supabase/functions/_shared/llm.ts`. Olivia reemplaza la antigua barra de "búsqueda
+inteligente" del muro.
 
 ## Cómo funciona
 
