@@ -6,7 +6,7 @@
 //
 //   POST /ai/search            búsqueda semántica sobre objetos encontrados
 //   GET  /ai/match/:lostId     coincidencias de un objeto perdido
-//   POST /ai/assistant         asistente por intención (sin LLM)
+//   POST /ai/assistant         asistente Olivia (intención + LLM opcional, ver _shared/llm.ts)
 //   GET  /admin/stats          métricas (solo ADMIN)
 //   GET  /admin/users          lista de usuarios (solo ADMIN)
 //   PATCH /admin/users/:id/role cambia rol (solo ADMIN)
@@ -20,6 +20,7 @@
 
 import { adminClient, cors, getCaller, json, rateLimit } from '../_shared/http.ts';
 import { matchItems, type MatchableItem, semanticSearch } from '../_shared/matching.ts';
+import { tokenize } from '../_shared/nlp.ts';
 import { parseSignature } from '../_shared/visual.ts';
 import { composeAnswer, parseIntent } from '../_shared/assistant.ts';
 import { type AssistantItem, assistantAnswer } from '../_shared/llm.ts';
@@ -35,8 +36,31 @@ const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Longitud máxima de consultas/preguntas en lenguaje natural (acota el coste del NLP).
 const MAX_QUERY = 300;
+// Asistente: candidatos leídos de la BD y resultados devueltos tras el ranking.
+const ASSISTANT_CANDIDATES = 40;
+const ASSISTANT_RESULTS = 10;
 
 type Row = Record<string, unknown>;
+
+/**
+ * Ordena las filas por cuántas palabras de la pregunta aparecen en su texto. Si
+ * ninguna coincide (p. ej. "¿qué se encontró hoy?"), conserva el orden por fecha;
+ * si alguna coincide, devuelve solo las coincidentes (más relevantes primero).
+ */
+function rankByQuestion(rows: Row[], question: string): Row[] {
+  const terms = new Set(tokenize(question));
+  if (terms.size === 0) return rows;
+  const hits = rows
+    .map((r, i) => {
+      const words = new Set(tokenize(`${r.title} ${r.description} ${r.location ?? ''}`));
+      let score = 0;
+      for (const t of terms) if (words.has(t)) score++;
+      return { r, i, score };
+    })
+    .filter((x) => x.score > 0);
+  if (hits.length === 0) return rows;
+  return hits.sort((a, b) => b.score - a.score || a.i - b.i).map((x) => x.r);
+}
 
 function toMatchable(r: Row): MatchableItem {
   return {
@@ -121,6 +145,11 @@ Deno.serve(async (req: Request) => {
   if (path.startsWith('/ai/')) {
     const limited = await rateLimit(sb, `ai:${caller.id}`, 30, 60);
     if (limited) return limited;
+    // El asistente llama a un LLM de pago: tope horario adicional por usuario.
+    if (path === '/ai/assistant') {
+      const hourly = await rateLimit(sb, `assistant:${caller.id}`, 120, 3600);
+      if (hourly) return hourly;
+    }
   } else if (method === 'POST' && path === '/claims') {
     const limited = await rateLimit(sb, `claim:${caller.id}`, 10, 600);
     if (limited) return limited;
@@ -203,67 +232,48 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'BAD_REQUEST', message: `La pregunta debe tener entre 2 y ${MAX_QUERY} caracteres` }, 400);
       }
       const intent = parseIntent(question);
+      const isFound = intent.kind === 'found';
+      const dateCol = isFound ? 'found_at' : 'lost_at';
 
-      let foundItems: unknown[] = [];
-      let lostReports: unknown[] = [];
-      let count = 0;
-      let llmItems: AssistantItem[] = [];
+      // Misma visibilidad que el muro: encontrados disponibles y perdidos abiertos.
+      let q = sb
+        .from(isFound ? 'found_items' : 'lost_reports')
+        .select(REPORTER_SELECT)
+        .in('status', isFound ? ['PUBLISHED', 'CLAIMED'] : ['OPEN', 'MATCHED'])
+        .order(dateCol, { ascending: false })
+        .limit(ASSISTANT_CANDIDATES);
+      if (intent.categories.length) q = q.in('category', intent.categories);
+      if (intent.location) q = q.ilike('location', `%${intent.location}%`);
+      if (intent.since) q = q.gte(dateCol, intent.since.toISOString());
+      const { data, error } = await q;
+      if (error) throw error;
 
-      if (intent.kind === 'found') {
-        let q = sb
-          .from('found_items')
-          .select(REPORTER_SELECT)
-          .in('status', ['PUBLISHED', 'CLAIMED'])
-          .order('found_at', { ascending: false })
-          .limit(10);
-        if (intent.categories.length) q = q.in('category', intent.categories);
-        if (intent.location) q = q.ilike('location', `%${intent.location}%`);
-        if (intent.since) q = q.gte('found_at', intent.since.toISOString());
-        const { data } = await q;
-        const rows = (data ?? []) as Row[];
-        count = rows.length;
-        await primeSignedUrls(sb, rows.map((r) => r.image_path));
-        foundItems = await Promise.all(rows.map((r) => serializeFoundItem(sb, r)));
-        llmItems = rows.map((r) => ({
-          kind: 'found',
-          title: r.title as string,
-          category: r.category as string,
-          location: (r.location as string) ?? '',
-          date: r.found_at as string,
-          description: (r.description as string) ?? '',
-        }));
-      } else {
-        let q = sb
-          .from('lost_reports')
-          .select(REPORTER_SELECT)
-          .order('lost_at', { ascending: false })
-          .limit(10);
-        if (intent.categories.length) q = q.in('category', intent.categories);
-        if (intent.location) q = q.ilike('location', `%${intent.location}%`);
-        if (intent.since) q = q.gte('lost_at', intent.since.toISOString());
-        const { data } = await q;
-        const rows = (data ?? []) as Row[];
-        count = rows.length;
-        await primeSignedUrls(sb, rows.map((r) => r.image_path));
-        lostReports = await Promise.all(rows.map((r) => serializeLostReport(sb, r)));
-        llmItems = rows.map((r) => ({
-          kind: 'lost',
-          title: r.title as string,
-          category: r.category as string,
-          location: (r.location as string) ?? '',
-          date: r.lost_at as string,
-          description: (r.description as string) ?? '',
-        }));
-      }
+      // Prioriza los objetos que mencionan las palabras de la pregunta ("botellas"
+      // dentro de la categoría Otros) para que tarjetas y respuesta coincidan.
+      const rows = rankByQuestion((data ?? []) as Row[], question).slice(0, ASSISTANT_RESULTS);
+      await primeSignedUrls(sb, rows.map((r) => r.image_path));
+      const serialized = await Promise.all(
+        rows.map((r) => (isFound ? serializeFoundItem(sb, r) : serializeLostReport(sb, r))),
+      );
 
-      // El LLM solo redacta la respuesta sobre los datos ya filtrados. Si no está
-      // configurado o falla, se usa el motor de palabras clave (composeAnswer).
       // El LLM solo redacta sobre los datos ya filtrados; si no está configurado
       // o falla, se usa el motor de palabras clave (composeAnswer).
-      const llmAnswer = await assistantAnswer(question, llmItems);
-      const answer = llmAnswer ?? composeAnswer(intent, count);
+      const llmItems: AssistantItem[] = rows.map((r) => ({
+        kind: intent.kind,
+        title: r.title as string,
+        category: r.category as string,
+        location: (r.location as string) ?? '',
+        date: r[dateCol] as string,
+        description: (r.description as string) ?? '',
+      }));
+      const answer = (await assistantAnswer(question, llmItems)) ?? composeAnswer(intent, rows.length);
 
-      return json({ answer, kind: intent.kind, foundItems, lostReports });
+      return json({
+        answer,
+        kind: intent.kind,
+        foundItems: isFound ? serialized : [],
+        lostReports: isFound ? [] : serialized,
+      });
     }
 
     // ================= CLAIMS (flujo con notificaciones) =================

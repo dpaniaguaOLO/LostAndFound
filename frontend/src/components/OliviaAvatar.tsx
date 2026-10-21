@@ -3,13 +3,19 @@
  * SVG propio (sin dependencias ni imágenes externas): un robot amable con el
  * verde de marca OLO. Pensado para sentirse como un asistente digital cercano.
  */
-export function OliviaAvatar({ className = 'h-9 w-9' }: { className?: string }) {
+export function OliviaAvatar({
+  className = 'h-9 w-9',
+  decorative = false,
+}: {
+  className?: string;
+  /** true cuando hay texto al lado que ya nombra a Olivia (evita repetirlo al lector de pantalla). */
+  decorative?: boolean;
+}) {
   return (
     <svg
       viewBox="0 0 48 48"
       className={className}
-      role="img"
-      aria-label="Olivia, asistente de OLO"
+      {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': 'Olivia, asistente de OLO' })}
     >
       {/* Fondo circular */}
       <circle cx="24" cy="24" r="24" fill="#00a785" />

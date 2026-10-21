@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { CreateUserCard } from '../components/CreateUserCard';
 import { PasswordResetCard } from '../components/PasswordResetCard';
-import { ConfirmDialog, ErrorState, ItemImage, Spinner, StatusBadge, Tabs } from '../components/ui';
+import { ConfirmDialog, ErrorState, ItemImage, PageHeader, Spinner, StatusBadge, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -32,6 +32,24 @@ const ACTION_LABELS: Record<string, string> = {
   USER_ACTIVATED: 'Reactivó a un colaborador',
   USER_DEACTIVATED: 'Desactivó a un colaborador',
 };
+
+function RoleBadge({ role }: { role: User['role'] }) {
+  return (
+    <span
+      className={`badge ${role === 'ADMIN' ? 'bg-olo-100 text-olo-800 dark:bg-olo-500/15 dark:text-olo-300' : 'bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300'}`}
+    >
+      {role === 'ADMIN' ? 'Administrador' : 'Empleado'}
+    </span>
+  );
+}
+
+function ActiveBadge({ active }: { active: boolean }) {
+  return active ? (
+    <span className="badge bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300">Activo</span>
+  ) : (
+    <span className="badge bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">Desactivado</span>
+  );
+}
 
 export function AdminPage() {
   const { notify } = useToast();
@@ -119,6 +137,34 @@ export function AdminPage() {
     }
   }
 
+  // Acciones por usuario (compartidas por la tabla de escritorio y las tarjetas móviles).
+  function userActions(u: User) {
+    return (
+      <>
+        {u.role === 'ADMIN' ? (
+          <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>
+            Quitar admin
+          </button>
+        ) : (
+          <button className="btn-secondary" onClick={() => changeRole(u, 'ADMIN')}>
+            Hacer admin
+          </button>
+        )}
+        {/* No permitir que un admin se desactive a sí mismo */}
+        {currentUser?.id !== u.id &&
+          (u.active ? (
+            <button className="btn-danger" onClick={() => setConfirmDeactivate(u)}>
+              Desactivar
+            </button>
+          ) : (
+            <button className="btn-primary" onClick={() => toggleActive(u)}>
+              Reactivar
+            </button>
+          ))}
+      </>
+    );
+  }
+
   if (loading) return <Spinner />;
   // El resumen/usuarios/historial dependen del backend REST (Express). Si no está
   // disponible (p. ej. con Supabase como backend de datos), igual ofrecemos las
@@ -142,12 +188,7 @@ export function AdminPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
-        Panel administrativo
-      </h1>
-      <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-        Supervisión del sistema, reclamaciones e historial.
-      </p>
+      <PageHeader title="Panel administrativo" subtitle="Supervisión del sistema, reclamaciones e historial." />
 
       <Tabs<Tab>
         tabs={[
@@ -163,22 +204,44 @@ export function AdminPage() {
       {/* --- RESUMEN --- */}
       {tab === 'overview' && (
         <>
-          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            {cards.map((c) => (
-              <div key={c.label} className="card overflow-hidden p-0">
-                <div className="h-1 w-full bg-olo-500" />
-                <div className="p-4">
-                  <p className="text-3xl font-bold text-ink dark:text-slate-100">{c.value}</p>
-                  <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {c.label}
-                  </p>
-                </div>
+          <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
+            {cards.map((c, i) => (
+              <div
+                key={c.label}
+                className={'card relative animate-fade-up overflow-hidden p-4 ' + (i === cards.length - 1 ? 'col-span-2 sm:col-span-1' : '')}
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-olo-500/10 dark:bg-olo-400/10" aria-hidden />
+                <p className="relative text-3xl font-extrabold tabular-nums tracking-tight text-ink dark:text-slate-50">{c.value}</p>
+                <p className="relative mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{c.label}</p>
               </div>
             ))}
           </div>
 
-          <h2 className="mb-3 text-lg font-semibold text-slate-800 dark:text-slate-100">Usuarios</h2>
-          <div className="card overflow-x-auto">
+          <h2 className="section-title mb-3">Usuarios</h2>
+
+          {/* Móvil: tarjetas (una tabla de 6 columnas no cabe en 360px) */}
+          <ul className="flex flex-col gap-2.5 md:hidden">
+            {users.map((u) => (
+              <li key={u.id} className="card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{u.name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      N° {u.employeeId} · desde {formatDate(u.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <RoleBadge role={u.role} />
+                    <ActiveBadge active={u.active} />
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 [&>*:only-child]:col-span-2">{userActions(u)}</div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="card hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200 text-slate-500 dark:border-olo-dark-800 dark:text-slate-400">
                 <tr>
@@ -196,47 +259,14 @@ export function AdminPage() {
                     <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.employeeId}</td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`badge ${u.role === 'ADMIN' ? 'bg-olo-100 text-olo-800 dark:bg-olo-500/15 dark:text-olo-300' : 'bg-slate-100 text-slate-600 dark:bg-olo-dark-800 dark:text-slate-300'}`}
-                      >
-                        {u.role === 'ADMIN' ? 'Administrador' : 'Empleado'}
-                      </span>
+                      <RoleBadge role={u.role} />
                     </td>
                     <td className="px-4 py-3">
-                      {u.active ? (
-                        <span className="badge bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300">
-                          Activo
-                        </span>
-                      ) : (
-                        <span className="badge bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                          Desactivado
-                        </span>
-                      )}
+                      <ActiveBadge active={u.active} />
                     </td>
                     <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{formatDate(u.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {u.role === 'ADMIN' ? (
-                          <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>
-                            Quitar admin
-                          </button>
-                        ) : (
-                          <button className="btn-secondary" onClick={() => changeRole(u, 'ADMIN')}>
-                            Hacer admin
-                          </button>
-                        )}
-                        {/* No permitir que un admin se desactive a sí mismo */}
-                        {currentUser?.id !== u.id &&
-                          (u.active ? (
-                            <button className="btn-danger" onClick={() => setConfirmDeactivate(u)}>
-                              Desactivar
-                            </button>
-                          ) : (
-                            <button className="btn-primary" onClick={() => toggleActive(u)}>
-                              Reactivar
-                            </button>
-                          ))}
-                      </div>
+                      <div className="flex flex-wrap gap-2">{userActions(u)}</div>
                     </td>
                   </tr>
                 ))}
@@ -309,8 +339,8 @@ export function AdminPage() {
                   key={`${kind}-${item.id}`}
                   className="card flex items-center gap-3 p-3 sm:gap-4"
                 >
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
-                    <ItemImage src={item.imageUrl} alt={item.title} />
+                  <div className="w-16 shrink-0 overflow-hidden rounded-xl">
+                    <ItemImage src={item.imageUrl} alt={item.title} rounded={false} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

@@ -24,12 +24,21 @@ inteligente" del muro.
 El código del cliente vive en `supabase/functions/_shared/llm.ts`; la integración en
 `supabase/functions/api/index.ts` (endpoint `/ai/assistant`).
 
+Antes de llamar al LLM, el servidor lee hasta 40 candidatos (filtrados por categoría,
+ubicación y fecha según la intención) y prioriza los que contienen las palabras de la
+pregunta; se devuelven los 10 mejores. "Hoy/ayer/esta semana" se calculan en
+`APP_TIMEZONE` (`supabase/functions/_shared/time.ts`), no en UTC.
+
 ## Seguridad
 
 - La **API key vive solo en el servidor**, como secret de la Edge Function
   (`OPENAI_API_KEY`). Nunca se expone al cliente ni se versiona.
 - El LLM solo ve lo que el backend le entrega (ya filtrado); no consulta la base directamente.
 - Solo texto. Las imágenes no se envían al proveedor.
+- **Inyección de prompt**: pregunta y descripciones (texto de usuarios) se envían como JSON
+  de datos y el system prompt ordena no seguir instrucciones incrustadas. Aun así el modelo
+  no tiene herramientas: lo peor que puede hacer es redactar un texto erróneo (React lo escapa).
+- **Coste**: límite de 30 peticiones/min a `/ai/*` y 120 preguntas/hora al asistente por usuario.
 
 ## Fallback automático
 
@@ -40,7 +49,8 @@ poner o quitar el secret.
 
 ## Configuración
 
-Modelo usado: `gpt-4o-mini` (OpenAI). Para activarlo:
+Modelo usado: `gpt-4o-mini` (OpenAI), cambiable con el secret opcional `OPENAI_MODEL`.
+Zona horaria opcional: `APP_TIMEZONE` (por defecto `America/Costa_Rica`). Para activarlo:
 
 ```bash
 # 1. Verifica que la clave es válida (debe listar modelos):

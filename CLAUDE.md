@@ -361,7 +361,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.17.0 (ver `VERSION`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
+- **Versión**: 0.22.0 (ver `VERSION`). 0.22.0: revisión del LLM (Olivia) + rediseño mobile
+  first (barra inferior en móvil, tokens de sombra/animación en `tailwind.config.js`,
+  componentes `PageHeader`/`Modal`/esqueletos en `components/ui.tsx`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
   auditoría de seguridad completa (20 medidas, `docs/SECURITY.md`). Ambas de Claude. Rama `feature/supabase-android`: Supabase Fases 1 y 2
   completas (CRUD/auth/storage + IA/admin en Edge Functions) y Android (Capacitor) preparado.
   La rama `main` iba por 0.10.1.

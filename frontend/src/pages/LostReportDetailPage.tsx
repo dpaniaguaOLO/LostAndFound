@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { LostReport } from '@laf/shared';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { ConfirmDialog, ErrorState, ItemImage, Spinner, StatusBadge } from '../components/ui';
+import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Spinner, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -68,54 +68,37 @@ export function LostReportDetailPage() {
 
   return (
     <div>
-      <button
-        className="mb-4 text-sm text-olo-700 hover:underline dark:text-olo-400"
-        onClick={() => navigate(-1)}
-      >
-        ← Volver
-      </button>
+      <BackButton />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="card overflow-hidden">
-          <ItemImage src={item.imageUrl} alt={item.title} />
+      <div className="grid gap-5 md:grid-cols-2 md:gap-8">
+        <div className="card overflow-hidden md:sticky md:top-24 md:self-start">
+          <ItemImage src={item.imageUrl} alt={item.title} rounded={false} />
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
-              {item.title}
-            </h1>
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
             <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
+            <h1 className="page-title break-words">{item.title}</h1>
           </div>
 
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt className="text-slate-500 dark:text-slate-400">Categoría</dt>
-              <dd className="font-medium dark:text-slate-200">{CATEGORY_LABELS[item.category]}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500 dark:text-slate-400">Ubicación</dt>
-              <dd className="font-medium dark:text-slate-200">{item.location || 'No indicada'}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500 dark:text-slate-400">Perdido el</dt>
-              <dd className="font-medium dark:text-slate-200">{formatDate(item.lostAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500 dark:text-slate-400">Reportado por</dt>
-              <dd className="font-medium dark:text-slate-200">{item.reporter.name}</dd>
-            </div>
-          </dl>
+          <DetailGrid
+            rows={[
+              ['Categoría', CATEGORY_LABELS[item.category]],
+              ['Ubicación', item.location || 'No indicada'],
+              ['Perdido el', formatDate(item.lostAt)],
+              ['Reportado por', item.reporter.name],
+            ]}
+          />
 
-          <div>
-            <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400">Descripción</h2>
-            <p className="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-300">{item.description}</p>
+          <div className="card p-4 sm:p-5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Descripción</h2>
+            <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
           {/* Acciones de moderación (solo administradores) */}
           {isAdmin && (
-            <div className="mt-1 rounded-lg border border-slate-200 p-3 dark:border-olo-dark-800">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <div className="rounded-2xl border border-dashed border-slate-300 p-4 dark:border-olo-dark-700">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Administración
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -134,12 +117,15 @@ export function LostReportDetailPage() {
       </div>
 
       {/* Coincidencias de la IA, destacadas */}
-      <div className="card mt-6 overflow-hidden">
-        <div className="px-4 pt-4">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+      <div className="card mt-6 overflow-hidden sm:mt-8">
+        <div className="border-b border-slate-100 bg-gradient-to-r from-olo-50/80 to-transparent px-4 py-4 dark:border-olo-dark-800 dark:from-olo-500/10 sm:px-5">
+          <h2 className="section-title flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="text-olo-600 dark:text-olo-400">
+              <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z" fill="currentColor" />
+            </svg>
             Coincidencias sugeridas por la IA
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
             Objetos encontrados que podrían ser este, comparados por imagen, descripción,
             categoría, ubicación y fecha.
           </p>
@@ -150,7 +136,7 @@ export function LostReportDetailPage() {
       <ConfirmDialog
         open={confirmClose}
         title="Archivar reporte perdido"
-        message="El reporte se cerrará y se retirará de las búsquedas activas, pero quedará registrado. Es una acción reversible desde la base de datos."
+        message="El reporte se cerrará y se retirará de las búsquedas activas, pero quedará registrado. Se puede restaurar desde el panel de administración (Archivados)."
         confirmLabel="Archivar"
         onConfirm={closeReport}
         onCancel={() => setConfirmClose(false)}

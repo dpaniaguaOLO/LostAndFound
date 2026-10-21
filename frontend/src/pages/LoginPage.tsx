@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { allowSelfRegister } from '../lib/config';
@@ -40,13 +41,24 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-olo-50 to-slate-100 px-4 py-8 dark:from-slate-900 dark:to-slate-950">
-      <div className="card w-full max-w-md p-6 sm:p-8">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Logo showWordmark={false} markClassName="h-11 w-auto" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      {/* Fondo: manchas de color de marca difuminadas */}
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+        <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-olo-300/30 blur-3xl dark:bg-olo-500/15" />
+        <div className="absolute -bottom-32 -right-20 h-96 w-96 rounded-full bg-olo-200/40 blur-3xl dark:bg-olo-700/20" />
+      </div>
+      <div className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))]">
+        <ThemeToggle />
+      </div>
+
+      <div className="w-full max-w-md animate-fade-up rounded-3xl border border-white/60 bg-white/80 p-6 shadow-elevated backdrop-blur-xl dark:border-olo-dark-800 dark:bg-olo-dark-900/80 sm:p-8">
+        <div className="mb-7 flex flex-col items-center gap-3 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-card ring-1 ring-slate-200/80 dark:bg-olo-dark-850 dark:ring-olo-dark-800">
+            <Logo showWordmark={false} markClassName="h-7 w-auto" />
+          </div>
           <div>
-            <h1 className="text-xl font-semibold text-ink dark:text-slate-100">Lost &amp; Found</h1>
-            <p className="text-xs uppercase tracking-wide text-olo-700 dark:text-olo-400">
+            <h1 className="text-2xl font-extrabold tracking-tight text-ink dark:text-slate-50">Lost &amp; Found</h1>
+            <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-olo-700 dark:text-olo-400">
               Overseas Logistics Operations
             </p>
           </div>
@@ -143,13 +155,14 @@ export function LoginPage() {
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-olo-600 focus:ring-olo-500 dark:border-slate-600 dark:bg-slate-800"
+                className="h-5 w-5 rounded-md border-slate-300 accent-olo-600 dark:border-slate-600 dark:bg-slate-800"
               />
               Recordar este dispositivo
             </label>
           )}
 
-          <button className="btn-primary w-full" type="submit" disabled={submitting}>
+          <button className="btn-primary mt-1 w-full py-3 text-base sm:text-sm" type="submit" disabled={submitting}>
+            {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />}
             {submitting ? 'Procesando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
           </button>
         </form>
@@ -172,10 +185,13 @@ export function LoginPage() {
           </p>
         )}
 
-        <div className="mt-6 rounded-lg bg-slate-50 p-3 text-center text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-          Cuentas de prueba: colaborador <strong>1001</strong> (admin) /{' '}
-          <strong>2002</strong> (colaborador) — contraseña <strong>password123</strong>
-        </div>
+        {/* Credenciales demo solo en desarrollo: no deben aparecer en builds de producción (APK). */}
+        {import.meta.env.DEV && (
+          <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3 text-center text-xs text-slate-500 dark:border-olo-dark-700 dark:bg-olo-dark-850 dark:text-slate-400">
+            Cuentas de prueba: colaborador <strong>1001</strong> (admin) /{' '}
+            <strong>2002</strong> (colaborador) — contraseña <strong>password123</strong>
+          </div>
+        )}
       </div>
     </div>
   );

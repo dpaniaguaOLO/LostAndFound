@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
+import { CardGridSkeleton, EmptyState, ErrorState, PageHeader, Tabs } from '../components/ui';
 import { getErrorMessage } from '../lib/errors';
 import { services } from '../services';
 
@@ -43,24 +43,19 @@ export function MyThingsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">
-        Mis objetos
-      </h1>
-      <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-        Los objetos que tú perdiste o encontraste.
-      </p>
+      <PageHeader title="Mis objetos" subtitle="Los objetos que tú perdiste o encontraste." />
 
       <Tabs<Tab>
         tabs={[
-          { key: 'lost', label: `Perdidos (${lost.length})` },
-          { key: 'found', label: `Encontrados (${found.length})` },
+          { key: 'lost', label: 'Perdidos', count: loading ? undefined : lost.length },
+          { key: 'found', label: 'Encontrados', count: loading ? undefined : found.length },
         ]}
         value={tab}
         onChange={changeTab}
       />
 
       {loading ? (
-        <Spinner />
+        <CardGridSkeleton count={3} />
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : items.length === 0 ? (
@@ -68,19 +63,23 @@ export function MyThingsPage() {
           title={tab === 'found' ? 'No has publicado objetos encontrados' : 'No has reportado objetos perdidos'}
           description="Usa el botón para registrar uno."
           action={
-            <Link to={tab === 'found' ? '/publicar' : '/publicar'} className="btn-primary">
+            <Link to="/publicar" className="btn-primary">
               {tab === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
             </Link>
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {tab === 'found'
-            ? found.map((i) => <FoundItemCard key={i.id} item={i} />)
-            : lost.map((i) => (
+            ? found.map((i, idx) => (
+                <div key={i.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}>
+                  <FoundItemCard item={i} />
+                </div>
+              ))
+            : lost.map((i, idx) => (
                 // Cada objeto perdido propio: tarjeta + acceso al detalle + coincidencias.
-                <div key={i.id} className="card overflow-hidden">
-                  <Link to={`/perdidos/${i.id}`} className="block transition hover:opacity-90">
+                <div key={i.id} className="card group animate-fade-up overflow-hidden transition duration-300 hover:shadow-card-hover" style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}>
+                  <Link to={`/perdidos/${i.id}`} className="block">
                     <LostReportCard item={i} embedded />
                   </Link>
                   <MatchSuggestions lostReportId={i.id} />

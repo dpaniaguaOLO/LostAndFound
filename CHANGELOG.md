@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.22.0] - 2026-10-21
+
+Revisión del asistente con LLM (Olivia) y rediseño mobile first de toda la interfaz. (Claude)
+
+### Corregido
+- **"Hoy" en el asistente**: las Edge Functions corren en UTC, así que "hoy" empezaba a las
+  18:00 del día anterior en Costa Rica. Nuevo `supabase/functions/_shared/time.ts` calcula el
+  inicio del día en `APP_TIMEZONE` (por defecto `America/Costa_Rica`).
+- **Fecha al publicar**: `new Date("YYYY-MM-DD")` se interpretaba como medianoche UTC y el
+  objeto se guardaba/mostraba con el día anterior; y el máximo del selector de fecha usaba
+  la fecha UTC (de noche permitía "mañana"). Ahora se usa la fecha local.
+- El asistente mostraba reportes perdidos `RESOLVED`/`CLOSED`; ahora solo `OPEN`/`MATCHED`
+  (igual que el muro).
+- "Reintentar" en el muro no volvía a cargar tras un error.
+- Las credenciales demo de la pantalla de login solo se muestran en desarrollo (no en el APK).
+
+### Mejorado (LLM)
+- **Relevancia**: se leen hasta 40 candidatos y se priorizan los que contienen las palabras
+  de la pregunta ("botellas" ya no devuelve todo lo de la categoría Otros); tarjetas y
+  respuesta del LLM coinciden.
+- **Prompt endurecido**: pregunta y objetos se envían como JSON de datos, con instrucción de
+  no seguir órdenes incrustadas (inyección de prompt) y se incluye la fecha de hoy.
+- Timeout 12 s → 8 s, respuesta acotada a 700 caracteres, logs de error recortados, modelo
+  configurable con el secret `OPENAI_MODEL`.
+- **Tope de coste**: además de 30/min, el asistente admite 120 preguntas/hora por usuario.
+
+### Cambiado (diseño)
+- **Mobile first**: barra de navegación inferior en móvil con "Publicar" destacado y hoja de
+  perfil; cabecera translúcida con sombra al hacer scroll; objetivos táctiles de 44 px;
+  inputs a 16 px en móvil (iOS no hace zoom); modales como hoja inferior.
+- **Sistema visual**: sombras en capas con tinte de marca, halo verde en acciones
+  principales, degradados, radios más amplios, chips de categoría deslizables, insignias de
+  estado con punto, tarjetas que se elevan al pasar el ratón.
+- **Animaciones**: entrada de página, aparición escalonada de tarjetas, esqueletos de carga
+  con brillo, toasts animados (arriba en móvil), indicador "escribiendo" de Olivia. Todo
+  respeta `prefers-reduced-motion`.
+- **Olivia**: chat a pantalla completa en móvil, miniaturas en los resultados, botón de
+  envío circular; el halo del botón ya no parpadea indefinidamente.
+- Panel admin: usuarios en tarjetas en móvil (la tabla no cabía), métricas rediseñadas.
+- Barra de estado de Android y `theme-color` siguen al tema claro/oscuro.
+- Open Sans se carga con `<link>` + preconnect en vez de `@import` (no bloquea el render).
+
+---
+
 ## [0.21.2] - 2026-10-20
 
 ### Cambiado

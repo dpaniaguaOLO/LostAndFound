@@ -3,20 +3,28 @@ import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
-import { EmptyState, ErrorState, Spinner, Tabs } from '../components/ui';
+import { CardGridSkeleton, EmptyState, ErrorState, PageHeader, Tabs } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../lib/errors';
 import { useDebounce } from '../lib/useDebounce';
 import { services } from '../services';
 
 type Tab = 'found' | 'lost';
 
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+
 export function WallPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('found');
   const [filters, setFilters] = useState<FilterValues>({ search: '', category: '', location: '' });
   const debouncedSearch = useDebounce(filters.search);
   const debouncedLocation = useDebounce(filters.location);
 
   const [page, setPage] = useState(1);
+  const [reload, setReload] = useState(0); // fuerza un nuevo intento tras un error
   const [found, setFound] = useState<Paginated<FoundItem> | null>(null);
   const [lost, setLost] = useState<Paginated<LostReport> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,28 +64,35 @@ export function WallPage() {
     return () => {
       active = false;
     };
-  }, [tab, debouncedSearch, filters.category, debouncedLocation, page]);
+  }, [tab, debouncedSearch, filters.category, debouncedLocation, page, reload]);
+
+  function goToPage(next: number) {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   const result = tab === 'found' ? found : lost;
+  const firstName = user?.name?.split(' ')[0];
 
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Muro</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Objetos publicados por los colaboradores en las instalaciones.
-          </p>
-        </div>
-        <Link to="/publicar" className="btn-primary w-full sm:w-auto">
-          Publicar
-        </Link>
-      </div>
+      <PageHeader
+        title={firstName ? `${greeting()}, ${firstName}` : 'Muro'}
+        subtitle="Objetos publicados por los colaboradores en las instalaciones."
+        action={
+          <Link to="/publicar" className="btn-primary hidden md:inline-flex">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
+            Publicar
+          </Link>
+        }
+      />
 
       <Tabs<Tab>
         tabs={[
-          { key: 'found', label: 'Encontrados' },
-          { key: 'lost', label: 'Perdidos' },
+          { key: 'found', label: 'Encontrados', count: found?.total },
+          { key: 'lost', label: 'Perdidos', count: lost?.total },
         ]}
         value={tab}
         onChange={setTab}
@@ -86,15 +101,15 @@ export function WallPage() {
       <Filters value={filters} onChange={setFilters} />
 
       {loading ? (
-        <Spinner label="Cargando objetos…" />
+        <CardGridSkeleton />
       ) : error ? (
-        <ErrorState message={error} onRetry={() => setPage((p) => p)} />
+        <ErrorState message={error} onRetry={() => setReload((n) => n + 1)} />
       ) : !result || result.data.length === 0 ? (
         <EmptyState
           title={
             tab === 'found' ? 'No hay objetos encontrados' : 'No hay objetos perdidos reportados'
           }
-          description="Ajusta la búsqueda o publica desde el botón Publicar."
+          description="Ajusta la búsqueda o publica un objeto nuevo."
           action={
             <Link to="/publicar" className="btn-primary">
               Publicar
@@ -103,36 +118,38 @@ export function WallPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
             {tab === 'found'
-              ? (result.data as FoundItem[]).map((item) => (
-                  <FoundItemCard key={item.id} item={item} />
+              ? (result.data as FoundItem[]).map((item, i) => (
+                  <div key={item.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                    <FoundItemCard item={item} />
+                  </div>
                 ))
-              : (result.data as LostReport[]).map((item) => (
-                  <LostReportCard key={item.id} item={item} />
+              : (result.data as LostReport[]).map((item, i) => (
+                  <div key={item.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                    <LostReportCard item={item} />
+                  </div>
                 ))}
           </div>
 
           {result.totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-3">
-              <button
-                className="btn-secondary"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
+            <nav className="mt-8 flex items-center justify-between gap-3 sm:justify-center" aria-label="Paginación">
+              <button className="btn-secondary" disabled={page <= 1} onClick={() => goToPage(Math.max(1, page - 1))}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="m15 6-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
                 Anterior
               </button>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                Página {result.page} de {result.totalPages}
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                {result.page} / {result.totalPages}
               </span>
-              <button
-                className="btn-secondary"
-                disabled={page >= result.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <button className="btn-secondary" disabled={page >= result.totalPages} onClick={() => goToPage(page + 1)}>
                 Siguiente
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </button>
-            </div>
+            </nav>
           )}
         </>
       )}

@@ -16,9 +16,9 @@ function Thumb({ src, alt, label }: { src: string | null; alt: string; label: st
   return (
     <div className="flex w-20 shrink-0 flex-col items-center gap-1">
       {src ? (
-        <img src={src} alt={alt} className="h-20 w-20 rounded-lg object-cover" />
+        <img src={src} alt={alt} className="h-20 w-20 rounded-xl object-cover shadow-card" loading="lazy" />
       ) : (
-        <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-olo-dark-800 dark:text-slate-600">
+        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-olo-dark-800 dark:text-slate-600">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 11 3.5-4 2.5 3 3-4L18 16H6Z"
@@ -40,7 +40,7 @@ function SignalBar({ label, value }: { label: string; value: number }) {
     <div className="flex items-center gap-2">
       <span className="w-20 shrink-0 text-[11px] text-slate-500 dark:text-slate-400">{label}</span>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-olo-dark-800">
-        <div className="h-full rounded-full bg-olo-500" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-olo-400 to-olo-600 transition-[width] duration-700 ease-out-expo" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </div>
       <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
         {value}%
@@ -108,10 +108,10 @@ export function MatchSuggestions({
   }
 
   return (
-    <div className="border-t border-slate-200 p-3 dark:border-olo-dark-800">
+    <div className="border-t border-slate-100 p-3 dark:border-olo-dark-800 sm:p-4">
       <button
         onClick={toggle}
-        className="flex w-full items-center justify-between text-sm font-medium text-olo-700 dark:text-olo-400"
+        className="flex min-h-10 w-full items-center justify-between rounded-xl px-2 text-sm font-semibold text-olo-700 transition hover:bg-olo-50 dark:text-olo-400 dark:hover:bg-olo-500/10"
         aria-expanded={open}
       >
         <span className="flex items-center gap-1.5">
@@ -135,7 +135,17 @@ export function MatchSuggestions({
       {open && (
         <div className="mt-3">
           {loading ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Analizando objetos…</p>
+            <div className="flex flex-col gap-3" role="status" aria-label="Analizando objetos">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex flex-col gap-2 rounded-xl border border-slate-200/80 p-3 dark:border-olo-dark-800" aria-hidden>
+                  <div className="skeleton h-4 w-1/2" />
+                  <div className="flex gap-3">
+                    <div className="skeleton h-20 w-20 rounded-xl" />
+                    <div className="skeleton h-20 w-20 rounded-xl" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : error ? (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           ) : !data || data.length === 0 ? (
@@ -144,10 +154,11 @@ export function MatchSuggestions({
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
-              {data.map((s) => (
+              {data.map((s, i) => (
                 <li
                   key={s.item.id}
-                  className="rounded-lg border border-slate-200 p-3 dark:border-olo-dark-800"
+                  className="animate-fade-up rounded-xl border border-slate-200/80 bg-white p-3 transition hover:shadow-card dark:border-olo-dark-800 dark:bg-olo-dark-900"
+                  style={{ animationDelay: `${i * 50}ms` }}
                 >
                   {/* Título a ancho completo: así el nombre no compite con las imágenes */}
                   <div className="flex items-start justify-between gap-2">

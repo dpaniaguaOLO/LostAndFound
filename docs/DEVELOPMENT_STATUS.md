@@ -2,10 +2,12 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.20.0 (rama `feature/llm`). El trabajo de Supabase + Android +
-  seguridad (0.11.0–0.19.0) ya está **mergeado en `main`** (PR #3). 0.20.0 = asistente con
-  LLM Fase 1 (solo lectura, ver `docs/LLM.md`).
-- **Fecha**: 2026-10-20
+- **Versión actual**: 0.22.0 (rama `feature/llm`). El trabajo de Supabase + Android +
+  seguridad (0.11.0–0.19.0) ya está **mergeado en `main`** (PR #3). 0.20.0–0.21.x = asistente
+  con LLM Fase 1 / Olivia (solo lectura, ver `docs/LLM.md`). 0.22.0 = revisión del LLM
+  (zona horaria, relevancia, prompt endurecido, tope de coste) y rediseño mobile first
+  (navegación inferior, sistema de sombras/animaciones, esqueletos de carga).
+- **Fecha**: 2026-10-21
 - **Commit más reciente**: revisión de seguridad y robustez de backend + Supabase (ver `git log`
   y `CHANGELOG.md` 0.16.0): RLS endurecida, revisión de reclamaciones atómica (`review_claim`),
   correcciones en Express, URLs firmadas en lote, code splitting.

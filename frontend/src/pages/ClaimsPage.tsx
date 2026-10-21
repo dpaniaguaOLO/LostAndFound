@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Claim } from '@laf/shared';
-import { EmptyState, ErrorState, Spinner, StatusBadge } from '../components/ui';
+import { EmptyState, ErrorState, ListSkeleton, PageHeader, StatusBadge, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
 import { CLAIM_STATUS_LABELS, formatDateTime } from '../lib/format';
@@ -50,28 +50,19 @@ export function ClaimsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:text-2xl">Reclamaciones</h1>
-      <p className="mb-5 text-sm text-slate-500 dark:text-slate-400">
-        Gestiona las solicitudes de objetos que publicaste y las que tú hiciste.
-      </p>
+      <PageHeader title="Reclamaciones" subtitle="Gestiona las solicitudes de objetos que publicaste y las que tú hiciste." />
 
-      <div className="mb-6 inline-flex rounded-lg border border-slate-200 bg-white p-1 dark:border-olo-dark-800 dark:bg-olo-dark-900">
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'incoming' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
-          onClick={() => setTab('incoming')}
-        >
-          Recibidas
-        </button>
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'mine' ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-300'}`}
-          onClick={() => setTab('mine')}
-        >
-          Mías
-        </button>
-      </div>
+      <Tabs<Tab>
+        tabs={[
+          { key: 'incoming', label: 'Recibidas' },
+          { key: 'mine', label: 'Mías' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {loading ? (
-        <Spinner />
+        <ListSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : claims.length === 0 ? (
@@ -91,19 +82,36 @@ export function ClaimsPage() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-4">
-          {claims.map((claim) => (
-            <div key={claim.id} className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
-              <div className="flex-1">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          {claims.map((claim, i) => (
+            <article
+              key={claim.id}
+              className="card flex animate-fade-up flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5"
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+            >
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-slate-800 dark:text-slate-100">
-                    {claim.foundItem?.title ?? 'Objeto'}
-                  </h3>
+                  {claim.foundItem ? (
+                    <Link
+                      to={`/objetos/${claim.foundItem.id}`}
+                      className="font-semibold text-slate-900 hover:text-olo-700 dark:text-slate-100 dark:hover:text-olo-300"
+                    >
+                      {claim.foundItem.title}
+                    </Link>
+                  ) : (
+                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">Objeto</h3>
+                  )}
                   <StatusBadge status={claim.status} label={CLAIM_STATUS_LABELS[claim.status]} />
                 </div>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{claim.message}</p>
-                <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-                  {tab === 'incoming' ? `De ${claim.claimant.name} · ` : ''}
+                <blockquote className="mt-2 rounded-xl border-l-4 border-olo-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-olo-500/40 dark:bg-olo-dark-850 dark:text-slate-300">
+                  {claim.message}
+                </blockquote>
+                <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  {tab === 'incoming' && (
+                    <>
+                      <span className="font-semibold text-slate-600 dark:text-slate-300">{claim.claimant.name}</span>·
+                    </>
+                  )}
                   {formatDateTime(claim.createdAt)}
                 </p>
                 {claim.reviewNote && (
@@ -111,24 +119,25 @@ export function ClaimsPage() {
                 )}
               </div>
 
-              <div className="flex gap-2">
-                {tab === 'incoming' && claim.status === 'PENDING' && (
-                  <>
-                    <button className="btn-primary" onClick={() => review(claim, 'APPROVED')}>
-                      Aprobar
+              {claim.status === 'PENDING' && (
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                  {tab === 'incoming' ? (
+                    <>
+                      <button className="btn-secondary" onClick={() => review(claim, 'REJECTED')}>
+                        Rechazar
+                      </button>
+                      <button className="btn-primary" onClick={() => review(claim, 'APPROVED')}>
+                        Aprobar
+                      </button>
+                    </>
+                  ) : (
+                    <button className="btn-secondary col-span-2" onClick={() => cancel(claim)}>
+                      Cancelar solicitud
                     </button>
-                    <button className="btn-secondary" onClick={() => review(claim, 'REJECTED')}>
-                      Rechazar
-                    </button>
-                  </>
-                )}
-                {tab === 'mine' && claim.status === 'PENDING' && (
-                  <button className="btn-secondary" onClick={() => cancel(claim)}>
-                    Cancelar
-                  </button>
-                )}
-              </div>
-            </div>
+                  )}
+                </div>
+              )}
+            </article>
           ))}
         </div>
       )}
