@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.21.2] - 2026-10-20
+
+### Cambiado
+- **Botón de Olivia más visible**: avatar más grande, halo animado, sombra y anillo que
+  resaltan, etiqueta "Pregunta a Olivia" al lado (se oculta al abrir el chat) y punto de
+  "disponible". Invita más claramente a usar el asistente.
+
+---
+
 ## [0.21.1] - 2026-10-20
 
 ### Cambiado

@@ -73,26 +73,39 @@ export function Assistant() {
 
   return (
     <>
-      {/* Botón flotante: muestra a Olivia (o una X al estar abierto) */}
+      {/* Botón flotante: etiqueta + avatar de Olivia (o una X al estar abierto) */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-olo-500 focus:ring-offset-2 dark:focus:ring-offset-olo-dark-950"
+        className="group fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-olo-500 focus:ring-offset-2 dark:focus:ring-offset-olo-dark-950"
         aria-label={open ? 'Cerrar a Olivia' : 'Hablar con Olivia, la asistente'}
       >
+        {/* Etiqueta invitadora (oculta cuando el chat está abierto) */}
+        {!open && (
+          <span className="hidden rounded-full bg-white px-3 py-2 text-sm font-semibold text-olo-700 shadow-lg ring-1 ring-olo-200 transition group-hover:bg-olo-50 dark:bg-olo-dark-900 dark:text-olo-300 dark:ring-olo-dark-800 sm:inline-block">
+            Pregunta a Olivia
+          </span>
+        )}
+
         {open ? (
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-olo-600 text-white shadow-xl transition hover:scale-105 dark:bg-olo-500 dark:text-slate-950">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </span>
         ) : (
-          <OliviaAvatar className="h-14 w-14" />
+          <span className="relative flex h-16 w-16 items-center justify-center">
+            {/* Halo animado para atraer la atención */}
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-olo-500/40" />
+            <OliviaAvatar className="relative h-16 w-16 rounded-full shadow-xl ring-2 ring-white transition group-hover:scale-105 dark:ring-olo-dark-900" />
+            {/* Punto de "disponible" */}
+            <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-emerald-400 dark:border-olo-dark-900" />
+          </span>
         )}
       </button>
 
       {/* Panel */}
       {open && (
-        <div className="card fixed bottom-20 right-4 z-40 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
+        <div className="card fixed bottom-24 right-5 z-40 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
           <div className="flex items-center gap-3 border-b border-slate-200 bg-olo-600 px-4 py-3 text-white dark:border-olo-dark-800 dark:bg-olo-500 dark:text-slate-950">
             <OliviaAvatar className="h-9 w-9 shrink-0 rounded-full ring-2 ring-white/40" />
             <div>
