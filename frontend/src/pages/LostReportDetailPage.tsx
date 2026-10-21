@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { LostReport } from '@laf/shared';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Spinner, StatusBadge } from '../components/ui';
+import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Notice, Spinner, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -15,13 +15,14 @@ import { services } from '../services';
  */
 export function LostReportDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
   const [item, setItem] = useState<LostReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [confirmResolve, setConfirmResolve] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   function load() {
@@ -50,6 +51,19 @@ export function LostReportDetailPage() {
     }
   }
 
+  async function resolveReport() {
+    if (!item) return;
+    try {
+      const updated = await services.lostReports.resolve(item.id);
+      setItem(updated);
+      notify('¡Qué bien! Marcamos tu reporte como resuelto.', 'success');
+    } catch (err) {
+      notify(getErrorMessage(err, 'No se pudo actualizar'), 'error');
+    } finally {
+      setConfirmResolve(false);
+    }
+  }
+
   async function deleteReport() {
     if (!item) return;
     try {
@@ -65,6 +79,9 @@ export function LostReportDetailPage() {
   if (loading) return <Spinner />;
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!item) return null;
+
+  const isOwner = user?.id === item.reporter.id;
+  const isActive = item.status === 'OPEN' || item.status === 'MATCHED';
 
   return (
     <div>
@@ -95,6 +112,30 @@ export function LostReportDetailPage() {
             <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
+          {item.status === 'MATCHED' && (
+            <Notice tone="warn">
+              {isOwner
+                ? 'Tu reclamación fue aprobada: coordina la entrega con quien lo encontró.'
+                : 'Ya hay una reclamación aprobada para este objeto.'}
+            </Notice>
+          )}
+          {item.status === 'RESOLVED' && (
+            <Notice tone="success">{isOwner ? '¡Recuperaste este objeto!' : 'Su dueño ya lo recuperó.'}</Notice>
+          )}
+          {!isOwner && isActive && (
+            <Notice tone="info">
+              ¿Lo encontraste? Publícalo desde{' '}
+              <Link to="/publicar" className="font-semibold underline">Publicar → Encontré un objeto</Link>{' '}
+              y la app avisará a su dueño.
+            </Notice>
+          )}
+
+          {isOwner && isActive && (
+            <button className="btn-primary" onClick={() => setConfirmResolve(true)}>
+              Ya lo recuperé
+            </button>
+          )}
+
           {/* Acciones de moderación (solo administradores) */}
           {isAdmin && (
             <div className="rounded-2xl border border-dashed border-slate-300 p-4 dark:border-olo-dark-700">
@@ -116,7 +157,8 @@ export function LostReportDetailPage() {
         </div>
       </div>
 
-      {/* Coincidencias de la IA, destacadas */}
+      {/* Coincidencias de la IA, destacadas (solo el dueño o un admin pueden verlas) */}
+      {(isOwner || isAdmin) && isActive && (
       <div className="card mt-6 overflow-hidden sm:mt-8">
         <div className="border-b border-slate-100 bg-gradient-to-r from-olo-50/80 to-transparent px-4 py-4 dark:border-olo-dark-800 dark:from-olo-500/10 sm:px-5">
           <h2 className="section-title flex items-center gap-2">
@@ -132,6 +174,16 @@ export function LostReportDetailPage() {
         </div>
         <MatchSuggestions lostReportId={item.id} defaultOpen />
       </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmResolve}
+        title="Marcar como recuperado"
+        message="Tu reporte se cerrará y dejará de aparecer en las búsquedas. ¿Ya tienes tu objeto?"
+        confirmLabel="Sí, ya lo tengo"
+        onConfirm={resolveReport}
+        onCancel={() => setConfirmResolve(false)}
+      />
 
       <ConfirmDialog
         open={confirmClose}

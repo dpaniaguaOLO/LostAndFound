@@ -22,11 +22,14 @@ export function ItemForm({
   submitLabel,
   onSubmit,
   optionalLocation = false,
+  allowCamera = true,
 }: {
   dateLabel: string;
   submitLabel: string;
   onSubmit: (values: ItemFormValues) => Promise<void>;
   optionalLocation?: boolean;
+  /** false al reportar un perdido: no tienes el objeto delante para fotografiarlo. */
+  allowCamera?: boolean;
 }) {
   // Fecha local (no UTC): con toISOString, en UTC-6 a partir de las 18:00 "hoy" sería mañana.
   const today = localDateString();
@@ -75,14 +78,16 @@ export function ItemForm({
         <span className="label">Fotografía (opcional)</span>
 
         {/* Dos entradas ocultas: cámara (capture) y galería/archivo. */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-        />
+        {allowCamera && (
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
+        )}
         <input
           ref={fileInputRef}
           type="file"
@@ -112,16 +117,21 @@ export function ItemForm({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <PhotoButton label="Tomar foto" onClick={() => cameraInputRef.current?.click()}>
-              <path
-                d="M4 8a2 2 0 0 1 2-2h1l1.2-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L17 6h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              />
-              <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-            </PhotoButton>
-            <PhotoButton label="Elegir de galería" onClick={() => fileInputRef.current?.click()}>
+          <div className={allowCamera ? 'grid grid-cols-2 gap-3' : 'grid gap-3'}>
+            {allowCamera && (
+              <PhotoButton label="Tomar foto" onClick={() => cameraInputRef.current?.click()}>
+                <path
+                  d="M4 8a2 2 0 0 1 2-2h1l1.2-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L17 6h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+              </PhotoButton>
+            )}
+            <PhotoButton
+              label={allowCamera ? 'Elegir de galería' : 'Subir una foto del objeto (si tienes una)'}
+              onClick={() => fileInputRef.current?.click()}
+            >
               <path d="M4 5h16v14H4zM4 15l4-4 3 3 4-4 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
             </PhotoButton>
           </div>

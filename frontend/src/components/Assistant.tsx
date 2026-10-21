@@ -191,9 +191,18 @@ export function Assistant() {
                             </li>
                           ))}
                           {m.lost?.map((it) => (
-                            <li key={it.id} className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 dark:border-olo-dark-800 dark:bg-olo-dark-900">
-                              <ResultThumb src={it.imageUrl} />
-                              <ResultText title={it.title} meta={`${CATEGORY_LABELS[it.category]}${it.location ? ` · ${it.location}` : ''}`} />
+                            <li key={it.id}>
+                              <Link
+                                to={`/perdidos/${it.id}`}
+                                onClick={() => setOpen(false)}
+                                className="group flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 transition hover:border-olo-300 hover:shadow-card active:scale-[0.98] dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:hover:border-olo-500/50"
+                              >
+                                <ResultThumb src={it.imageUrl} />
+                                <ResultText title={it.title} meta={`Perdido · ${CATEGORY_LABELS[it.category]}${it.location ? ` · ${it.location}` : ''}`} />
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-olo-500">
+                                  <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                              </Link>
                             </li>
                           ))}
                         </ul>

@@ -6,6 +6,8 @@
 //
 //   POST /ai/search            búsqueda semántica sobre objetos encontrados
 //   GET  /ai/match/:lostId     coincidencias de un objeto perdido
+//   POST /ai/match/:lostId/notify  aviso de la mejor coincidencia al dueño (≥55%)
+//   POST /claims, PATCH /claims/:id/review|cancel  flujo de reclamaciones
 //   POST /ai/assistant         asistente Olivia (intención + LLM opcional, ver _shared/llm.ts)
 //   GET  /admin/stats          métricas (solo ADMIN)
 //   GET  /admin/users          lista de usuarios (solo ADMIN)
@@ -36,6 +38,8 @@ const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Longitud máxima de consultas/preguntas en lenguaje natural (acota el coste del NLP).
 const MAX_QUERY = 300;
+// Coincidencia mínima (0-100) para avisar al dueño de un perdido (igual que Express).
+const AUTO_NOTIFY_THRESHOLD = 55;
 // Asistente: candidatos leídos de la BD y resultados devueltos tras el ranking.
 const ASSISTANT_CANDIDATES = 40;
 const ASSISTANT_RESULTS = 10;
@@ -204,6 +208,40 @@ Deno.serve(async (req: Request) => {
       return json({ query, results });
     }
 
+    // POST /ai/match/:lostReportId/notify — aviso automático al crear un reporte de
+    // perdido: si el mejor candidato reclamable supera el umbral, notifica al dueño
+    // (equivale a matchNotify.ts del backend Express). Idempotente por objeto.
+    if (method === 'POST' && /^\/ai\/match\/[^/]+\/notify$/.test(path)) {
+      const lostId = path.split('/')[3];
+      const { data: lost } = await sb.from('lost_reports').select('*').eq('id', lostId).single();
+      if (!lost) return json({ error: 'NOT_FOUND', message: 'Reporte no encontrado' }, 404);
+      if (lost.reporter_id !== caller.id) {
+        return json({ error: 'FORBIDDEN', message: 'No puedes notificar sobre este reporte' }, 403);
+      }
+      const items = (await availableFoundItems(sb)).filter((i) => i.status === 'PUBLISHED');
+      const [best] = matchItems(toMatchable(lost as Row), items.map(toMatchable), {
+        limit: 1,
+        minScore: AUTO_NOTIFY_THRESHOLD,
+      });
+      if (!best) return json({ notified: false });
+      const { count } = await sb
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', caller.id)
+        .eq('type', 'MATCH_FOUND')
+        .eq('related_item_id', best.item.id);
+      if (!count) {
+        await notify(sb, {
+          userId: caller.id,
+          type: 'MATCH_FOUND',
+          title: 'Posible coincidencia encontrada',
+          body: `Encontramos un objeto que podría ser tu "${lost.title}": "${best.item.title}" (${best.score}% de coincidencia). Revísalo.`,
+          relatedItemId: best.item.id,
+        });
+      }
+      return json({ notified: true, foundItemId: best.item.id, score: best.score });
+    }
+
     // GET /ai/match/:lostReportId
     if (method === 'GET' && path.startsWith('/ai/match/')) {
       const lostId = decodeURIComponent(path.slice('/ai/match/'.length));
@@ -313,15 +351,21 @@ Deno.serve(async (req: Request) => {
 
     // ================= CLAIMS (flujo con notificaciones) =================
     const CLAIM_SELECT =
-      '*, claimant:profiles!claimant_id (id, name), found_item:found_items!found_item_id (id, title, image_path, status, reporter_id)';
+      '*, claimant:profiles!claimant_id (id, name), ' +
+      'found_item:found_items!found_item_id (id, title, image_path, status, reporter_id, reporter:profiles!reporter_id (id, name))';
 
     // POST /claims — crear una reclamación.
     if (method === 'POST' && path === '/claims') {
       const body = await req.json().catch(() => ({}));
       const foundItemId = String(body.foundItemId ?? '');
       const message = String(body.message ?? '').trim();
+      // Opcional: el reporte de perdido del reclamante al que corresponde el objeto.
+      const lostReportId = body.lostReportId ? String(body.lostReportId) : null;
       if (!UUID_RE.test(foundItemId) || message.length < 2 || message.length > 1000) {
         return json({ error: 'BAD_REQUEST', message: 'foundItemId y mensaje (2 a 1000 caracteres) requeridos' }, 400);
+      }
+      if (lostReportId && !UUID_RE.test(lostReportId)) {
+        return json({ error: 'BAD_REQUEST', message: 'lostReportId inválido' }, 400);
       }
       const { data: item } = await sb
         .from('found_items')
@@ -329,11 +373,25 @@ Deno.serve(async (req: Request) => {
         .eq('id', foundItemId)
         .single();
       if (!item) return json({ error: 'NOT_FOUND', message: 'Objeto no encontrado' }, 404);
-      if (item.status === 'RETURNED' || item.status === 'ARCHIVED') {
+      // Solo PUBLISHED: sobre un objeto CLAIMED la reclamación nunca podría aprobarse.
+      if (item.status === 'CLAIMED') {
+        return json({ error: 'BAD_REQUEST', message: 'Este objeto ya tiene una reclamación aprobada y está pendiente de entrega' }, 400);
+      }
+      if (item.status !== 'PUBLISHED') {
         return json({ error: 'BAD_REQUEST', message: 'Este objeto ya no está disponible para reclamar' }, 400);
       }
       if (item.reporter_id === caller.id) {
         return json({ error: 'BAD_REQUEST', message: 'No puedes reclamar un objeto que tú publicaste' }, 400);
+      }
+      if (lostReportId) {
+        const { data: lost } = await sb
+          .from('lost_reports')
+          .select('id, reporter_id, status')
+          .eq('id', lostReportId)
+          .maybeSingle();
+        if (!lost || lost.reporter_id !== caller.id || !['OPEN', 'MATCHED'].includes(lost.status as string)) {
+          return json({ error: 'BAD_REQUEST', message: 'El reporte de perdido indicado no es tuyo o ya está cerrado' }, 400);
+        }
       }
       const { data: existing } = await sb
         .from('claims')
@@ -347,7 +405,7 @@ Deno.serve(async (req: Request) => {
       }
       const { data: created, error } = await sb
         .from('claims')
-        .insert({ found_item_id: foundItemId, claimant_id: caller.id, message })
+        .insert({ found_item_id: foundItemId, claimant_id: caller.id, message, lost_report_id: lostReportId })
         .select(CLAIM_SELECT)
         .single();
       if (error) {
@@ -357,11 +415,12 @@ Deno.serve(async (req: Request) => {
         }
         throw error;
       }
+      const claimantName = ((created as Row).claimant as Row | null)?.name as string | undefined;
       await notify(sb, {
         userId: item.reporter_id,
         type: 'CLAIM_REQUESTED',
         title: 'Nueva solicitud de reclamación',
-        body: `Alguien solicitó reclamar "${item.title}".`,
+        body: `${claimantName || 'Un colaborador'} solicitó reclamar "${item.title}". Revísala en Reclamaciones.`,
         relatedItemId: item.id,
       });
       return json(await serializeClaim(sb, created as Row), 201);

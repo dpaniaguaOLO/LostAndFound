@@ -208,7 +208,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | POST | `/api/lost-reports` | sí | `multipart/form-data`: `title, description, category, location, lostAt(ISO)`, `image?` | `201 LostReport` |
 | PATCH | `/api/lost-reports/:id/resolve` | sí (autor o admin) | — | `LostReport` |
 | GET | `/api/lost-reports/mine/list` | sí | — | `LostReport[]` |
-| POST | `/api/claims` | sí | `{ foundItemId, message }` | `201 Claim` |
+| POST | `/api/claims` | sí | `{ foundItemId, message, lostReportId? }` (`lostReportId` solo Supabase) | `201 Claim` |
 | GET | `/api/claims/mine` | sí | — | `Claim[]` (reclamaciones que hice) |
 | GET | `/api/claims/incoming` | sí | — | `Claim[]` (sobre objetos que publiqué) |
 | PATCH | `/api/claims/:id/review` | sí (autor del hallazgo o admin) | `{ status: APPROVED\|REJECTED, reviewNote? }` | `Claim` |
@@ -218,7 +218,8 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | PATCH | `/api/notifications/read-all` | sí | — | `{ ok: true }` |
 | POST | `/api/ai/search` | sí | `{ query, limit? }` | `SemanticSearchResponse` (encontrados rankeados 0–100) |
 | GET | `/api/ai/match/:lostReportId` | sí (autor o admin) | — | `MatchSuggestionsResponse` (encontrados candidatos con score y motivos) |
-| POST | `/api/ai/assistant` | sí | `{ question }` | `AssistantResponse` (texto + items reales) |
+| POST | `/api/ai/assistant` | sí | `{ question, history? }` | `AssistantResponse` (texto + items reales; `kind: 'chat'` sin items) |
+| POST | `/ai/match/:lostReportId/notify` (solo Edge Function `api`) | sí (autor) | — | `{ notified, foundItemId?, score? }` (aviso `MATCH_FOUND` ≥55%, idempotente) |
 | GET | `/api/admin/stats` | admin | — | `{ users, foundItems, lostReports, claimsPending, returned }` |
 | GET | `/api/admin/users` | admin | — | `User[]` |
 | PATCH | `/api/admin/users/:id/role` | admin | `{ role: ADMIN\|EMPLOYEE }` | `User` |
@@ -272,7 +273,13 @@ reclamaciones e **historial de auditoría**. El borrado es destructivo y se regi
 prefiere archivar.
 
 **Reglas de negocio clave**
-- No se puede reclamar un objeto propio, ni uno `RETURNED`/`ARCHIVED`.
+- Solo se reclaman objetos `PUBLISHED` (no propios). Uno `CLAIMED` ya tiene una
+  reclamación aprobada y otra nunca podría aprobarse.
+- Al marcar un objeto `RETURNED` (trigger `found_items_on_returned` en Supabase; igual en
+  Express): aviso `ITEM_RETURNED` al reclamante aprobado, su reporte enlazado
+  (`claims.lost_report_id`) pasa a `RESOLVED` y las pendientes se rechazan con aviso.
+- Supabase: `claims.lost_report_id` (opcional) enlaza la reclamación con el reporte de
+  perdido del propio reclamante; al aprobar pasa a `MATCHED`.
 - Un usuario no puede tener dos reclamaciones `PENDING` sobre el mismo objeto.
 - Al aprobar una reclamación: el objeto pasa a `CLAIMED` y las demás reclamaciones
   pendientes del mismo objeto se rechazan automáticamente (transacción).
@@ -361,7 +368,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.23.1 (ver `VERSION`). 0.23.1: icono y splash de Android con la marca OLO
+- **Versión**: 0.24.0 (ver `VERSION`). 0.24.0: flujo reclamación → entrega completo
+  (migración 009: trigger de devolución, `claims.lost_report_id`), aviso de coincidencia en
+  Supabase, navegación desde coincidencias/Olivia. 0.23.1: icono y splash de Android con la marca OLO
   (opción "verde OLO"). 0.23.0: Olivia conversa (personalidad, guía de la
   app, límites de tema, memoria corta); APK debug. 0.22.0: revisión del LLM (Olivia) + rediseño mobile
   first (barra inferior en móvil, tokens de sombra/animación en `tailwind.config.js`,

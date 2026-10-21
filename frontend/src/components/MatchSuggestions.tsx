@@ -160,31 +160,42 @@ export function MatchSuggestions({
                   className="animate-fade-up rounded-xl border border-slate-200/80 bg-white p-3 transition hover:shadow-card dark:border-olo-dark-800 dark:bg-olo-dark-900"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  {/* Título a ancho completo: así el nombre no compite con las imágenes */}
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      to={`/objetos/${s.item.id}`}
-                      className="block font-medium leading-snug text-slate-800 hover:text-olo-700 dark:text-slate-100 dark:hover:text-olo-400"
-                    >
-                      {s.item.title}
-                    </Link>
-                    <span className={`badge shrink-0 ${scoreClass(s.score)}`}>{s.score}%</span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {CATEGORY_LABELS[s.item.category]}
-                    {s.item.location ? ` · ${s.item.location}` : ''}
-                  </p>
+                  {/* Toda la cabecera de la coincidencia lleva al objeto encontrado; el
+                      reporte viaja en ?perdido= para enlazarlo si se reclama. */}
+                  <Link
+                    to={`/objetos/${s.item.id}?perdido=${lostReportId}`}
+                    className="group -m-1 block rounded-lg p-1 focus-visible:ring-2"
+                    aria-label={`Ver ${s.item.title} (${s.score}% de coincidencia)`}
+                  >
+                    {/* Título a ancho completo: así el nombre no compite con las imágenes */}
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="block font-semibold leading-snug text-slate-800 group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-400">
+                        {s.item.title}
+                      </span>
+                      <span className={`badge shrink-0 ${scoreClass(s.score)}`}>{s.score}%</span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      {CATEGORY_LABELS[s.item.category]}
+                      {s.item.location ? ` · ${s.item.location}` : ''}
+                    </p>
 
-                  {/* Comparación de imágenes: perdido → encontrado */}
-                  <div className="mt-2 flex items-center gap-3">
-                    <Thumb src={reference?.imageUrl ?? null} alt="Tu objeto" label="Perdido" />
-                    <span className="text-slate-300 dark:text-slate-600" aria-hidden>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                    <Thumb src={s.item.imageUrl} alt={s.item.title} label="Encontrado" />
-                  </div>
+                    {/* Comparación de imágenes: perdido → encontrado */}
+                    <div className="mt-2 flex items-center gap-3">
+                      <Thumb src={reference?.imageUrl ?? null} alt="Tu objeto" label="Perdido" />
+                      <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <path d="M4 12h16M14 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                      <Thumb src={s.item.imageUrl} alt={s.item.title} label="Encontrado" />
+                      <span className="ml-auto hidden items-center gap-1 text-xs font-semibold text-olo-700 group-hover:underline dark:text-olo-400 sm:inline-flex">
+                        Ver y reclamar
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                    </div>
+                  </Link>
 
                   {s.reasons.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">

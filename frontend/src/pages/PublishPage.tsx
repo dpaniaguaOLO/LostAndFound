@@ -34,9 +34,10 @@ export function PublishPage() {
         navigate(`/objetos/${created.id}`);
       } else {
         fd.set('lostAt', iso);
-        await services.lostReports.create(fd);
+        const created = await services.lostReports.create(fd);
         notify('Objeto perdido reportado', 'success');
-        navigate('/mis-objetos?tab=lost');
+        // Directo al detalle: ahí se ven de inmediato las posibles coincidencias.
+        navigate(`/perdidos/${created.id}`);
       }
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo publicar'), 'error');
@@ -109,6 +110,7 @@ export function PublishPage() {
         dateLabel={mode === 'found' ? 'Fecha en que se encontró' : 'Fecha en que se perdió'}
         submitLabel={mode === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
         optionalLocation={mode === 'lost'}
+        allowCamera={mode === 'found'}
         onSubmit={handleSubmit}
       />
     </div>

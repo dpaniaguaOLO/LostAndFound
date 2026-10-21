@@ -116,8 +116,10 @@ export async function serializeClaim(sb: SupabaseClient, c: Row) {
           title: foundItem.title as string,
           imageUrl: await signedUrl(sb, foundItem.image_path),
           status: foundItem.status as string,
+          reporterName: ((foundItem.reporter as Row | null)?.name as string | undefined) ?? undefined,
         }
       : undefined,
+    lostReportId: (c.lost_report_id as string | null) ?? null,
     claimant: claimant
       ? { id: claimant.id as string, name: (claimant.name as string) ?? '' }
       : { id: (c.claimant_id as string) ?? '', name: '' },

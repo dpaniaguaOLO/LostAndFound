@@ -25,7 +25,11 @@ claimsRouter.post(
     const body = parseOrThrow(createClaimSchema, req.body);
     const item = await prisma.foundItem.findUnique({ where: { id: body.foundItemId } });
     if (!item) throw notFound('Objeto no encontrado');
-    if (item.status === 'RETURNED' || item.status === 'ARCHIVED') {
+    // Solo PUBLISHED: sobre un objeto CLAIMED la reclamación nunca podría aprobarse.
+    if (item.status === 'CLAIMED') {
+      throw badRequest('Este objeto ya tiene una reclamación aprobada y está pendiente de entrega');
+    }
+    if (item.status !== 'PUBLISHED') {
       throw badRequest('Este objeto ya no está disponible para reclamar');
     }
     if (item.reporterId === req.auth!.sub) {

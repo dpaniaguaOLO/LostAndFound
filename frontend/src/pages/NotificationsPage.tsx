@@ -5,7 +5,23 @@ import { EmptyState, ErrorState, ListSkeleton, PageHeader } from '../components/
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
 import { formatDateTime } from '../lib/format';
+import { notifyUnreadChanged } from '../lib/unread';
 import { services } from '../services';
+
+/**
+ * A dónde lleva cada aviso: una solicitud nueva se gestiona en Reclamaciones; el
+ * resto (aprobada, rechazada, entregada, coincidencia) apunta al objeto encontrado.
+ */
+function targetOf(n: Notification): string | null {
+  if (n.type === 'CLAIM_REQUESTED') return '/reclamaciones';
+  return n.relatedItemId ? `/objetos/${n.relatedItemId}` : null;
+}
+
+function actionLabel(n: Notification): string {
+  if (n.type === 'CLAIM_REQUESTED') return 'Revisar solicitud';
+  if (n.type === 'MATCH_FOUND') return 'Ver coincidencia';
+  return 'Ver objeto';
+}
 
 export function NotificationsPage() {
   const { notify } = useToast();
@@ -30,6 +46,7 @@ export function NotificationsPage() {
     try {
       await services.notifications.markRead(id);
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      notifyUnreadChanged();
     } catch {
       /* silencioso */
     }
@@ -39,6 +56,7 @@ export function NotificationsPage() {
     try {
       await services.notifications.markAllRead();
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+      notifyUnreadChanged();
       notify('Todas marcadas como leídas', 'success');
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo actualizar'), 'error');
@@ -73,14 +91,14 @@ export function NotificationsPage() {
             <button
               key={n.id}
               onClick={() => {
-                if (!n.read) markOne(n.id);
-                // Las notificaciones con objeto relacionado (p. ej. coincidencia) llevan a su detalle.
-                if (n.relatedItemId) navigate(`/objetos/${n.relatedItemId}`);
+                if (!n.read) void markOne(n.id);
+                const to = targetOf(n);
+                if (to) navigate(to);
               }}
               style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
               className={
                 'card relative flex animate-fade-up items-start gap-3 p-4 text-left transition duration-200 active:scale-[0.99] ' +
-                (n.relatedItemId ? 'hover:border-olo-300 hover:shadow-card-hover dark:hover:border-olo-500/40 ' : '') +
+                (targetOf(n) ? 'hover:border-olo-300 hover:shadow-card-hover dark:hover:border-olo-500/40 ' : '') +
                 (n.read ? '' : 'border-olo-200 bg-olo-50/50 dark:border-olo-500/30 dark:bg-olo-500/[0.07]')
               }
             >
@@ -107,8 +125,8 @@ export function NotificationsPage() {
                 <span className="mt-0.5 block text-sm text-slate-600 dark:text-slate-400">{n.body}</span>
                 <span className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(n.createdAt)}</span>
-                  {n.relatedItemId && (
-                    <span className="text-xs font-semibold text-olo-700 dark:text-olo-400">Ver objeto →</span>
+                  {targetOf(n) && (
+                    <span className="text-xs font-semibold text-olo-700 dark:text-olo-400">{actionLabel(n)} →</span>
                   )}
                 </span>
               </span>

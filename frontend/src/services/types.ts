@@ -47,6 +47,8 @@ export interface LostReportsService {
   get(id: string): Promise<LostReport>;
   mine(): Promise<LostReport[]>;
   create(form: FormData): Promise<LostReport>;
+  /** El dueño indica que ya recuperó su objeto (→ RESOLVED). */
+  resolve(id: string): Promise<LostReport>;
   /** Cierra un reporte perdido (equivalente a "archivar": lo retira pero lo conserva). */
   close(id: string): Promise<LostReport>;
   /** Elimina un reporte perdido (moderación: solo admin). */
@@ -56,7 +58,8 @@ export interface LostReportsService {
 export interface ClaimsService {
   mine(): Promise<Claim[]>;
   incoming(): Promise<Claim[]>;
-  create(foundItemId: string, message: string): Promise<Claim>;
+  /** `lostReportId`: reporte de perdido propio al que corresponde (se resuelve al entregar). */
+  create(foundItemId: string, message: string, lostReportId?: string | null): Promise<Claim>;
   review(id: string, status: 'APPROVED' | 'REJECTED', reviewNote?: string): Promise<Claim>;
   cancel(id: string): Promise<Claim>;
 }

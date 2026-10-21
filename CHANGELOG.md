@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.24.0] - 2026-10-21
+
+Revisión a fondo de reclamaciones y notificaciones, y navegación desde coincidencias. (Claude)
+
+> **Despliegue (en este orden):** `supabase db push` (migración 009) →
+> `supabase functions deploy api` → generar el APK. El frontend nuevo envía
+> `lost_report_id` al reclamar: sin la migración, crear reclamaciones fallaría.
+
+### Corregido
+- **Marcar como devuelto no tenía efectos**: el dueño no recibía aviso, las reclamaciones
+  pendientes del objeto quedaban colgadas para siempre y su reporte de perdido seguía
+  "Abierto". Ahora un trigger en la BD (`found_items_on_returned`, migración 009) avisa al
+  reclamante aprobado (`ITEM_RETURNED`), marca su reporte enlazado como `RESOLVED`, cierra
+  las pendientes con aviso y registra auditoría. Funciona también con los APK ya instalados.
+- **Reclamaciones imposibles de aprobar**: se podía reclamar un objeto ya `CLAIMED`, pero
+  aprobar exige `PUBLISHED`. Ahora solo se reclama lo `PUBLISHED` (Edge Function, Express y UI).
+- **Aviso de coincidencia en modo Supabase**: al reportar un perdido nunca se notificaba la
+  mejor coincidencia (solo existía en Express). Nueva ruta `POST /ai/match/:id/notify`
+  (≥55%, idempotente) que la app llama al crear el reporte.
+- Reclamaciones: los botones se podían pulsar dos veces (el segundo intento fallaba); al
+  cambiar de pestaña se veían un instante las de la otra con sus botones.
+- El contador de la campana no bajaba al marcar avisos como leídos hasta cambiar de página;
+  ahora se refresca al instante y al volver a la app.
+- Las coincidencias de un perdido se pedían también para usuarios sin permiso (error 403).
+
+### Añadido
+- **Coincidencias y Olivia enlazan al objeto**: toda la tarjeta de coincidencia abre el
+  objeto encontrado (con "Ver y reclamar"); los perdidos de Olivia abren su detalle. Las
+  tarjetas de perdidos del muro también se pueden abrir.
+- **Reclamación enlazada a tu reporte de perdido** (`claims.lost_report_id`): al reclamar
+  puedes indicar a qué reporte corresponde (se preselecciona si vienes de una coincidencia).
+  Al aprobar pasa a `MATCHED` y al entregar a `RESOLVED`.
+- Reclamaciones: miniatura, "Encontrado por …", siguiente paso según el estado
+  ("Coordina la entrega…"), **botón "Marcar como entregado"** y confirmación al aprobar.
+- Reporte de perdido: botón **"Ya lo recuperé"** para el dueño y avisos de estado.
+- Notificaciones: cada tipo lleva a su sitio (solicitud nueva → Reclamaciones).
+- Al publicar un perdido se abre su detalle con las coincidencias.
+
+### Cambiado
+- Al reportar un perdido ya no se ofrece **"Tomar foto"** (solo subir una de la galería).
+
 ## [0.23.1] - 2026-10-21 — APK de prueba (debug)
 
 ### Cambiado

@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { FoundItem } from '@laf/shared';
-import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Modal, Spinner, StatusBadge } from '../components/ui';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import type { FoundItem, LostReport } from '@laf/shared';
+import { useSupabase } from '../lib/config';
+import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Modal, Notice, Spinner, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -18,9 +19,15 @@ export function FoundItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [searchParams] = useSearchParams();
   const [claimOpen, setClaimOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [claimSent, setClaimSent] = useState(false);
+  // Reporte de perdido propio al que corresponde el objeto (viene de ?perdido= al
+  // llegar desde una coincidencia). Al entregarlo, ese reporte se marca resuelto.
+  const [myLost, setMyLost] = useState<LostReport[]>([]);
+  const [lostReportId, setLostReportId] = useState(searchParams.get('perdido') ?? '');
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -38,12 +45,23 @@ export function FoundItemDetailPage() {
 
   useEffect(load, [id]);
 
+  // Al abrir el formulario de reclamación: mis reportes de perdido abiertos, para
+  // enlazar la reclamación (solo Supabase guarda el enlace).
+  useEffect(() => {
+    if (!claimOpen || !useSupabase) return;
+    services.lostReports
+      .mine()
+      .then((list) => setMyLost(list.filter((r) => r.status === 'OPEN' || r.status === 'MATCHED')))
+      .catch(() => setMyLost([]));
+  }, [claimOpen]);
+
   if (loading) return <Spinner />;
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!item) return null;
 
   const isOwner = user?.id === item.reporter.id;
-  const canClaim = !isOwner && (item.status === 'PUBLISHED' || item.status === 'CLAIMED');
+  // Solo PUBLISHED: si ya hay una reclamación aprobada (CLAIMED) no se puede aprobar otra.
+  const canClaim = !isOwner && item.status === 'PUBLISHED' && !claimSent;
   const canMarkReturned = (isOwner || isAdmin) && item.status !== 'RETURNED' && item.status !== 'ARCHIVED';
 
   async function submitClaim(e: FormEvent) {
@@ -51,10 +69,11 @@ export function FoundItemDetailPage() {
     if (!item) return;
     setSubmitting(true);
     try {
-      await services.claims.create(item.id, message);
-      notify('Solicitud de reclamación enviada', 'success');
+      await services.claims.create(item.id, message, lostReportId || null);
+      notify('Solicitud enviada. Te avisaremos cuando la revisen.', 'success');
       setClaimOpen(false);
       setMessage('');
+      setClaimSent(true);
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo enviar'), 'error');
     } finally {
@@ -67,7 +86,7 @@ export function FoundItemDetailPage() {
     try {
       const updated = await services.foundItems.markReturned(item.id);
       setItem(updated);
-      notify('Objeto marcado como devuelto', 'success');
+      notify('Entrega registrada. Avisamos a quien lo reclamó.', 'success');
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo actualizar'), 'error');
     } finally {
@@ -130,6 +149,21 @@ export function FoundItemDetailPage() {
             <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
+          {/* Estado de la reclamación / entrega */}
+          {claimSent && (
+            <Notice tone="info">
+              Enviaste una solicitud para este objeto. Puedes seguirla en{' '}
+              <Link to="/reclamaciones" className="font-semibold underline">Reclamaciones</Link>.
+            </Notice>
+          )}
+          {item.status === 'CLAIMED' && (
+            <Notice tone="warn">
+              {isOwner
+                ? 'Aprobaste una reclamación. Cuando entregues el objeto, márcalo como devuelto.'
+                : 'Este objeto ya tiene una reclamación aprobada y está pendiente de entrega.'}
+            </Notice>
+          )}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {canClaim && (
               <button className="btn-primary" onClick={() => setClaimOpen(true)}>
@@ -137,7 +171,10 @@ export function FoundItemDetailPage() {
               </button>
             )}
             {canMarkReturned && (
-              <button className="btn-secondary" onClick={() => setConfirmReturn(true)}>
+              <button
+                className={item.status === 'CLAIMED' ? 'btn-primary' : 'btn-secondary'}
+                onClick={() => setConfirmReturn(true)}
+              >
                 Marcar como devuelto
               </button>
             )}
@@ -167,14 +204,7 @@ export function FoundItemDetailPage() {
             </div>
           )}
 
-          {item.status === 'RETURNED' && (
-            <p className="flex items-center gap-2 rounded-2xl bg-green-50 p-4 text-sm font-medium text-green-700 dark:bg-green-500/10 dark:text-green-300">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="m7 12.5 3.2 3.2L17 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Este objeto ya fue devuelto a su dueño.
-            </p>
-          )}
+          {item.status === 'RETURNED' && <Notice tone="success">Este objeto ya fue devuelto a su dueño.</Notice>}
         </div>
       </div>
 
@@ -193,6 +223,29 @@ export function FoundItemDetailPage() {
             minLength={2}
             maxLength={1000}
           />
+          {myLost.length > 0 && (
+            <div className="mt-4">
+              <label className="label" htmlFor="claim-lost">
+                ¿Corresponde a un objeto que reportaste como perdido?
+              </label>
+              <select
+                id="claim-lost"
+                className="input"
+                value={lostReportId}
+                onChange={(e) => setLostReportId(e.target.value)}
+              >
+                <option value="">No / no lo reporté</option>
+                {myLost.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.title} · {formatDate(r.lostAt)}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Si lo eliges, tu reporte se marcará como resuelto cuando te lo entreguen.
+              </p>
+            </div>
+          )}
           <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button type="button" className="btn-secondary" onClick={() => setClaimOpen(false)}>
               Cancelar
@@ -207,7 +260,7 @@ export function FoundItemDetailPage() {
       <ConfirmDialog
         open={confirmReturn}
         title="Marcar como devuelto"
-        message="¿Confirmas que este objeto ya fue entregado a su dueño? Quedará registrado en el historial."
+        message="¿Confirmas que ya entregaste el objeto a su dueño? Le avisaremos, y las demás reclamaciones pendientes se cerrarán. Quedará registrado en el historial."
         confirmLabel="Sí, marcar devuelto"
         onConfirm={markReturned}
         onCancel={() => setConfirmReturn(false)}

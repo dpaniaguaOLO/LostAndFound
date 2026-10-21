@@ -114,6 +114,31 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
+const NOTICE_TONES = {
+  info: 'bg-sky-50 text-sky-800 dark:bg-sky-500/10 dark:text-sky-200',
+  warn: 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200',
+  success: 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300',
+} as const;
+
+/** Aviso en línea (estado de una reclamación, entrega, etc.). */
+export function Notice({ tone, children }: { tone: keyof typeof NOTICE_TONES; children: ReactNode }) {
+  return (
+    <p className={`flex animate-fade-in items-start gap-2.5 rounded-2xl p-4 text-sm font-medium ${NOTICE_TONES[tone]}`} role="status">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="mt-0.5 shrink-0">
+        {tone === 'success' ? (
+          <path d="m7 12.5 3.2 3.2L17 9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M12 11v5m0-8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </>
+        )}
+      </svg>
+      <span>{children}</span>
+    </p>
+  );
+}
+
 /** Insignia de estado coloreada (con punto indicador). */
 export function StatusBadge({ status, label }: { status: string; label: string }) {
   return (

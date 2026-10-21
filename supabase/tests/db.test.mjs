@@ -218,3 +218,53 @@ test('revoke_user_sessions: borra sesiones del usuario y solo la usa service_rol
   assert.equal((await one(`select count(*)::int n from auth.refresh_tokens where user_id = $1`, [C])).n, 0);
   assert.equal((await one(`select count(*)::int n from auth.sessions where user_id = $1`, [D])).n, 1, 'otros intactos');
 });
+
+
+// --- Migración 009: flujo reclamación -> entrega -------------------------------
+const newLost = async (reporter) =>
+  (await one(`insert into public.lost_reports (title, description, category, lost_at, reporter_id)
+              values ('Paraguas', 'negro', 'OTHER', now(), $1) returning id`, [reporter])).id;
+const notifs = async (user, item, type) =>
+  (await one(`select count(*)::int n from public.notifications where user_id = $1 and related_item_id = $2 and type = $3`, [user, item, type])).n;
+
+test('entrega: aviso al dueño, reporte resuelto, pendientes cerradas y auditoría', async () => {
+  const item = await newItem(B);
+  const lost = await newLost(C);
+  const claim = (await one(`insert into public.claims (found_item_id, claimant_id, message, lost_report_id)
+                            values ($1, $2, 'es mío', $3) returning id`, [item, C, lost])).id;
+  await review(claim, B, 'APPROVED');
+  assert.equal((await one(`select status from public.lost_reports where id = $1`, [lost])).status, 'MATCHED');
+
+  // Pendiente "colgada" de otro usuario (datos previos a la regla de solo PUBLISHED).
+  const stale = await newClaim(item, D);
+
+  // El autor marca la entrega desde la app (update directo, como hace el APK).
+  await asUser(B, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
+
+  assert.equal(await notifs(C, item, 'ITEM_RETURNED'), 1, 'el dueño recibe aviso de entrega');
+  assert.equal((await one(`select status from public.lost_reports where id = $1`, [lost])).status, 'RESOLVED');
+  const s = await one(`select status, reviewer_id from public.claims where id = $1`, [stale]);
+  assert.equal(s.status, 'REJECTED', 'la pendiente se cierra');
+  assert.equal(s.reviewer_id, B);
+  assert.equal(await notifs(D, item, 'CLAIM_REJECTED'), 1, 'y se avisa a su reclamante');
+  assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_RETURNED'`, [item])).n, 1);
+
+  // Volver a guardar RETURNED no repite efectos.
+  await asServer(`update public.found_items set title = 'Paraguas negro' where id = $1`, [item]);
+  assert.equal(await notifs(C, item, 'ITEM_RETURNED'), 1);
+});
+
+test('entrega sin reclamación aprobada (devuelto en mano): sin errores ni avisos', async () => {
+  const item = await newItem(B);
+  await asUser(B, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
+  assert.equal((await one(`select status from public.found_items where id = $1`, [item])).status, 'RETURNED');
+  assert.equal((await one(`select count(*)::int n from public.notifications where related_item_id = $1`, [item])).n, 0);
+});
+
+test('reclamación: el reporte de perdido enlazado debe ser del reclamante', async () => {
+  const item = await newItem(B);
+  const lostOfD = await newLost(D);
+  assert.ok(await error(() => asServer(
+    `insert into public.claims (found_item_id, claimant_id, message, lost_report_id) values ($1, $2, 'x', $3)`,
+    [item, C, lostOfD])));
+});

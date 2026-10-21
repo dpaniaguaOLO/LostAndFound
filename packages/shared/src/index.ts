@@ -104,7 +104,10 @@ export interface LostReport {
 export interface Claim {
   id: string;
   foundItemId: string;
-  foundItem?: Pick<FoundItem, 'id' | 'title' | 'imageUrl' | 'status'>;
+  /** `reporterName`: quien encontró el objeto (para coordinar la entrega). */
+  foundItem?: Pick<FoundItem, 'id' | 'title' | 'imageUrl' | 'status'> & { reporterName?: string };
+  /** Reporte de perdido del reclamante al que corresponde (Supabase; se resuelve al entregar). */
+  lostReportId?: string | null;
   claimant: Pick<User, 'id' | 'name'>;
   message: string;
   status: ClaimStatus;

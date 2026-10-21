@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
 import { Logo } from './Logo';
@@ -45,15 +46,23 @@ export function Layout() {
   const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Contador de no leídas: se refresca al navegar (p. ej. tras leerlas).
+  // Contador de no leídas: se refresca al navegar, al marcarlas como leídas y al
+  // volver a la app (en el móvil la app queda abierta en segundo plano).
   useEffect(() => {
     let active = true;
-    services.notifications
-      .list()
-      .then((list) => active && setUnread(list.filter((n) => !n.read).length))
-      .catch(() => void 0);
+    const refresh = () =>
+      services.notifications
+        .list()
+        .then((list) => active && setUnread(list.filter((n) => !n.read).length))
+        .catch(() => void 0);
+    void refresh();
+    const onVisible = () => document.visibilityState === 'visible' && void refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    const off = onUnreadChanged(() => void refresh());
     return () => {
       active = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      off();
     };
   }, [pathname]);
 

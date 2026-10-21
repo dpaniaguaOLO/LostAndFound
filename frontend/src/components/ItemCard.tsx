@@ -57,12 +57,23 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
 }
 
 /**
- * Tarjeta para un reporte de objeto perdido (sin enlace a detalle propio).
- * `embedded`: omite el contenedor `card` cuando se inserta dentro de otra tarjeta.
+ * Tarjeta para un reporte de objeto perdido (enlaza a su detalle).
+ * `embedded`: sin contenedor `card` ni enlace propio, para insertarla dentro de
+ * otra tarjeta que ya enlaza (p. ej. "Mis objetos").
  */
 export function LostReportCard({ item, embedded = false }: { item: LostReport; embedded?: boolean }) {
+  const body = <LostReportCardBody item={item} />;
+  if (embedded) return <div className="group flex flex-col overflow-hidden">{body}</div>;
   return (
-    <div className={(embedded ? '' : 'card ') + 'group flex flex-col overflow-hidden'}>
+    <Link to={`/perdidos/${item.id}`} className="card-interactive group flex flex-col overflow-hidden">
+      {body}
+    </Link>
+  );
+}
+
+function LostReportCardBody({ item }: { item: LostReport }) {
+  return (
+    <>
       <div className="relative">
         <ItemImage src={item.imageUrl} alt={item.title} />
         <div className="absolute left-3 top-3">
@@ -72,10 +83,12 @@ export function LostReportCard({ item, embedded = false }: { item: LostReport; e
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="line-clamp-1 font-semibold text-slate-900 dark:text-slate-100">{item.title}</h3>
+        <h3 className="line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
+          {item.title}
+        </h3>
         <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
         <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={formatDate(item.lostAt)} />
       </div>
-    </div>
+    </>
   );
 }

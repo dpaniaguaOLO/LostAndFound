@@ -446,6 +446,22 @@ const lostReports: LostReportsService = {
       .select(REPORTER_SELECT)
       .single();
     if (error) throw error;
+    // Aviso automático si ya hay un encontrado muy parecido (Edge Function, en
+    // segundo plano: si falla no debe impedir que el reporte quede creado).
+    void sb.functions
+      .invoke(`api/ai/match/${data.id}/notify`, { method: 'POST' })
+      .catch(() => undefined);
+    return toLostReport(data);
+  },
+
+  async resolve(id) {
+    const { data, error } = await requireSupabase()
+      .from('lost_reports')
+      .update({ status: 'RESOLVED' })
+      .eq('id', id)
+      .select(REPORTER_SELECT)
+      .single();
+    if (error) throw error;
     return toLostReport(data);
   },
 
@@ -480,8 +496,10 @@ async function toClaim(c: Row): Promise<Claim> {
           title: fi.title as string,
           imageUrl: await signedUrl((fi.image_path as string | null) ?? null),
           status: fi.status as FoundItemStatus,
+          reporterName: ((fi.reporter as Row | null)?.name as string | undefined) ?? undefined,
         }
       : undefined,
+    lostReportId: (c.lost_report_id as string | null) ?? null,
     claimant: { id: (claimant?.id ?? c.claimant_id) as string, name: (claimant?.name as string) ?? '' },
     message: c.message as string,
     status: c.status as Claim['status'],
@@ -492,8 +510,9 @@ async function toClaim(c: Row): Promise<Claim> {
   };
 }
 
+// Literal en una sola cadena: supabase-js infiere el tipo de la fila a partir de ella.
 const CLAIM_SELECT =
-  '*, found_item:found_items!inner (id, title, image_path, status, reporter_id), claimant:profiles!claimant_id (id, name)';
+  '*, found_item:found_items!inner (id, title, image_path, status, reporter_id, reporter:profiles!reporter_id (id, name)), claimant:profiles!claimant_id (id, name)';
 const claimImage = (c: Row) => (c.found_item as Row | null)?.image_path;
 
 const claims: ClaimsService = {
@@ -524,8 +543,8 @@ const claims: ClaimsService = {
   // Las reclamaciones pasan por la Edge Function `api`: el flujo necesita
   // privilegios (notificar al dueño/reclamante, cambiar el estado del objeto,
   // rechazar en cascada), que no se pueden hacer con RLS desde el cliente.
-  async create(foundItemId, message) {
-    return edgeClaim('POST', '/claims', { foundItemId, message });
+  async create(foundItemId, message, lostReportId) {
+    return edgeClaim('POST', '/claims', { foundItemId, message, lostReportId: lostReportId || undefined });
   },
   async review(id, status, reviewNote) {
     return edgeClaim('PATCH', `/claims/${id}/review`, { status, reviewNote });

@@ -8,6 +8,7 @@ import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
+import { notify } from '../lib/notify.js';
 import { likeSafe, pagination, queryString } from '../lib/query.js';
 import { byUser, rateLimit } from '../lib/rateLimit.js';
 
@@ -127,12 +128,51 @@ foundItemsRouter.patch(
     if (!isOwner && !isAdmin) throw forbidden('Solo el autor o un administrador puede marcar la devoluciÃ³n');
     if (item.status === 'RETURNED') throw badRequest('El objeto ya fue marcado como devuelto');
 
-    const updated = await prisma.foundItem.update({
-      where: { id: item.id },
-      data: { status: 'RETURNED' },
-      include: reporterSelect,
+    // Igual que el trigger found_items_on_returned de Supabase: avisar al reclamante
+    // aprobado y cerrar (con aviso) las reclamaciones pendientes, que ya no pueden prosperar.
+    const actorId = req.auth!.sub;
+    const [updated, approved, pending] = await prisma.$transaction(async (tx) => {
+      const u = await tx.foundItem.update({
+        where: { id: item.id },
+        data: { status: 'RETURNED' },
+        include: reporterSelect,
+      });
+      const a = await tx.claim.findFirst({
+        where: { foundItemId: item.id, status: 'APPROVED' },
+        orderBy: { updatedAt: 'desc' },
+      });
+      const p = await tx.claim.findMany({ where: { foundItemId: item.id, status: 'PENDING' } });
+      for (const c of p) {
+        await tx.claim.update({
+          where: { id: c.id },
+          data: {
+            status: 'REJECTED',
+            reviewerId: c.claimantId === actorId ? null : actorId,
+            reviewNote: 'El objeto ya fue entregado a su dueño',
+          },
+        });
+      }
+      return [u, a, p] as const;
     });
-    await writeAudit(req.auth!.sub, 'FOUND_ITEM_RETURNED', 'FoundItem', item.id, item.title);
+    if (approved) {
+      await notify({
+        userId: approved.claimantId,
+        type: 'ITEM_RETURNED',
+        title: 'Entrega registrada',
+        body: `Se registró la entrega de "${item.title}". ¡Qué bueno que lo recuperaste!`,
+        relatedItemId: item.id,
+      });
+    }
+    for (const c of pending) {
+      await notify({
+        userId: c.claimantId,
+        type: 'CLAIM_REJECTED',
+        title: 'Reclamación cerrada',
+        body: `Tu reclamación de "${item.title}" se cerró: el objeto ya fue entregado a su dueño.`,
+        relatedItemId: item.id,
+      });
+    }
+    await writeAudit(actorId, 'FOUND_ITEM_RETURNED', 'FoundItem', item.id, item.title);
     res.json(serializeFoundItem(updated));
   }),
 );

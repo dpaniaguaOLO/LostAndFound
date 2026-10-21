@@ -80,6 +80,7 @@ const lostReports: LostReportsService = {
   get: (id) => api<LostReport>(`/lost-reports/${id}`),
   mine: () => api<LostReport[]>('/lost-reports/mine/list'),
   create: (form) => api<LostReport>('/lost-reports', { method: 'POST', formData: form }),
+  resolve: (id) => api<LostReport>(`/lost-reports/${id}/resolve`, { method: 'PATCH' }),
   close: (id) => api<LostReport>(`/lost-reports/${id}/close`, { method: 'PATCH' }),
   remove: async (id) => {
     await api(`/lost-reports/${id}`, { method: 'DELETE' });
@@ -89,6 +90,7 @@ const lostReports: LostReportsService = {
 const claims: ClaimsService = {
   mine: () => api<Claim[]>('/claims/mine'),
   incoming: () => api<Claim[]>('/claims/incoming'),
+  // El backend Express no enlaza el reporte de perdido (solo Supabase): se ignora.
   create: (foundItemId, message) =>
     api<Claim>('/claims', { method: 'POST', body: { foundItemId, message } }),
   review: (id, status, reviewNote) =>
