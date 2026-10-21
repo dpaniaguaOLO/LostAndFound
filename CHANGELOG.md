@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.1] - 2026-10-21 — APK de prueba (debug)
+
+Primer APK de Android generado (`app-debug.apk`, `versionName 0.22.1`, `versionCode 2201`),
+con backend Supabase (`VITE_DATA_BACKEND=supabase`). (Claude)
+
+- **Build de depuración, no de producción**: está firmado con la clave debug. El equipo
+  acordó que sirve para instalarlo en los teléfonos y usar la app. Antes de una
+  distribución formal siguen pendientes los requisitos de producción: firma de release
+  (no hay keystore), anon key rotada y configuración de Auth revisada.
+- Android: `versionName` sigue a `VERSION`; `versionCode = MAJOR*10000 + MINOR*100 + PATCH`.
+- Compilar requiere JDK 17–21: el JBR de Android Studio (Java 25) no es compatible con
+  Gradle 8.14. Ejemplo: `JAVA_HOME=<jdk21> gradlew assembleDebug` en `frontend/android`.
+
+---
+
 ## [0.22.0] - 2026-10-21
 
 Revisión del asistente con LLM (Olivia) y rediseño mobile first de toda la interfaz. (Claude)
