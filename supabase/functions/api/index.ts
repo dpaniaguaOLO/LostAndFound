@@ -22,6 +22,7 @@ import { adminClient, cors, getCaller, json, rateLimit } from '../_shared/http.t
 import { matchItems, type MatchableItem, semanticSearch } from '../_shared/matching.ts';
 import { parseSignature } from '../_shared/visual.ts';
 import { composeAnswer, parseIntent } from '../_shared/assistant.ts';
+import { type AssistantItem, assistantAnswer } from '../_shared/llm.ts';
 import {
   primeSignedUrls,
   serializeClaim,
@@ -206,6 +207,7 @@ Deno.serve(async (req: Request) => {
       let foundItems: unknown[] = [];
       let lostReports: unknown[] = [];
       let count = 0;
+      let llmItems: AssistantItem[] = [];
 
       if (intent.kind === 'found') {
         let q = sb
@@ -222,6 +224,14 @@ Deno.serve(async (req: Request) => {
         count = rows.length;
         await primeSignedUrls(sb, rows.map((r) => r.image_path));
         foundItems = await Promise.all(rows.map((r) => serializeFoundItem(sb, r)));
+        llmItems = rows.map((r) => ({
+          kind: 'found',
+          title: r.title as string,
+          category: r.category as string,
+          location: (r.location as string) ?? '',
+          date: r.found_at as string,
+          description: (r.description as string) ?? '',
+        }));
       } else {
         let q = sb
           .from('lost_reports')
@@ -236,9 +246,24 @@ Deno.serve(async (req: Request) => {
         count = rows.length;
         await primeSignedUrls(sb, rows.map((r) => r.image_path));
         lostReports = await Promise.all(rows.map((r) => serializeLostReport(sb, r)));
+        llmItems = rows.map((r) => ({
+          kind: 'lost',
+          title: r.title as string,
+          category: r.category as string,
+          location: (r.location as string) ?? '',
+          date: r.lost_at as string,
+          description: (r.description as string) ?? '',
+        }));
       }
 
-      return json({ answer: composeAnswer(intent, count), kind: intent.kind, foundItems, lostReports });
+      // El LLM solo redacta la respuesta sobre los datos ya filtrados. Si no está
+      // configurado o falla, se usa el motor de palabras clave (composeAnswer).
+      // El LLM solo redacta sobre los datos ya filtrados; si no está configurado
+      // o falla, se usa el motor de palabras clave (composeAnswer).
+      const llmAnswer = await assistantAnswer(question, llmItems);
+      const answer = llmAnswer ?? composeAnswer(intent, count);
+
+      return json({ answer, kind: intent.kind, foundItems, lostReports });
     }
 
     // ================= CLAIMS (flujo con notificaciones) =================

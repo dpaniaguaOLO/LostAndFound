@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.20.0] - 2026-10-20
+
+Asistente con LLM (Fase 1, solo lectura) — rama `feature/llm`.
+
+### Añadido
+- **Asistente potenciado por OpenAI** (`gpt-4o-mini`). El backend filtra por permisos los
+  objetos que el usuario puede ver y el LLM redacta una respuesta en lenguaje natural sobre
+  ese extracto. No accede a la base ni ejecuta acciones (solo lectura).
+  - Cliente aislado en `supabase/functions/_shared/llm.ts`; integrado en el endpoint
+    `POST /ai/assistant` de la Edge Function `api`.
+  - La API key vive solo en el servidor (secret `OPENAI_API_KEY`); nunca en el cliente.
+    Solo se envía texto (nunca fotos).
+- **Fallback automático**: si no hay clave, o el LLM falla o tarda, el asistente usa el motor
+  de palabras clave anterior (la app nunca se rompe por el LLM).
+- Documentación: `docs/LLM.md`.
+
+### Notas
+- Verificado end-to-end contra Supabase real: el asistente responde con lenguaje natural
+  usando datos reales; sin clave cae al motor clásico.
+- Requiere `supabase secrets set OPENAI_API_KEY=...` y `supabase functions deploy api`.
+- Fase 2 (acciones via function calling) pendiente.
+- Versión de desarrollo (sin APK).
+
+---
+
 ## [0.19.0] - 2026-10-20
 
 Desactivación de colaboradores por el administrador (en vez de borrado, para conservar el
