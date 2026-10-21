@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.21.1] - 2026-10-20
+
+### Cambiado
+- **Avatar de Olivia rediseñado como robot** (antena, visor y ojos que brillan en verde
+  menta sobre el verde de marca OLO). Reemplaza la carita humana anterior, que resultaba
+  menos clara como asistente. Solo cambia el SVG; nombre, voz y comportamiento intactos.
+
+---
+
 ## [0.21.0] - 2026-10-20
 
 Olivia: identidad del asistente, y se retira la barra de búsqueda inteligente.
