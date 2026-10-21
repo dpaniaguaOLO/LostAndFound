@@ -5,6 +5,7 @@ import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
 import { Logo } from './Logo';
+import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
 import { Modal } from './ui';
 
@@ -17,6 +18,7 @@ const icons: Record<string, ReactNode> = {
   user: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0" />,
   bell: <path d="M12 4a5.5 5.5 0 0 0-5.5 5.5v3L5 15.5h14L17.5 12.5v-3A5.5 5.5 0 0 0 12 4Zm-2.5 14a2.5 2.5 0 0 0 5 0" />,
   logout: <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4m-4 4h10" />,
+  help: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-2.5-11.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6m0 3h.01" />,
 };
 
 function Icon({ name, className = 'h-[22px] w-[22px]' }: { name: keyof typeof icons; className?: string }) {
@@ -93,6 +95,24 @@ export function Layout() {
     document.title = `${title} · Lost & Found OLO`;
     setAnnounce(title);
   }, [pathname]);
+
+  // Introducción para usuarios nuevos: solo la primera vez (por usuario y dispositivo).
+  const onboardKey = `laf.onboarded.${user?.id ?? ''}`;
+  const [onboarding, setOnboarding] = useState(() => {
+    try {
+      return !!user && !localStorage.getItem(onboardKey);
+    } catch {
+      return false;
+    }
+  });
+  function finishOnboarding() {
+    setOnboarding(false);
+    try {
+      localStorage.setItem(onboardKey, '1');
+    } catch {
+      /* sin almacenamiento: se volverá a mostrar, no es grave */
+    }
+  }
 
   // Aviso de conexión: en el móvil es fácil quedarse sin red y no saberlo.
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -230,6 +250,17 @@ export function Layout() {
                     Mis objetos
                   </Link>
                   <button
+                    onClick={() => {
+                      setUserMenu(false);
+                      setOnboarding(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
+                    role="menuitem"
+                  >
+                    <Icon name="help" className="h-[18px] w-[18px]" />
+                    Cómo funciona
+                  </button>
+                  <button
                     onClick={handleLogout}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
                     role="menuitem"
@@ -313,6 +344,18 @@ export function Layout() {
           <SheetLink to="/notificaciones" icon="bell" label="Notificaciones" badge={unread} />
           <SheetLink to="/mis-objetos" icon="mine" label="Mis objetos" />
           {isAdmin && <SheetLink to="/admin" icon="admin" label="Panel de administración" />}
+          <button
+            onClick={() => {
+              setSheet(false);
+              setOnboarding(true);
+            }}
+            className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium text-slate-700 transition hover:bg-slate-100 active:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-olo-dark-850 dark:text-slate-300">
+              <Icon name="help" className="h-5 w-5" />
+            </span>
+            <span className="flex-1">Cómo funciona</span>
+          </button>
         </div>
         <button className="btn-secondary mt-5 w-full text-red-600 dark:text-red-400" onClick={handleLogout}>
           <Icon name="logout" className="h-[18px] w-[18px]" />
@@ -322,6 +365,8 @@ export function Layout() {
 
       {/* Olivia, la asistente (disponible en toda la app) */}
       <Assistant />
+
+      <Onboarding open={onboarding} onClose={finishOnboarding} />
     </div>
   );
 }

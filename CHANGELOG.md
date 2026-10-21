@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.26.0] - 2026-10-21
+
+Principios de diseño de apps móviles aplicados (guía de CodersLink: compromiso gradual,
+operación con una mano, retroalimentación, experiencia sin conexión, personalización,
+pocos pasos). (Claude)
+
+### Añadido
+- **Introducción para usuarios nuevos** (4 pasos, se puede saltar), solo la primera vez;
+  se puede volver a ver en "Cómo funciona" (menú de usuario / hoja de perfil).
+- **Acción principal al alcance del pulgar**: en el móvil, "Reclamar este objeto",
+  "Marcar como devuelto" y "Ya lo recuperé" quedan en una barra fija sobre la navegación
+  (Olivia sube para no taparla).
+- **Respuesta háptica**: vibración breve al completar o fallar una acción y al cambiar de
+  pestaña (Android; respeta "reducir movimiento"). Permiso `VIBRATE` en el manifiesto.
+- **Muro sin conexión**: se guarda la última carga y, sin red, se muestra con un aviso; se
+  recarga solo al volver la conexión. La copia se borra al cerrar sesión. Las fotos que no
+  cargan muestran el marcador en vez de un icono roto.
+- **"Para ti" en el muro**: avisos personalizados de solicitudes por revisar y de tus
+  objetos perdidos aún en búsqueda.
+- **Un paso menos**: `/publicar?tipo=perdido` abre directamente "Perdí un objeto" (enlaces
+  desde el muro y "Mis objetos").
+
 ## [0.25.0] - 2026-10-21
 
 Auditoría de seguridad completa y mejoras de funcionalidad y accesibilidad. (Claude)

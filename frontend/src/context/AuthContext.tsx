@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { LoginRequest, RegisterRequest, User } from '@laf/shared';
+import { cacheClear } from '../lib/cache';
 import { services } from '../services';
 
 interface AuthContextValue {
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     // La implementación activa limpia su sesión (token REST o sesión Supabase).
     void services.auth.logout();
+    cacheClear(); // la copia local del muro no debe quedar para el siguiente usuario
     setUser(null);
   }
 

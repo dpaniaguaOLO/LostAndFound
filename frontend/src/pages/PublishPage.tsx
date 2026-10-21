@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FOUND_HINT, ItemForm, itemFormData, LOST_HINT, type ItemFormValues } from '../components/ItemForm';
 import { PageHeader } from '../components/ui';
 import { useToast } from '../context/ToastContext';
@@ -11,7 +11,9 @@ type Mode = 'found' | 'lost';
 export function PublishPage() {
   const { notify } = useToast();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<Mode>('found');
+  // ?tipo=perdido abre directamente "Perdí un objeto" (un paso menos desde el muro).
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<Mode>(searchParams.get('tipo') === 'perdido' ? 'lost' : 'found');
 
   async function handleSubmit(values: ItemFormValues) {
     try {

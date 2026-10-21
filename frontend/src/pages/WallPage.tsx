@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
-import { CardGridSkeleton, EmptyState, ErrorState, PageHeader, Tabs } from '../components/ui';
+import { CardGridSkeleton, EmptyState, ErrorState, Notice, PageHeader, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { cacheGet, cacheSet } from '../lib/cache';
 import { getErrorMessage } from '../lib/errors';
+import { formatDateTime } from '../lib/format';
 import { useDebounce } from '../lib/useDebounce';
 import { services } from '../services';
 
@@ -14,6 +16,74 @@ type Tab = 'found' | 'lost';
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+
+/**
+ * "Para ti": lo que requiere tu atención primero (personalización). Solo aparece
+ * si hay algo: reportes de perdido tuyos aún en búsqueda y solicitudes de
+ * reclamación pendientes de revisar sobre objetos que publicaste.
+ */
+function ForYou() {
+  const [openLost, setOpenLost] = useState(0);
+  const [pendingClaims, setPendingClaims] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    services.lostReports
+      .mine()
+      .then((l) => active && setOpenLost(l.filter((r) => r.status === 'OPEN' || r.status === 'MATCHED').length))
+      .catch(() => void 0);
+    services.claims
+      .incoming()
+      .then((c) => active && setPendingClaims(c.filter((x) => x.status === 'PENDING').length))
+      .catch(() => void 0);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!openLost && !pendingClaims) return null;
+  return (
+    <div className="mb-5 grid animate-fade-up gap-3 sm:grid-cols-2">
+      {pendingClaims > 0 && (
+        <ForYouCard
+          to="/reclamaciones"
+          tone="amber"
+          title={pendingClaims === 1 ? '1 solicitud por revisar' : `${pendingClaims} solicitudes por revisar`}
+          text="Alguien reclama un objeto que publicaste."
+        />
+      )}
+      {openLost > 0 && (
+        <ForYouCard
+          to="/mis-objetos?tab=lost"
+          tone="olo"
+          title={openLost === 1 ? 'Buscando 1 objeto tuyo' : `Buscando ${openLost} objetos tuyos`}
+          text="Revisa las posibles coincidencias."
+        />
+      )}
+    </div>
+  );
+}
+
+function ForYouCard({ to, tone, title, text }: { to: string; tone: 'amber' | 'olo'; title: string; text: string }) {
+  const tones = {
+    amber: 'bg-amber-50 text-amber-900 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/20',
+    olo: 'bg-olo-50 text-olo-900 ring-olo-200 dark:bg-olo-500/10 dark:text-olo-100 dark:ring-olo-500/20',
+  };
+  return (
+    <Link
+      to={to}
+      className={`group flex items-center gap-3 rounded-2xl p-4 ring-1 transition hover:shadow-card-hover active:scale-[0.99] ${tones[tone]}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block font-bold">{title}</span>
+        <span className="block text-sm opacity-80">{text}</span>
+      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 transition group-hover:translate-x-0.5">
+        <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    </Link>
+  );
 }
 
 export function WallPage() {
@@ -29,6 +99,15 @@ export function WallPage() {
   const [lost, setLost] = useState<Paginated<LostReport> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Fecha de la copia local mostrada cuando no hay conexión (null = datos en vivo).
+  const [offlineSince, setOfflineSince] = useState<string | null>(null);
+
+  // Al recuperar la red, recargar en vivo.
+  useEffect(() => {
+    const onOnline = () => setReload((n) => n + 1);
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
 
   // Vuelve a la página 1 al cambiar pestaña o filtros.
   useEffect(() => {
@@ -47,6 +126,10 @@ export function WallPage() {
       page,
     };
 
+    // Solo la vista por defecto (pág. 1 sin filtros) se guarda para verla sin conexión.
+    const cacheable = page === 1 && !params.search && !params.category && !params.location;
+    const cacheKey = `wall.${tab}`;
+
     const request =
       tab === 'found' ? services.foundItems.list(params) : services.lostReports.list(params);
     request
@@ -54,9 +137,19 @@ export function WallPage() {
         if (!active) return;
         if (tab === 'found') setFound(data as Paginated<FoundItem>);
         else setLost(data as Paginated<LostReport>);
+        setOfflineSince(null);
+        if (cacheable) cacheSet(cacheKey, data);
       })
       .catch((err) => {
         if (!active) return;
+        // Sin red: mostrar lo último guardado en vez de una pantalla de error.
+        const cached = cacheable && !navigator.onLine ? cacheGet<Paginated<FoundItem | LostReport>>(cacheKey) : null;
+        if (cached) {
+          if (tab === 'found') setFound(cached.data as Paginated<FoundItem>);
+          else setLost(cached.data as Paginated<LostReport>);
+          setOfflineSince(cached.savedAt);
+          return;
+        }
         setError(getErrorMessage(err, 'Error al cargar el muro'));
       })
       .finally(() => active && setLoading(false));
@@ -103,6 +196,8 @@ export function WallPage() {
         }
       />
 
+      <ForYou />
+
       <Tabs<Tab>
         tabs={[
           { key: 'found', label: 'Encontrados', count: found?.total },
@@ -113,6 +208,14 @@ export function WallPage() {
       />
 
       <Filters value={filters} onChange={setFilters} />
+
+      {offlineSince && (
+        <div className="mb-4">
+          <Notice tone="warn">
+            Sin conexión: mostrando lo último guardado ({formatDateTime(offlineSince)}). Se actualizará al volver la red.
+          </Notice>
+        </div>
+      )}
 
       {/* Esqueleto solo en la primera carga; al refrescar se mantienen los
           resultados (atenuados) para no hacer "parpadear" la lista. */}
@@ -127,8 +230,8 @@ export function WallPage() {
           }
           description="Ajusta la búsqueda o publica un objeto nuevo."
           action={
-            <Link to="/publicar" className="btn-primary">
-              Publicar
+            <Link to={tab === 'lost' ? '/publicar?tipo=perdido' : '/publicar'} className="btn-primary">
+              {tab === 'lost' ? 'Reportar un perdido' : 'Publicar'}
             </Link>
           }
         />

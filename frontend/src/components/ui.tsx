@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { statusBadgeClass } from '../lib/format';
+import { haptics } from '../lib/haptics';
 
 /** Indicador de carga centrado. */
 export function Spinner({ label = 'Cargando…' }: { label?: string }) {
@@ -188,7 +189,10 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={active}
             tabIndex={active ? 0 : -1}
-            onClick={() => onChange(t.key)}
+            onClick={() => {
+              if (!active) haptics.tap();
+              onChange(t.key);
+            }}
             className={
               'flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-sm font-semibold transition duration-200 sm:flex-none sm:px-4 ' +
               (active
@@ -217,7 +221,11 @@ export function Tabs<T extends string>({
 /** Imagen del objeto o un marcador de posición accesible. Hace zoom suave dentro de un `.group`. */
 export function ItemImage({ src, alt, rounded = true }: { src: string | null; alt: string; rounded?: boolean }) {
   const radius = rounded ? 'rounded-t-2xl' : '';
-  if (!src) {
+  // Si la imagen no carga (sin red, o URL firmada caducada en la copia sin
+  // conexión) se muestra el marcador en vez de un icono roto.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (!src || failed) {
     return (
       <div
         className={`flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200/70 text-slate-300 dark:from-olo-dark-850 dark:to-olo-dark-800 dark:text-slate-600 ${radius}`}
@@ -240,6 +248,7 @@ export function ItemImage({ src, alt, rounded = true }: { src: string | null; al
         className="h-full w-full object-cover transition duration-500 ease-out-expo group-hover:scale-[1.04]"
         loading="lazy"
         decoding="async"
+        onError={() => setFailed(true)}
       />
     </div>
   );
@@ -303,6 +312,30 @@ export function ZoomableImage({ src, alt }: { src: string | null; alt: string })
           </div>,
           document.body,
         )}
+    </>
+  );
+}
+
+/**
+ * Barra de acción principal fija sobre la navegación inferior (solo móvil): deja
+ * la acción más importante de la pantalla al alcance del pulgar. En sm+ no se
+ * muestra (la página mantiene sus botones en línea). Mientras está montada marca
+ * <html data-actionbar> para que el botón de Olivia suba y no la tape.
+ */
+export function MobileActionBar({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    document.documentElement.dataset.actionbar = '1';
+    return () => {
+      delete document.documentElement.dataset.actionbar;
+    };
+  }, []);
+  return (
+    <>
+      {/* Hueco para que el final de la página no quede bajo la barra */}
+      <div className="h-20 md:hidden" aria-hidden />
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 animate-slide-up border-t border-slate-200/80 bg-white/90 px-4 py-3 shadow-nav backdrop-blur-xl dark:border-olo-dark-800 dark:bg-olo-dark-900/90 md:hidden">
+        <div className="mx-auto flex max-w-md gap-2 [&>*]:flex-1">{children}</div>
+      </div>
     </>
   );
 }

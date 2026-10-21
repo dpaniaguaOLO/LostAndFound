@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { LostReport } from '@laf/shared';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { BackButton, ConfirmDialog, DetailGrid, ErrorState, Notice, Spinner, StatusBadge, ZoomableImage } from '../components/ui';
+import {
+  BackButton,
+  ConfirmDialog,
+  DetailGrid,
+  ErrorState,
+  MobileActionBar,
+  Notice,
+  Spinner,
+  StatusBadge,
+  ZoomableImage,
+} from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -133,9 +143,16 @@ export function LostReportDetailPage() {
           {(isOwner || isAdmin) && isActive && (
             <div className="flex flex-col gap-3 sm:flex-row">
               {isOwner && (
-                <button className="btn-primary" onClick={() => setConfirmResolve(true)}>
-                  Ya lo recuperé
-                </button>
+                <>
+                  <button className="btn-primary hidden md:inline-flex" onClick={() => setConfirmResolve(true)}>
+                    Ya lo recuperé
+                  </button>
+                  <MobileActionBar>
+                    <button className="btn-primary" onClick={() => setConfirmResolve(true)}>
+                      Ya lo recuperé
+                    </button>
+                  </MobileActionBar>
+                </>
               )}
               <Link to={`/perdidos/${item.id}/editar`} className="btn-secondary">
                 Editar

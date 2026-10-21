@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { haptics } from '../lib/haptics';
 
 type ToastKind = 'success' | 'error' | 'info';
 interface Toast {
@@ -39,6 +40,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const notify = useCallback(
     (message: string, kind: ToastKind = 'info') => {
       const id = Date.now() + Math.random();
+      // Retroalimentación táctil en el móvil para cada acción completada o fallida.
+      if (kind === 'success') haptics.success();
+      else if (kind === 'error') haptics.error();
       // Máximo 3 a la vista para no tapar la pantalla en móvil.
       setToasts((prev) => [...prev.slice(-2), { id, kind, message }]);
       setTimeout(() => dismiss(id), kind === 'error' ? 6000 : 4000);

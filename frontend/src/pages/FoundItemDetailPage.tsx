@@ -2,7 +2,18 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { useSupabase } from '../lib/config';
-import { BackButton, ConfirmDialog, DetailGrid, ErrorState, Modal, Notice, Spinner, StatusBadge, ZoomableImage } from '../components/ui';
+import {
+  BackButton,
+  ConfirmDialog,
+  DetailGrid,
+  ErrorState,
+  MobileActionBar,
+  Modal,
+  Notice,
+  Spinner,
+  StatusBadge,
+  ZoomableImage,
+} from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -63,6 +74,12 @@ export function FoundItemDetailPage() {
   // Solo PUBLISHED: si ya hay una reclamación aprobada (CLAIMED) no se puede aprobar otra.
   const canClaim = !isOwner && item.status === 'PUBLISHED' && !claimSent;
   const canMarkReturned = (isOwner || isAdmin) && item.status !== 'RETURNED' && item.status !== 'ARCHIVED';
+  // Una sola acción principal por pantalla: reclamar, o entregar si ya hay una aprobada.
+  const mobilePrimary: 'claim' | 'return' | null = canClaim
+    ? 'claim'
+    : canMarkReturned && item.status === 'CLAIMED'
+      ? 'return'
+      : null;
 
   async function submitClaim(e: FormEvent) {
     e.preventDefault();
@@ -164,15 +181,33 @@ export function FoundItemDetailPage() {
             </Notice>
           )}
 
+          {/* En móvil la acción principal va en la barra fija inferior (MobileActionBar). */}
+          {mobilePrimary && (
+            <MobileActionBar>
+              {mobilePrimary === 'claim' ? (
+                <button className="btn-primary" onClick={() => setClaimOpen(true)}>
+                  Reclamar este objeto
+                </button>
+              ) : (
+                <button className="btn-primary" onClick={() => setConfirmReturn(true)}>
+                  Marcar como devuelto
+                </button>
+              )}
+            </MobileActionBar>
+          )}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {canClaim && (
-              <button className="btn-primary" onClick={() => setClaimOpen(true)}>
+              <button className="btn-primary hidden md:inline-flex" onClick={() => setClaimOpen(true)}>
                 Reclamar este objeto
               </button>
             )}
             {canMarkReturned && (
               <button
-                className={item.status === 'CLAIMED' ? 'btn-primary' : 'btn-secondary'}
+                className={
+                  (item.status === 'CLAIMED' ? 'btn-primary' : 'btn-secondary') +
+                  (mobilePrimary === 'return' ? ' hidden md:inline-flex' : '')
+                }
                 onClick={() => setConfirmReturn(true)}
               >
                 Marcar como devuelto

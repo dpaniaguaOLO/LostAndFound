@@ -99,7 +99,7 @@ export function Assistant() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="group fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex animate-scale-in items-center gap-2 rounded-full md:bottom-6 md:right-6"
+          className="group fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex animate-scale-in items-center gap-2 rounded-full transition-[bottom] duration-300 md:bottom-6 md:right-6 [[data-actionbar]_&]:bottom-[calc(10rem+env(safe-area-inset-bottom))] md:[[data-actionbar]_&]:bottom-6"
           aria-label="Hablar con Olivia, la asistente"
         >
           <span className="hidden rounded-full bg-white/95 px-4 py-2.5 text-sm font-semibold text-olo-700 shadow-elevated ring-1 ring-slate-200/80 backdrop-blur transition duration-300 ease-out-expo group-hover:-translate-x-1 dark:bg-olo-dark-900/95 dark:text-olo-300 dark:ring-olo-dark-800 sm:inline-block">

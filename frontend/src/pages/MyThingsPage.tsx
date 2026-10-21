@@ -63,7 +63,7 @@ export function MyThingsPage() {
           title={tab === 'found' ? 'No has publicado objetos encontrados' : 'No has reportado objetos perdidos'}
           description="Usa el botón para registrar uno."
           action={
-            <Link to="/publicar" className="btn-primary">
+            <Link to={tab === 'lost' ? '/publicar?tipo=perdido' : '/publicar'} className="btn-primary">
               {tab === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
             </Link>
           }
