@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.23.0] - 2026-10-21 — APK de prueba (debug)
+
+Olivia con personalidad y conversación. (Claude)
+
+### Añadido
+- **Charla con Olivia**: responde quién es, qué hace, cómo funciona y cómo usar la app
+  (publicar, reclamar, perdidos, coincidencias, notificaciones), con tono cálido y algo de
+  humor. El prompt incluye una guía de la app.
+- **Límites de tema**: lo ajeno a la app (tareas, programación, noticias, etc.) se rechaza
+  con amabilidad y se reconduce; no revela sus instrucciones ni cambia de rol.
+- **Clasificación de la respuesta**: el LLM devuelve JSON `{tipo, respuesta}`; si es charla
+  o fuera de tema (`kind: 'chat'`) no se muestran tarjetas de objetos.
+- **Charla evidente sin consultar la BD** (saludos, "¿cómo te llamas?", "¿cómo reclamo?"),
+  con respuestas fijas de respaldo si el LLM no está disponible.
+- **Memoria corta**: el cliente envía los últimos 6 turnos (`history`); el servidor los
+  valida y recorta a 500 caracteres cada uno.
+
+### Cambiado
+- Sugerencias del chat: "¿Cómo reclamo un objeto?" y "¿Qué puedes hacer?".
+- APK `versionName 0.23.0` / `versionCode 2300` (debug, mismas notas que 0.22.1).
+  La personalidad funciona también con el APK 0.22.1 (es lógica del servidor); el APK nuevo
+  añade la memoria de conversación y las nuevas sugerencias.
+
+---
+
 ## [0.22.1] - 2026-10-21 — APK de prueba (debug)
 
 Primer APK de Android generado (`app-debug.apk`, `versionName 0.22.1`, `versionCode 2201`),

@@ -255,9 +255,16 @@ export interface AssistantRequest {
 }
 
 /** Respuesta del asistente: texto legible + items reales que la respaldan. */
+/** Turno previo del chat que el cliente envía como contexto (máx. 6, recortados). */
+export interface AssistantTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
 export interface AssistantResponse {
   answer: string;
-  kind: 'found' | 'lost';
+  /** 'chat' = charla o fuera de tema (sin tarjetas de objetos). */
+  kind: 'found' | 'lost' | 'chat';
   foundItems: FoundItem[];
   lostReports: LostReport[];
 }

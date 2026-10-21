@@ -2,7 +2,8 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.22.0 (rama `feature/llm`). El trabajo de Supabase + Android +
+- **Versión actual**: 0.23.0 (rama `feature/llm`, también en `main`). 0.23.0 = Olivia
+  conversa (personalidad, guía de la app, límites de tema, memoria corta) + APK debug. El trabajo de Supabase + Android +
   seguridad (0.11.0–0.19.0) ya está **mergeado en `main`** (PR #3). 0.20.0–0.21.x = asistente
   con LLM Fase 1 / Olivia (solo lectura, ver `docs/LLM.md`). 0.22.0 = revisión del LLM
   (zona horaria, relevancia, prompt endurecido, tope de coste) y rediseño mobile first

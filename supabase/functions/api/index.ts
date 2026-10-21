@@ -22,8 +22,8 @@ import { adminClient, cors, getCaller, json, rateLimit } from '../_shared/http.t
 import { matchItems, type MatchableItem, semanticSearch } from '../_shared/matching.ts';
 import { tokenize } from '../_shared/nlp.ts';
 import { parseSignature } from '../_shared/visual.ts';
-import { composeAnswer, parseIntent } from '../_shared/assistant.ts';
-import { type AssistantItem, assistantAnswer } from '../_shared/llm.ts';
+import { composeAnswer, isSmallTalk, parseIntent, smallTalkAnswer } from '../_shared/assistant.ts';
+import { type AssistantItem, assistantReply, type ChatTurn } from '../_shared/llm.ts';
 import {
   primeSignedUrls,
   serializeClaim,
@@ -41,6 +41,22 @@ const ASSISTANT_CANDIDATES = 40;
 const ASSISTANT_RESULTS = 10;
 
 type Row = Record<string, unknown>;
+
+// Historial de conversación que envía el cliente: dato no confiable, se acota.
+const MAX_HISTORY_TURNS = 6;
+const MAX_HISTORY_TEXT = 500;
+
+/** Valida y recorta el historial del chat (últimos turnos, roles conocidos). */
+function parseHistory(raw: unknown): ChatTurn[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (t): t is ChatTurn =>
+        !!t && (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string' && !!t.text.trim(),
+    )
+    .slice(-MAX_HISTORY_TURNS)
+    .map((t) => ({ role: t.role, text: t.text.trim().slice(0, MAX_HISTORY_TEXT) }));
+}
 
 /**
  * Ordena las filas por cuántas palabras de la pregunta aparecen en su texto. Si
@@ -231,7 +247,20 @@ Deno.serve(async (req: Request) => {
       if (question.length < 2 || question.length > MAX_QUERY) {
         return json({ error: 'BAD_REQUEST', message: `La pregunta debe tener entre 2 y ${MAX_QUERY} caracteres` }, 400);
       }
+      const history = parseHistory(body.history);
       const intent = parseIntent(question);
+
+      // Charla evidente ("¿cómo te llamas?"): sin consulta a la BD ni tarjetas.
+      if (isSmallTalk(question, intent)) {
+        const reply = await assistantReply(question, [], history);
+        return json({
+          answer: reply?.text ?? smallTalkAnswer(question),
+          kind: 'chat',
+          foundItems: [],
+          lostReports: [],
+        });
+      }
+
       const isFound = intent.kind === 'found';
       const dateCol = isFound ? 'found_at' : 'lost_at';
 
@@ -266,10 +295,16 @@ Deno.serve(async (req: Request) => {
         date: r[dateCol] as string,
         description: (r.description as string) ?? '',
       }));
-      const answer = (await assistantAnswer(question, llmItems)) ?? composeAnswer(intent, rows.length);
+      const reply = await assistantReply(question, llmItems, history);
+
+      // Si el modelo concluye que no era una búsqueda (charla o fuera de tema),
+      // no se muestran tarjetas: solo su respuesta.
+      if (reply && reply.type !== 'busqueda') {
+        return json({ answer: reply.text, kind: 'chat', foundItems: [], lostReports: [] });
+      }
 
       return json({
-        answer,
+        answer: reply?.text ?? composeAnswer(intent, rows.length),
         kind: intent.kind,
         foundItems: isFound ? serialized : [],
         lostReports: isFound ? [] : serialized,

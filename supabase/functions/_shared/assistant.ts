@@ -105,6 +105,63 @@ export function parseIntent(question: string): Intent {
   return { kind, categories: Array.from(categories), location, since, sinceLabel, keywords };
 }
 
+// --- Charla (sin búsqueda) -------------------------------------------------
+
+const SEARCH_HINT = /encontr|perd|extrav|busc|\bhay\b|olvid|dej[eé]|objeto|publicad/;
+
+const SMALL_TALK: { re: RegExp; answer: string }[] = [
+  {
+    re: /c[oó]mo te llamas|qui[eé]n eres|tu nombre|eres (un|una) (bot|robot|ia|humano|persona)/,
+    answer: 'Soy Olivia, la asistente virtual de Lost & Found de OLO 🤖 Te ayudo a buscar objetos perdidos y encontrados y a usar la app.',
+  },
+  {
+    re: /qu[eé] (haces|puedes hacer|sabes hacer)|en qu[eé] (me )?(puedes )?ayudar|para qu[eé] sirves|c[oó]mo funcionas/,
+    answer:
+      'Busco entre los objetos publicados en la app: pregúntame, por ejemplo, «¿se encontraron llaves esta semana?». ' +
+      'También te explico cómo publicar, reclamar un objeto o reportar algo que perdiste.',
+  },
+  {
+    re: /c[oó]mo (publico|publicar|reporto|reportar|subo|subir)/,
+    answer:
+      'Pulsa «Publicar» (el + verde en el móvil), elige si encontraste o perdiste algo y completa foto, ' +
+      'descripción, categoría, fecha y ubicación. Si reportas algo perdido, la app te avisa si aparece algo parecido.',
+  },
+  {
+    re: /c[oó]mo (reclamo|reclamar|recupero|recuperar)/,
+    answer:
+      'Abre el objeto en el muro y pulsa «Reclamar este objeto», explicando por qué es tuyo. ' +
+      'Quien lo encontró revisa tu solicitud y, si la aprueba, coordinan la entrega.',
+  },
+  { re: /gracias|te lo agradezco/, answer: '¡Con gusto! Aquí estoy si necesitas buscar algo más 😊' },
+  { re: /\b(adi[oó]s|hasta luego|nos vemos|chao|bye)\b/, answer: '¡Hasta luego! Ojalá no pierdas nada, pero si pasa, aquí estaré.' },
+  {
+    re: /^[\s¿¡]*(hola|buen[oa]s?( d[ií]as| tardes| noches)?|hey|qu[eé] tal|c[oó]mo est[aá]s)\b/,
+    answer: '¡Hola! Soy Olivia. ¿Buscas algo que perdiste o quieres saber si encontraron algo?',
+  },
+];
+
+/**
+ * ¿Es charla (saludo, preguntas sobre Olivia o la app) y no una búsqueda? Solo
+ * si no hay pistas de búsqueda (categoría, lugar, fecha o verbos como "perdí").
+ */
+export function isSmallTalk(question: string, intent: Intent): boolean {
+  const lower = question.toLowerCase();
+  if (intent.categories.length || intent.location || intent.since) return false;
+  if (SEARCH_HINT.test(lower) && !/c[oó]mo (publico|publicar|reporto|reportar|reclamo|reclamar)/.test(lower)) {
+    return false;
+  }
+  return SMALL_TALK.some((s) => s.re.test(lower));
+}
+
+/** Respuesta fija de charla (respaldo cuando el LLM no está disponible). */
+export function smallTalkAnswer(question: string): string {
+  const lower = question.toLowerCase();
+  return (
+    SMALL_TALK.find((s) => s.re.test(lower))?.answer ??
+    'Soy Olivia y te ayudo con objetos perdidos y encontrados en OLO. ¿Qué estás buscando?'
+  );
+}
+
 export function composeAnswer(intent: Intent, count: number): string {
   const tipo = intent.kind === 'found' ? 'encontrado(s)' : 'reportado(s) como perdido(s)';
   const parts: string[] = [];

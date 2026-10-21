@@ -24,6 +24,14 @@ inteligente" del muro.
 El código del cliente vive en `supabase/functions/_shared/llm.ts`; la integración en
 `supabase/functions/api/index.ts` (endpoint `/ai/assistant`).
 
+**Personalidad y conversación (0.23.0)**: Olivia también conversa sobre sí misma y sobre
+cómo usar la app (la guía está en el *system prompt*). Lo ajeno a la app se rechaza con
+amabilidad. El modelo responde JSON `{tipo: busqueda|conversacion|fuera_de_tema, respuesta}`;
+solo en `busqueda` se muestran tarjetas (si no, `kind: 'chat'`). Los saludos y preguntas
+evidentes ("¿cómo te llamas?", "¿cómo reclamo?") no consultan la BD (`isSmallTalk` en
+`_shared/assistant.ts`, con respuestas fijas de respaldo). El cliente envía los últimos 6
+turnos como `history` (el servidor los valida y recorta).
+
 Antes de llamar al LLM, el servidor lee hasta 40 candidatos (filtrados por categoría,
 ubicación y fecha según la intención) y prioriza los que contienen las palabras de la
 pregunta; se devuelven los 10 mejores. "Hoy/ayer/esta semana" se calculan en

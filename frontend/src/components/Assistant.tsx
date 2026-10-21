@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { FoundItem, LostReport } from '@laf/shared';
+import type { AssistantTurn, FoundItem, LostReport } from '@laf/shared';
 import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
 import { aiService } from '../services/ai';
@@ -15,14 +15,18 @@ interface Msg {
 }
 
 const SUGGESTIONS = [
-  '¿Se han encontrado botellas hoy?',
-  '¿Hay llaves en la cafetería?',
   '¿Qué se encontró esta semana?',
+  '¿Hay llaves en la cafetería?',
+  '¿Cómo reclamo un objeto?',
+  '¿Qué puedes hacer?',
 ];
+
+// Turnos previos enviados como contexto (el servidor también limita a 6).
+const HISTORY_TURNS = 6;
 
 const WELCOME =
   'Hola, soy Olivia 👋 tu asistente aquí en OLO. Pregúntame por objetos encontrados o ' +
-  'perdidos, por ejemplo: «¿se han encontrado botellas hoy?» y te ayudo a buscarlos.';
+  'perdidos, o cómo usar la app, y te ayudo.';
 
 // Debe coincidir con MAX_QUERY del servidor (supabase/functions/api).
 const MAX_QUESTION = 300;
@@ -59,11 +63,17 @@ export function Assistant() {
   async function ask(question: string) {
     const q = question.trim();
     if (!q || loading) return;
+    // Contexto para seguir la conversación: últimos turnos, sin el saludo ni errores.
+    const history: AssistantTurn[] = messages
+      .slice(1)
+      .filter((m) => !m.error)
+      .slice(-HISTORY_TURNS)
+      .map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: 'user', text: q }]);
     setInput('');
     setLoading(true);
     try {
-      const res = await aiService.assistant(q);
+      const res = await aiService.assistant(q, history);
       setMessages((m) => [
         ...m,
         { role: 'assistant', text: res.answer, found: res.foundItems, lost: res.lostReports },

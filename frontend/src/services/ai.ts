@@ -7,6 +7,7 @@
  */
 import type {
   AssistantResponse,
+  AssistantTurn,
   MatchSuggestionsResponse,
   SemanticSearchResponse,
 } from '@laf/shared';
@@ -17,7 +18,7 @@ import { api } from '../lib/api';
 export interface AiService {
   search(query: string): Promise<SemanticSearchResponse>;
   match(lostReportId: string): Promise<MatchSuggestionsResponse>;
-  assistant(question: string): Promise<AssistantResponse>;
+  assistant(question: string, history?: AssistantTurn[]): Promise<AssistantResponse>;
 }
 
 /** Invoca la Edge Function `api` con método y ruta, devolviendo JSON tipado. */
@@ -51,7 +52,8 @@ const supabaseAi: AiService = {
   search: (query) => invokeEdge<SemanticSearchResponse>('POST', '/ai/search', { query }),
   match: (lostReportId) =>
     invokeEdge<MatchSuggestionsResponse>('GET', `/ai/match/${lostReportId}`),
-  assistant: (question) => invokeEdge<AssistantResponse>('POST', '/ai/assistant', { question }),
+  assistant: (question, history = []) =>
+    invokeEdge<AssistantResponse>('POST', '/ai/assistant', { question, history }),
 };
 
 const restAi: AiService = {
