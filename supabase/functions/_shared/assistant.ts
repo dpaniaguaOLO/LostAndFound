@@ -1,8 +1,10 @@
 /**
  * Asistente de búsqueda por intención (sin LLM) — port a Deno.
- * Copia fiel de backend/src/lib/assistant.ts.
+ * Copia de backend/src/lib/assistant.ts, salvo que "hoy" se calcula en la zona
+ * horaria de la app (las Edge Functions corren en UTC; ver time.ts).
  */
 import { tokenize } from './nlp.ts';
+import { startOfTodayInAppTz } from './time.ts';
 
 export type ItemKind = 'found' | 'lost';
 
@@ -51,11 +53,7 @@ const LOCATION_HINTS = [
   'sala', 'juntas', 'entrada', 'bano', 'baño', 'oficina', 'planta', 'bodega', 'almacen', 'almacén',
 ];
 
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+const startOfToday = startOfTodayInAppTz;
 
 export function parseIntent(question: string): Intent {
   const lower = question.toLowerCase();

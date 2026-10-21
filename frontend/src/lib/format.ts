@@ -57,7 +57,7 @@ export function statusBadgeClass(status: string): string {
     case 'ARCHIVED':
     case 'CLOSED':
     case 'CANCELLED':
-      return 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
+      return 'bg-slate-100 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300';
     default:
       return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
   }
@@ -69,6 +69,12 @@ export function formatDate(iso: string): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/** Fecha local de hoy (o de `d`) como YYYY-MM-DD, para inputs type="date". */
+export function localDateString(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function formatDateTime(iso: string): string {

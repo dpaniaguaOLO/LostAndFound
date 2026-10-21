@@ -1,5 +1,5 @@
-/* Tipografía oficial de OLO (Open Sans). Ver docs/OLO_BRAND_RESEARCH.md */
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+/* Tipografía oficial de OLO (Open Sans), cargada desde index.html.
+   Ver docs/OLO_BRAND_RESEARCH.md */
 
 @tailwind base;
 @tailwind components;
@@ -8,15 +8,41 @@
 @layer base {
   html {
     font-family: 'Open Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
   }
   body {
-    /* Claro: tinta de marca sobre neutro claro.
-       Oscuro: superficie con leve tinte verde de OLO (olo-dark) + texto claro. */
-    @apply bg-slate-50 text-ink antialiased transition-colors dark:bg-olo-dark-950 dark:text-slate-100;
+    /* Claro: tinta de marca sobre neutro claro con un leve halo verde arriba.
+       Oscuro: casi negro con el mismo halo, muy sutil. */
+    @apply min-h-screen bg-slate-50 text-ink antialiased transition-colors duration-300 dark:bg-olo-dark-950 dark:text-slate-100;
+    background-image: radial-gradient(60rem 28rem at 50% -12rem, rgb(0 167 133 / 0.07), transparent 70%);
+    background-repeat: no-repeat;
     /* En Android (Capacitor) evita que el contenido quede bajo la barra de
        estado / gestos. En web los insets valen 0, así que no afecta. */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .dark body {
+    background-image: radial-gradient(60rem 28rem at 50% -12rem, rgb(0 167 133 / 0.09), transparent 70%);
+  }
+  ::selection {
+    @apply bg-olo-200 text-olo-950;
+  }
+  /* Anillo de foco visible solo con teclado (no al tocar/clicar). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-olo-500 ring-offset-2 ring-offset-white dark:ring-offset-olo-dark-950;
+  }
+
+  /* Accesibilidad: sin animaciones para quien las desactiva en el sistema. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -32,37 +58,87 @@
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
+  /* Oculta la barra de scroll en carruseles horizontales (chips, pestañas). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer components {
-  /* --- Botones --- */
+  /* --- Botones ---
+     Mobile first: 44px de alto (objetivo táctil recomendado); más compactos en sm+. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:ring-offset-olo-dark-950;
+    @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 ease-out-expo active:scale-[0.97] disabled:pointer-events-none disabled:opacity-55 sm:min-h-10 sm:py-2;
   }
-  /* Acción principal = verde de marca OLO (se aclara un paso en oscuro) */
+  /* Acción principal = verde de marca OLO con degradado y halo (se aclara en oscuro) */
   .btn-primary {
-    @apply btn bg-olo-600 text-white hover:bg-olo-700 focus:ring-olo-500 dark:bg-olo-500 dark:text-slate-950 dark:hover:bg-olo-400;
+    @apply btn bg-gradient-to-b from-olo-500 to-olo-600 text-white shadow-glow hover:from-olo-600 hover:to-olo-700 hover:shadow-glow-lg dark:from-olo-400 dark:to-olo-500 dark:text-slate-950 dark:hover:from-olo-300 dark:hover:to-olo-400;
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus:ring-slate-400 dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:text-slate-200 dark:hover:bg-olo-dark-800;
+    @apply btn border border-slate-200 bg-white text-slate-700 shadow-card hover:border-slate-300 hover:bg-slate-50 dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:text-slate-200 dark:hover:border-olo-dark-700 dark:hover:bg-olo-dark-850;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-850;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600;
+    @apply btn bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_6px_20px_-6px_rgb(220_38_38/0.5)] hover:from-red-600 hover:to-red-700;
+  }
+  .icon-btn {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-olo-dark-850 sm:h-10 sm:w-10;
   }
 
-  /* --- Formularios --- */
+  /* --- Formularios ---
+     16px en móvil para que iOS no haga zoom al enfocar; 14px desde sm. */
   .input {
-    @apply w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-olo-500 focus:outline-none focus:ring-1 focus:ring-olo-500 dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:text-slate-100 dark:placeholder:text-slate-500;
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-ink shadow-inner-soft transition placeholder:text-slate-400 hover:border-slate-300 focus:border-olo-500 focus:outline-none focus:ring-4 focus:ring-olo-500/15 dark:border-olo-dark-800 dark:bg-olo-dark-850 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-olo-dark-700 dark:focus:border-olo-400 dark:focus:ring-olo-400/15 sm:py-2 sm:text-sm;
+  }
+  select.input {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%2364748b' stroke-linecap='round' stroke-width='2' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.85rem center;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300;
+    @apply mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300;
   }
 
   /* --- Superficies --- */
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-card dark:border-olo-dark-800 dark:bg-olo-dark-900;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card dark:border-olo-dark-800 dark:bg-olo-dark-900;
+  }
+  /* Tarjeta interactiva: se eleva al pasar el ratón / al pulsar */
+  .card-interactive {
+    @apply card transition duration-300 ease-out-expo hover:-translate-y-0.5 hover:border-slate-300/80 hover:shadow-card-hover active:translate-y-0 active:scale-[0.99] dark:hover:border-olo-dark-700;
   }
   .badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .chip {
+    @apply inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-600 transition hover:border-olo-300 hover:text-olo-700 active:scale-95 dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:text-slate-300 dark:hover:border-olo-500/50 dark:hover:text-olo-300;
+  }
+  .chip-active {
+    @apply border-olo-500 bg-olo-50 text-olo-700 dark:border-olo-400/60 dark:bg-olo-500/15 dark:text-olo-300;
+  }
+
+  /* --- Tipografía de página --- */
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl;
+  }
+  .page-subtitle {
+    @apply mt-1 text-sm text-slate-500 dark:text-slate-400 sm:text-base;
+  }
+  .section-title {
+    @apply text-base font-semibold text-slate-800 dark:text-slate-100 sm:text-lg;
+  }
+
+  /* --- Esqueleto de carga con brillo --- */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-slate-200/70 dark:bg-olo-dark-800;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/5;
+    content: '';
   }
 }

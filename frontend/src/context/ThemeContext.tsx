@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { APP_BG, syncStatusBar } from '../lib/native';
 
 type Theme = 'light' | 'dark';
 
@@ -20,11 +21,18 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/** Aplica/quita la clase `dark` en <html> y ajusta color-scheme nativo. */
+/**
+ * Aplica/quita la clase `dark` en <html>, ajusta color-scheme nativo y el color
+ * de la barra del navegador / estado de Android para que siga al tema elegido.
+ */
 function applyThemeClass(theme: Theme) {
   const root = document.documentElement;
   root.classList.toggle('dark', theme === 'dark');
   root.style.colorScheme = theme;
+  document
+    .querySelectorAll('meta[name="theme-color"]')
+    .forEach((m) => m.setAttribute('content', APP_BG[theme]));
+  void syncStatusBar(theme);
 }
 
 /** Tema actual según el DOM (lo fija el script anti-FOUC de index.html). */

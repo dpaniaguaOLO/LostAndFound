@@ -1,15 +1,17 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS } from '../lib/format';
 import { aiService } from '../services/ai';
+import { OliviaAvatar } from './OliviaAvatar';
 
 interface Msg {
   role: 'user' | 'assistant';
   text: string;
   found?: FoundItem[];
   lost?: LostReport[];
+  error?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -18,21 +20,41 @@ const SUGGESTIONS = [
   '¿Qué se encontró esta semana?',
 ];
 
+const WELCOME =
+  'Hola, soy Olivia 👋 tu asistente aquí en OLO. Pregúntame por objetos encontrados o ' +
+  'perdidos, por ejemplo: «¿se han encontrado botellas hoy?» y te ayudo a buscarlos.';
+
+// Debe coincidir con MAX_QUERY del servidor (supabase/functions/api).
+const MAX_QUESTION = 300;
+
 /**
- * Asistente de búsqueda (sin LLM): botón flotante que abre un panel de chat.
- * Interpreta preguntas frecuentes y responde con datos reales de la app.
+ * Olivia: la asistente de Lost & Found (OLO). Botón flotante que abre un panel
+ * de chat (hoja a pantalla completa en móvil). Responde con datos reales de la
+ * app (vía LLM, con respaldo clásico).
  */
 export function Assistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: 'assistant',
-      text: 'Hola, soy el asistente de Lost & Found. Pregúntame por objetos encontrados o perdidos, por ejemplo: “¿se han encontrado botellas hoy?”.',
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([{ role: 'assistant', text: WELCOME }]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Desplaza al final cuando llega un mensaje o empieza/termina la carga.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading, open]);
+
+  // Al abrir: foco en el campo (solo con puntero fino, para no sacar el teclado
+  // en móvil sin que el usuario lo pida) y cierre con Escape.
+  useEffect(() => {
+    if (!open) return;
+    if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -44,25 +66,15 @@ export function Assistant() {
       const res = await aiService.assistant(q);
       setMessages((m) => [
         ...m,
-        {
-          role: 'assistant',
-          text: res.answer,
-          found: res.foundItems,
-          lost: res.lostReports,
-        },
+        { role: 'assistant', text: res.answer, found: res.foundItems, lost: res.lostReports },
       ]);
     } catch (err) {
       setMessages((m) => [
         ...m,
-        {
-          role: 'assistant',
-          text: getErrorMessage(err, 'No pude procesar la pregunta.'),
-        },
+        { role: 'assistant', text: getErrorMessage(err, 'No pude procesar la pregunta.'), error: true },
       ]);
     } finally {
       setLoading(false);
-      // Desplaza al final tras renderizar.
-      setTimeout(() => scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight), 50);
     }
   }
 
@@ -73,119 +85,190 @@ export function Assistant() {
 
   return (
     <>
-      {/* Botón flotante */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-olo-600 text-white shadow-lg transition hover:bg-olo-700 dark:bg-olo-500 dark:text-slate-950 dark:hover:bg-olo-400"
-        aria-label={open ? 'Cerrar asistente' : 'Abrir asistente de búsqueda'}
-      >
-        {open ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M12 3c4.97 0 9 3.36 9 7.5S16.97 18 12 18c-.7 0-1.38-.07-2.03-.2L5 19l1.1-3.3C4.78 14.4 3 12.6 3 10.5 3 6.36 7.03 3 12 3Z"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
+      {/* Botón flotante: sobre la barra inferior en móvil; etiqueta visible en sm+ */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="group fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex animate-scale-in items-center gap-2 rounded-full md:bottom-6 md:right-6"
+          aria-label="Hablar con Olivia, la asistente"
+        >
+          <span className="hidden rounded-full bg-white/95 px-4 py-2.5 text-sm font-semibold text-olo-700 shadow-elevated ring-1 ring-slate-200/80 backdrop-blur transition duration-300 ease-out-expo group-hover:-translate-x-1 dark:bg-olo-dark-900/95 dark:text-olo-300 dark:ring-olo-dark-800 sm:inline-block">
+            Pregunta a Olivia
+          </span>
+          <span className="relative flex h-14 w-14 items-center justify-center sm:h-16 sm:w-16">
+            {/* Halo suave (3 pulsos para llamar la atención, sin distraer después) */}
+            <span className="absolute inset-0 rounded-full bg-olo-500/50 opacity-0 animate-soft-pulse" aria-hidden />
+            <OliviaAvatar
+              decorative
+              className="relative h-full w-full rounded-full shadow-glow-lg ring-[3px] ring-white transition duration-300 ease-out-expo group-hover:scale-105 group-active:scale-95 dark:ring-olo-dark-900"
             />
-            <path d="M9 10h6M9 13h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        )}
-      </button>
+            {/* Punto de "disponible" */}
+            <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 dark:border-olo-dark-900" aria-hidden />
+          </span>
+        </button>
+      )}
 
-      {/* Panel */}
       {open && (
-        <div className="card fixed bottom-20 right-4 z-40 flex h-[32rem] w-[22rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0">
-          <div className="flex items-center gap-2 border-b border-slate-200 bg-olo-600 px-4 py-3 text-white dark:border-olo-dark-800 dark:bg-olo-500 dark:text-slate-950">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3Z" fill="currentColor" />
-            </svg>
-            <div>
-              <p className="text-sm font-semibold leading-none">Asistente de búsqueda</p>
-              <p className="text-[11px] opacity-90">Responde con datos de la app</p>
+        <>
+          {/* Fondo atenuado solo en móvil (en escritorio el panel convive con la página) */}
+          <div className="fixed inset-0 z-40 animate-fade-in bg-slate-950/40 backdrop-blur-sm sm:hidden" onClick={() => setOpen(false)} aria-hidden />
+
+          <section
+            role="dialog"
+            aria-label="Chat con Olivia"
+            className="fixed inset-x-0 bottom-0 z-50 flex h-[88dvh] animate-slide-up flex-col overflow-hidden rounded-t-3xl border border-slate-200/80 bg-white shadow-elevated dark:border-olo-dark-800 dark:bg-olo-dark-900 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[min(36rem,calc(100dvh-7rem))] sm:w-[24rem] sm:origin-bottom-right sm:animate-scale-in sm:rounded-3xl"
+          >
+            {/* Cabecera */}
+            <header className="relative flex items-center gap-3 bg-gradient-to-br from-olo-500 to-olo-700 px-4 py-3.5 text-white">
+              <div className="relative">
+                <OliviaAvatar decorative className="h-10 w-10 shrink-0 rounded-full ring-2 ring-white/40" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-olo-600 bg-emerald-300" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold leading-tight">Olivia</p>
+                <p className="text-xs text-white/80">{loading ? 'Escribiendo…' : 'Asistente de OLO · en línea'}</p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 active:scale-90"
+                aria-label="Cerrar chat"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </header>
+
+            {/* Conversación */}
+            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/60 p-4 dark:bg-olo-dark-950/40" aria-live="polite">
+              {messages.map((m, i) =>
+                m.role === 'user' ? (
+                  <div key={i} className="flex animate-fade-up justify-end">
+                    <p className="max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-olo-500 to-olo-600 px-3.5 py-2.5 text-sm text-white shadow-glow dark:text-slate-950">
+                      {m.text}
+                    </p>
+                  </div>
+                ) : (
+                  <div key={i} className="flex animate-fade-up items-start gap-2">
+                    <OliviaAvatar decorative className="mt-0.5 h-7 w-7 shrink-0" />
+                    <div className="min-w-0 max-w-[88%] flex-1">
+                      <p
+                        className={
+                          'inline-block rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed shadow-card ' +
+                          (m.error
+                            ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
+                            : 'bg-white text-slate-700 dark:bg-olo-dark-850 dark:text-slate-200')
+                        }
+                      >
+                        {m.text}
+                      </p>
+                      {/* Resultados enlazados */}
+                      {(m.found?.length || m.lost?.length) ? (
+                        <ul className="mt-2 space-y-1.5">
+                          {m.found?.map((it) => (
+                            <li key={it.id}>
+                              <Link
+                                to={`/objetos/${it.id}`}
+                                onClick={() => setOpen(false)}
+                                className="group flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 transition hover:border-olo-300 hover:shadow-card active:scale-[0.98] dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:hover:border-olo-500/50"
+                              >
+                                <ResultThumb src={it.imageUrl} />
+                                <ResultText title={it.title} meta={`${CATEGORY_LABELS[it.category]} · ${it.location}`} />
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-olo-500">
+                                  <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                              </Link>
+                            </li>
+                          ))}
+                          {m.lost?.map((it) => (
+                            <li key={it.id} className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 dark:border-olo-dark-800 dark:bg-olo-dark-900">
+                              <ResultThumb src={it.imageUrl} />
+                              <ResultText title={it.title} meta={`${CATEGORY_LABELS[it.category]}${it.location ? ` · ${it.location}` : ''}`} />
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
+                ),
+              )}
+
+              {/* Indicador "escribiendo" */}
+              {loading && (
+                <div className="flex animate-fade-in items-start gap-2" role="status" aria-label="Olivia está escribiendo">
+                  <OliviaAvatar decorative className="mt-0.5 h-7 w-7 shrink-0" />
+                  <div className="flex gap-1 rounded-2xl rounded-tl-md bg-white px-4 py-3.5 shadow-card dark:bg-olo-dark-850">
+                    {[0, 150, 300].map((d) => (
+                      <span key={d} className="h-2 w-2 animate-typing-dot rounded-full bg-olo-500" style={{ animationDelay: `${d}ms` }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sugerencias iniciales */}
+              {messages.length === 1 && !loading && (
+                <div className="flex flex-col items-start gap-2 pl-9">
+                  {SUGGESTIONS.map((s, i) => (
+                    <button
+                      key={s}
+                      onClick={() => ask(s)}
+                      className="chip animate-fade-up text-left"
+                      style={{ animationDelay: `${150 + i * 70}ms` }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
-            {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                <div
-                  className={
-                    'max-w-[85%] rounded-2xl px-3 py-2 text-sm ' +
-                    (m.role === 'user'
-                      ? 'bg-olo-600 text-white dark:bg-olo-500 dark:text-slate-950'
-                      : 'bg-slate-100 text-slate-700 dark:bg-olo-dark-800 dark:text-slate-200')
-                  }
-                >
-                  <p>{m.text}</p>
-                  {/* Resultados enlazados */}
-                  {(m.found?.length || m.lost?.length) ? (
-                    <ul className="mt-2 space-y-1">
-                      {m.found?.map((it) => (
-                        <li key={it.id}>
-                          <Link
-                            to={`/objetos/${it.id}`}
-                            onClick={() => setOpen(false)}
-                            className="block rounded-lg bg-white/70 px-2 py-1 text-xs text-slate-700 hover:bg-white dark:bg-olo-dark-900 dark:text-slate-200"
-                          >
-                            {it.title} · {CATEGORY_LABELS[it.category]} · {it.location}
-                          </Link>
-                        </li>
-                      ))}
-                      {m.lost?.map((it) => (
-                        <li
-                          key={it.id}
-                          className="rounded-lg bg-white/70 px-2 py-1 text-xs text-slate-700 dark:bg-olo-dark-900 dark:text-slate-200"
-                        >
-                          {it.title} · {CATEGORY_LABELS[it.category]} · {it.location}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-500 dark:bg-olo-dark-800 dark:text-slate-400">
-                  Buscando…
-                </div>
-              </div>
-            )}
-
-            {/* Sugerencias iniciales */}
-            {messages.length === 1 && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {SUGGESTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => ask(s)}
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:border-olo-400 hover:text-olo-700 dark:border-olo-dark-800 dark:text-slate-300 dark:hover:text-olo-300"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={onSubmit} className="flex gap-2 border-t border-slate-200 p-3 dark:border-olo-dark-800">
-            <input
-              className="input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu pregunta…"
-              aria-label="Pregunta al asistente"
-            />
-            <button type="submit" className="btn-primary" disabled={loading}>
-              Enviar
-            </button>
-          </form>
-        </div>
+            {/* Entrada */}
+            <form onSubmit={onSubmit} className="flex items-center gap-2 border-t border-slate-200/80 bg-white p-3 safe-bottom dark:border-olo-dark-800 dark:bg-olo-dark-900">
+              <input
+                ref={inputRef}
+                className="input rounded-full"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Escribe tu pregunta…"
+                aria-label="Pregunta para Olivia"
+                maxLength={MAX_QUESTION}
+                enterKeyHint="send"
+              />
+              <button
+                type="submit"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-500 to-olo-600 text-white shadow-glow transition hover:shadow-glow-lg active:scale-90 disabled:opacity-50 disabled:shadow-none dark:text-slate-950"
+                disabled={loading || input.trim().length < 2}
+                aria-label="Enviar pregunta"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </form>
+          </section>
+        </>
       )}
     </>
+  );
+}
+
+function ResultThumb({ src }: { src: string | null }) {
+  return src ? (
+    <img src={src} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" loading="lazy" />
+  ) : (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-olo-50 text-olo-500 dark:bg-olo-500/10" aria-hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Zm0 0 8 4.5m0 0 8-4.5M12 13v7" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
+function ResultText({ title, meta }: { title: string; meta: string }) {
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</span>
+      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{meta}</span>
+    </span>
   );
 }

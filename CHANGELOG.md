@@ -1,5 +1,112 @@
 # Changelog
 
+## [0.22.0] - 2026-10-21
+
+Revisión del asistente con LLM (Olivia) y rediseño mobile first de toda la interfaz. (Claude)
+
+### Corregido
+- **"Hoy" en el asistente**: las Edge Functions corren en UTC, así que "hoy" empezaba a las
+  18:00 del día anterior en Costa Rica. Nuevo `supabase/functions/_shared/time.ts` calcula el
+  inicio del día en `APP_TIMEZONE` (por defecto `America/Costa_Rica`).
+- **Fecha al publicar**: `new Date("YYYY-MM-DD")` se interpretaba como medianoche UTC y el
+  objeto se guardaba/mostraba con el día anterior; y el máximo del selector de fecha usaba
+  la fecha UTC (de noche permitía "mañana"). Ahora se usa la fecha local.
+- El asistente mostraba reportes perdidos `RESOLVED`/`CLOSED`; ahora solo `OPEN`/`MATCHED`
+  (igual que el muro).
+- "Reintentar" en el muro no volvía a cargar tras un error.
+- Las credenciales demo de la pantalla de login solo se muestran en desarrollo (no en el APK).
+
+### Mejorado (LLM)
+- **Relevancia**: se leen hasta 40 candidatos y se priorizan los que contienen las palabras
+  de la pregunta ("botellas" ya no devuelve todo lo de la categoría Otros); tarjetas y
+  respuesta del LLM coinciden.
+- **Prompt endurecido**: pregunta y objetos se envían como JSON de datos, con instrucción de
+  no seguir órdenes incrustadas (inyección de prompt) y se incluye la fecha de hoy.
+- Timeout 12 s → 8 s, respuesta acotada a 700 caracteres, logs de error recortados, modelo
+  configurable con el secret `OPENAI_MODEL`.
+- **Tope de coste**: además de 30/min, el asistente admite 120 preguntas/hora por usuario.
+
+### Cambiado (diseño)
+- **Mobile first**: barra de navegación inferior en móvil con "Publicar" destacado y hoja de
+  perfil; cabecera translúcida con sombra al hacer scroll; objetivos táctiles de 44 px;
+  inputs a 16 px en móvil (iOS no hace zoom); modales como hoja inferior.
+- **Sistema visual**: sombras en capas con tinte de marca, halo verde en acciones
+  principales, degradados, radios más amplios, chips de categoría deslizables, insignias de
+  estado con punto, tarjetas que se elevan al pasar el ratón.
+- **Animaciones**: entrada de página, aparición escalonada de tarjetas, esqueletos de carga
+  con brillo, toasts animados (arriba en móvil), indicador "escribiendo" de Olivia. Todo
+  respeta `prefers-reduced-motion`.
+- **Olivia**: chat a pantalla completa en móvil, miniaturas en los resultados, botón de
+  envío circular; el halo del botón ya no parpadea indefinidamente.
+- Panel admin: usuarios en tarjetas en móvil (la tabla no cabía), métricas rediseñadas.
+- Barra de estado de Android y `theme-color` siguen al tema claro/oscuro.
+- Open Sans se carga con `<link>` + preconnect en vez de `@import` (no bloquea el render).
+
+---
+
+## [0.21.2] - 2026-10-20
+
+### Cambiado
+- **Botón de Olivia más visible**: avatar más grande, halo animado, sombra y anillo que
+  resaltan, etiqueta "Pregunta a Olivia" al lado (se oculta al abrir el chat) y punto de
+  "disponible". Invita más claramente a usar el asistente.
+
+---
+
+## [0.21.1] - 2026-10-20
+
+### Cambiado
+- **Avatar de Olivia rediseñado como robot** (antena, visor y ojos que brillan en verde
+  menta sobre el verde de marca OLO). Reemplaza la carita humana anterior, que resultaba
+  menos clara como asistente. Solo cambia el SVG; nombre, voz y comportamiento intactos.
+
+---
+
+## [0.21.0] - 2026-10-20
+
+Olivia: identidad del asistente, y se retira la barra de búsqueda inteligente.
+
+### Añadido
+- **Olivia**, la asistente de OLO: nombre, avatar propio (SVG en el verde de marca,
+  `components/OliviaAvatar.tsx`) y voz cálida en primera persona. Aparece en el botón
+  flotante, la cabecera del chat y junto a cada respuesta. El prompt del LLM se ajustó para
+  que responda como Olivia.
+
+### Cambiado / Eliminado
+- **Se quita la barra de "Búsqueda inteligente"** del muro: Olivia cubre esa función. Se
+  elimina el componente `SmartSearch`.
+
+### Notas
+- Requiere redesplegar la Edge Function (hecho) para el nuevo prompt.
+- Versión de desarrollo (sin APK).
+
+---
+
+## [0.20.0] - 2026-10-20
+
+Asistente con LLM (Fase 1, solo lectura) — rama `feature/llm`.
+
+### Añadido
+- **Asistente potenciado por OpenAI** (`gpt-4o-mini`). El backend filtra por permisos los
+  objetos que el usuario puede ver y el LLM redacta una respuesta en lenguaje natural sobre
+  ese extracto. No accede a la base ni ejecuta acciones (solo lectura).
+  - Cliente aislado en `supabase/functions/_shared/llm.ts`; integrado en el endpoint
+    `POST /ai/assistant` de la Edge Function `api`.
+  - La API key vive solo en el servidor (secret `OPENAI_API_KEY`); nunca en el cliente.
+    Solo se envía texto (nunca fotos).
+- **Fallback automático**: si no hay clave, o el LLM falla o tarda, el asistente usa el motor
+  de palabras clave anterior (la app nunca se rompe por el LLM).
+- Documentación: `docs/LLM.md`.
+
+### Notas
+- Verificado end-to-end contra Supabase real: el asistente responde con lenguaje natural
+  usando datos reales; sin clave cae al motor clásico.
+- Requiere `supabase secrets set OPENAI_API_KEY=...` y `supabase functions deploy api`.
+- Fase 2 (acciones via function calling) pendiente.
+- Versión de desarrollo (sin APK).
+
+---
+
 ## [0.19.0] - 2026-10-20
 
 Desactivación de colaboradores por el administrador (en vez de borrado, para conservar el

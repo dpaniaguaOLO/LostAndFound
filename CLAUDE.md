@@ -361,7 +361,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.17.0 (ver `VERSION`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
+- **Versión**: 0.22.0 (ver `VERSION`). 0.22.0: revisión del LLM (Olivia) + rediseño mobile
+  first (barra inferior en móvil, tokens de sombra/animación en `tailwind.config.js`,
+  componentes `PageHeader`/`Modal`/esqueletos en `components/ui.tsx`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
   auditoría de seguridad completa (20 medidas, `docs/SECURITY.md`). Ambas de Claude. Rama `feature/supabase-android`: Supabase Fases 1 y 2
   completas (CRUD/auth/storage + IA/admin en Edge Functions) y Android (Capacitor) preparado.
   La rama `main` iba por 0.10.1.
@@ -434,3 +436,10 @@ Antes de cada commit: revisar cambios, verificar que no hay secretos, compilar/p
 actualizar documentación afectada (`CHANGELOG.md`, `docs/DEVELOPMENT_STATUS.md`,
 `VERSION` si cambia) y revisar `git status`. No hacer push ni operaciones destructivas sin
 autorización.
+
+**Versiones de producción (APK):** toda versión para la que se **genere un APK** se considera
+de **producción**. Al generar el APK: subir la versión (`VERSION` + `CHANGELOG.md`), dejar
+constancia de que es un build de producción (p. ej. etiqueta/sección "Producción" en el
+changelog) y, antes de distribuirlo, cumplir los requisitos de producción (anon key rotada,
+configuración de Auth revisada, firma de release del APK). Las versiones sin APK son de
+desarrollo.
