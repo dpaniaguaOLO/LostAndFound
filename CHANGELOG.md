@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.1] - 2026-10-21 — APK de prueba (debug)
+
+### Cambiado
+- **Icono de la app con la marca OLO** (antes era el genérico de Capacitor): fondo en
+  degradado verde de marca con el logotipo OLO en blanco y el bloque en verde oscuro.
+  Icono adaptativo (capas `ic_launcher_background/foreground`), iconos de legado
+  cuadrado/redondo y capa **monocroma** para los iconos temáticos de Android 13+.
+- **Pantalla de carga (splash)** con el mismo estilo: degradado verde y logotipo OLO. En
+  Android 12+ se usa la API de splash nativa (fondo `#00A785` + logotipo).
+- APK `versionName 0.23.1` / `versionCode 2301`. (Claude)
+
+---
+
 ## [0.23.0] - 2026-10-21 — APK de prueba (debug)
 
 Olivia con personalidad y conversación. (Claude)

@@ -16,7 +16,12 @@
     </style>
 
 
+    <!-- Splash: Android < 12 usa la imagen @drawable/splash; Android 12+ usa el
+         fondo verde OLO con el logotipo del icono (capa frontal) centrado. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

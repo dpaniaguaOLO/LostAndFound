@@ -361,8 +361,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.23.0 (ver `VERSION`). 0.23.0: Olivia conversa (personalidad, guía de la
-  app, límites de tema, memoria corta); APK debug. 0.22.0: 0.22.0: revisión del LLM (Olivia) + rediseño mobile
+- **Versión**: 0.23.1 (ver `VERSION`). 0.23.1: icono y splash de Android con la marca OLO
+  (opción "verde OLO"). 0.23.0: Olivia conversa (personalidad, guía de la
+  app, límites de tema, memoria corta); APK debug. 0.22.0: revisión del LLM (Olivia) + rediseño mobile
   first (barra inferior en móvil, tokens de sombra/animación en `tailwind.config.js`,
   componentes `PageHeader`/`Modal`/esqueletos en `components/ui.tsx`). 0.16.0: revisión de seguridad/robustez; 0.17.0:
   auditoría de seguridad completa (20 medidas, `docs/SECURITY.md`). Ambas de Claude. Rama `feature/supabase-android`: Supabase Fases 1 y 2

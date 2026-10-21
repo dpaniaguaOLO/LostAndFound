@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Verde de marca OLO (fondo del splash en Android 12+). -->
+    <color name="ic_launcher_background">#00A785</color>
 </resources>
