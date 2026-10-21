@@ -66,6 +66,20 @@ export function WallPage() {
     };
   }, [tab, debouncedSearch, filters.category, debouncedLocation, page, reload]);
 
+  // Al volver a la app (o a la pestaña) tras un rato, recargar: puede haber
+  // objetos nuevos. Como mucho una vez por minuto.
+  useEffect(() => {
+    let last = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - last > 60_000) {
+        last = Date.now();
+        setReload((n) => n + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   function goToPage(next: number) {
     setPage(next);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -100,7 +114,9 @@ export function WallPage() {
 
       <Filters value={filters} onChange={setFilters} />
 
-      {loading ? (
+      {/* Esqueleto solo en la primera carga; al refrescar se mantienen los
+          resultados (atenuados) para no hacer "parpadear" la lista. */}
+      {loading && !result ? (
         <CardGridSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={() => setReload((n) => n + 1)} />
@@ -118,7 +134,10 @@ export function WallPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+          <div
+            className={'grid grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 ' + (loading ? 'opacity-60' : '')}
+            aria-busy={loading}
+          >
             {tab === 'found'
               ? (result.data as FoundItem[]).map((item, i) => (
                   <div key={item.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>

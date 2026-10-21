@@ -71,6 +71,20 @@ export function formatDate(iso: string): string {
   });
 }
 
+/**
+ * Fecha relativa corta para listas ("Hoy", "Ayer", "Hace 3 días"); a partir de
+ * una semana, la fecha normal. Compara días de calendario locales, no horas.
+ */
+export function formatRelativeDay(iso: string): string {
+  const d = new Date(iso);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(d)) / 86_400_000);
+  if (days <= 0) return 'Hoy';
+  if (days === 1) return 'Ayer';
+  if (days < 7) return `Hace ${days} días`;
+  return formatDate(iso);
+}
+
 /** Fecha local de hoy (o de `d`) como YYYY-MM-DD, para inputs type="date". */
 export function localDateString(d: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');

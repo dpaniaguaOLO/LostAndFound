@@ -106,7 +106,7 @@ export function NotificationsPage() {
                 className={
                   'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ' +
                   (n.read
-                    ? 'bg-slate-100 text-slate-400 dark:bg-olo-dark-850 dark:text-slate-500'
+                    ? 'bg-slate-100 text-slate-500 dark:bg-olo-dark-850 dark:text-slate-500'
                     : 'bg-olo-100 text-olo-700 dark:bg-olo-500/15 dark:text-olo-300')
                 }
                 aria-hidden
@@ -124,7 +124,7 @@ export function NotificationsPage() {
                 </span>
                 <span className="mt-0.5 block text-sm text-slate-600 dark:text-slate-400">{n.body}</span>
                 <span className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(n.createdAt)}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(n.createdAt)}</span>
                   {targetOf(n) && (
                     <span className="text-xs font-semibold text-olo-700 dark:text-olo-400">{actionLabel(n)} →</span>
                   )}

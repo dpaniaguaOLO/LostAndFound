@@ -141,7 +141,7 @@ export function ClaimsPage() {
                       )}
                       <StatusBadge status={claim.status} label={CLAIM_STATUS_LABELS[claim.status]} />
                     </div>
-                    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-400 dark:text-slate-500">
+                    <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500 dark:text-slate-400">
                       {incoming ? (
                         <>
                           <span className="font-semibold text-slate-600 dark:text-slate-300">{claim.claimant.name}</span>·

@@ -16,12 +16,18 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   // Background behind the web view (matches the OLO dark neutral surface).
   backgroundColor: '#0b0e12',
+  android: {
+    // Never allow chrome://inspect on the WebView, even in debug-signed APKs
+    // (it would expose the Supabase session token stored in localStorage).
+    webContentsDebuggingEnabled: false,
+  },
   plugins: {
     StatusBar: {
       // Let the app draw behind the status bar so safe-area insets apply.
       overlaysWebView: false,
-      style: 'DARK',
-      backgroundColor: '#00a785',
+      // Initial look; lib/native.ts then follows the app theme (light/dark).
+      style: 'LIGHT',
+      backgroundColor: '#f8fafc',
     },
     Keyboard: {
       resizeOnFullScreen: true,

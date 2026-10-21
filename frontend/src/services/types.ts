@@ -37,6 +37,8 @@ export interface FoundItemsService {
   get(id: string): Promise<FoundItem>;
   mine(): Promise<FoundItem[]>;
   create(form: FormData): Promise<FoundItem>;
+  /** Editar (autor o admin). Mismos campos que `create`; `removeImage=1` quita la foto. */
+  update(id: string, form: FormData): Promise<FoundItem>;
   markReturned(id: string): Promise<FoundItem>;
   archive(id: string): Promise<FoundItem>;
   remove(id: string): Promise<void>;
@@ -47,6 +49,8 @@ export interface LostReportsService {
   get(id: string): Promise<LostReport>;
   mine(): Promise<LostReport[]>;
   create(form: FormData): Promise<LostReport>;
+  /** Editar (autor o admin). Mismos campos que `create`; `removeImage=1` quita la foto. */
+  update(id: string, form: FormData): Promise<LostReport>;
   /** El dueño indica que ya recuperó su objeto (→ RESOLVED). */
   resolve(id: string): Promise<LostReport>;
   /** Cierra un reporte perdido (equivalente a "archivar": lo retira pero lo conserva). */

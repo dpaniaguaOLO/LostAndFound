@@ -30,8 +30,12 @@ foundItemsRouter.get(
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (status && FOUND_STATUSES.has(status)) where.status = status;
-    else where.status = { in: ['PUBLISHED', 'CLAIMED'] }; // por defecto, ocultar archivados/devueltos
+    // ARCHIVED (moderado) solo lo lista un admin, como la RLS de Supabase.
+    if (status && FOUND_STATUSES.has(status) && (status !== 'ARCHIVED' || req.auth!.role === 'ADMIN')) {
+      where.status = status;
+    } else {
+      where.status = { in: ['PUBLISHED', 'CLAIMED'] }; // por defecto, ocultar archivados/devueltos
+    }
     if (location) {
       const term = likeSafe(location);
       where.location = term ? { contains: term } : { in: [] };

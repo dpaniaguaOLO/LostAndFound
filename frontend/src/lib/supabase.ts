@@ -16,7 +16,9 @@ if (config.supabase.configured) {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // false: la app no usa OAuth ni enlaces mágicos. Con true, un enlace con
+      // #access_token=<token de otro> iniciaba sesión con la cuenta del atacante.
+      detectSessionInUrl: false,
       storageKey: 'laf.supabase.auth',
     },
   });

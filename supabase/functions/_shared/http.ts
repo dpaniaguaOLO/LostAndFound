@@ -41,6 +41,8 @@ export async function rateLimit(
   key: string,
   max: number,
   windowSeconds: number,
+  /** true para operaciones con coste (LLM): si el limitador falla, se rechaza. */
+  failClosed = false,
 ): Promise<Response | null> {
   const { data, error } = await sb.rpc('rate_limit_hit', {
     p_key: key,
@@ -49,7 +51,9 @@ export async function rateLimit(
   });
   if (error) {
     console.error('[rate-limit]', error.message);
-    return null;
+    return failClosed
+      ? json({ error: 'UNAVAILABLE', message: 'Servicio no disponible en este momento. Inténtalo más tarde.' }, 503)
+      : null;
   }
   const wait = Number(data) || 0;
   if (wait <= 0) return null;
@@ -88,19 +92,22 @@ export interface Caller {
 
 /**
  * Identifica al llamador por su token y carga su perfil. Devuelve null si no
- * hay sesión válida. Usa el cliente del llamador (sujeto a RLS de profiles).
+ * hay sesión válida o si la cuenta está DESACTIVADA: un JWT emitido antes de la
+ * desactivación (o un login directo contra Auth) no debe servir para nada.
+ * La columna `active` no es legible por `authenticated`, así que el perfil se lee
+ * con service_role tras validar el token.
  */
 export async function getCaller(authHeader: string | null): Promise<Caller | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const sb = callerClient(authHeader);
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) return null;
-  const { data: profile } = await sb
+  const { data: profile } = await adminClient()
     .from('profiles')
-    .select('id, name, role')
+    .select('id, name, role, active')
     .eq('id', data.user.id)
     .single();
-  if (!profile) return null;
+  if (!profile || profile.active === false) return null;
   return {
     id: profile.id as string,
     name: (profile.name as string) ?? '',

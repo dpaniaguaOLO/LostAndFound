@@ -196,6 +196,50 @@ async function uploadPhoto(file: File): Promise<string> {
   return path;
 }
 
+/**
+ * Edición de un objeto/reporte (autor o admin; lo garantizan RLS y los GRANT por
+ * columna). Si cambia la foto, sube la nueva y borra la anterior de Storage
+ * (best-effort: si el borrado falla, solo queda un archivo huérfano).
+ */
+async function updateItem(table: 'found_items' | 'lost_reports', id: string, form: FormData) {
+  const sb = requireSupabase();
+  const f = readItemForm(form);
+  const { data: current, error: readErr } = await sb.from(table).select('image_path').eq('id', id).single();
+  if (readErr) throw readErr;
+  const oldPath = (current?.image_path as string | null) ?? null;
+
+  const patch: Record<string, unknown> = {
+    title: f.title,
+    description: f.description,
+    category: f.category,
+    location: f.location,
+  };
+  const date = table === 'found_items' ? f.foundAt : f.lostAt;
+  if (date) patch[table === 'found_items' ? 'found_at' : 'lost_at'] = date;
+  if (f.image) patch.image_path = await uploadPhoto(f.image);
+  else if (form.get('removeImage') === '1') patch.image_path = null;
+
+  const { data, error } = await sb.from(table).update(patch).eq('id', id).select(REPORTER_SELECT).single();
+  if (error) throw error;
+  if (oldPath && 'image_path' in patch && patch.image_path !== oldPath) {
+    void sb.storage.from(PHOTO_BUCKET).remove([oldPath]).catch(() => undefined);
+  }
+  return data;
+}
+
+/**
+ * Borrado definitivo (solo admin, por RLS) que elimina también la foto de Storage:
+ * antes quedaba huérfana y seguía siendo legible por cualquier colaborador.
+ */
+async function removeWithPhoto(table: 'found_items' | 'lost_reports', id: string) {
+  const sb = requireSupabase();
+  const { data } = await sb.from(table).select('image_path').eq('id', id).maybeSingle();
+  const { error } = await sb.from(table).delete().eq('id', id);
+  if (error) throw error;
+  const path = (data?.image_path as string | null) ?? null;
+  if (path) void sb.storage.from(PHOTO_BUCKET).remove([path]).catch(() => undefined);
+}
+
 // Extrae los campos del FormData que usan los formularios actuales.
 function readItemForm(form: FormData) {
   return {
@@ -355,6 +399,10 @@ const foundItems: FoundItemsService = {
     return toFoundItem(data);
   },
 
+  async update(id, form) {
+    return toFoundItem(await updateItem('found_items', id, form));
+  },
+
   async markReturned(id) {
     const sb = requireSupabase();
     const { data, error } = await sb
@@ -380,8 +428,7 @@ const foundItems: FoundItemsService = {
   },
 
   async remove(id) {
-    const { error } = await requireSupabase().from('found_items').delete().eq('id', id);
-    if (error) throw error;
+    await removeWithPhoto('found_items', id);
   },
 };
 
@@ -454,6 +501,10 @@ const lostReports: LostReportsService = {
     return toLostReport(data);
   },
 
+  async update(id, form) {
+    return toLostReport(await updateItem('lost_reports', id, form));
+  },
+
   async resolve(id) {
     const { data, error } = await requireSupabase()
       .from('lost_reports')
@@ -477,8 +528,7 @@ const lostReports: LostReportsService = {
   },
 
   async remove(id) {
-    const { error } = await requireSupabase().from('lost_reports').delete().eq('id', id);
-    if (error) throw error;
+    await removeWithPhoto('lost_reports', id);
   },
 };
 

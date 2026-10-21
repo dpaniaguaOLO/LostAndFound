@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.25.0] - 2026-10-21
+
+Auditoría de seguridad completa y mejoras de funcionalidad y accesibilidad. (Claude)
+
+> **Despliegue (en este orden):** `supabase db push` (migraciones 009 y 010) →
+> `supabase functions deploy api` → **desactivar el registro abierto en el panel** de
+> Supabase (Authentication → Sign In / Providers) → generar el APK.
+
+### Seguridad (detalle en `docs/SECURITY.md`, "Auditoría 2026-10-21")
+- **Alta**: las cuentas desactivadas ya no tienen acceso (RLS restrictiva, `is_admin()` exige
+  cuenta activa, Edge Function las rechaza, baneo en Auth); no se puede desactivar al
+  último admin activo.
+- **Alta**: registro abierto desactivado (`enable_signup = false`; falta el panel).
+- Reportes de perdido: el autor solo puede marcarlos resueltos (no reabrir lo moderado).
+- Lo archivado/cerrado solo lo ven y editan su autor y los admins; el borrado elimina la foto.
+- El usuario ya no puede cambiarse el nombre (suplantación).
+- APK: WebView no inspeccionable y `debuggable false` también en el build debug.
+- Olivia: filtro de enlaces/correos/credenciales contra inyección de instrucciones; límite
+  del asistente "falla cerrado".
+- `detectSessionInUrl: false`; revocados `TRUNCATE/TRIGGER/REFERENCES`.
+- Las fotos se recomprimen en el dispositivo y **pierden los metadatos EXIF/GPS**.
+
+### Añadido
+- **Editar publicaciones** (autor o admin): `/objetos/:id/editar` y `/perdidos/:id/editar`,
+  con cambio o eliminación de la foto (la anterior se borra de Storage).
+- **Visor de foto a pantalla completa** en los detalles.
+- **Fotos optimizadas antes de subir** (máx. 1600 px, JPEG): las de móvil (4-8 MB) ya no
+  superan el límite de 5 MB; aviso claro si una foto no es válida.
+- Consejos de verificación al publicar (no revelar detalles que solo el dueño sabría).
+- Fechas relativas en las tarjetas ("Hoy", "Ayer", "Hace 3 días").
+- Aviso de **sin conexión** y mensajes de error comprensibles (sin red, sesión caducada…).
+- El muro se actualiza al volver a la app y ya no "parpadea" al refrescar.
+
+### Accesibilidad
+- Contraste WCAG AA en todos los textos secundarios (63 textos pasaban de 2,6:1 a ≥4,5:1).
+- Diálogos con **trampa de foco**, foco inicial y devolución del foco al cerrar.
+- Pestañas navegables con flechas/Inicio/Fin (patrón WAI-ARIA).
+- Título de página por ruta y anuncio de la página a lectores de pantalla.
+
 ## [0.24.0] - 2026-10-21
 
 Revisión a fondo de reclamaciones y notificaciones, y navegación desde coincidencias. (Claude)

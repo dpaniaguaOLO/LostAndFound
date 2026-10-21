@@ -30,8 +30,12 @@ lostReportsRouter.get(
 
     const where: Record<string, unknown> = {};
     if (category) where.category = category;
-    if (status && LOST_STATUSES.has(status)) where.status = status;
-    else where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
+    // CLOSED (moderado) solo lo lista un admin, como la RLS de Supabase.
+    if (status && LOST_STATUSES.has(status) && (status !== 'CLOSED' || req.auth!.role === 'ADMIN')) {
+      where.status = status;
+    } else {
+      where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
+    }
     if (location) {
       const term = likeSafe(location);
       where.location = term ? { contains: term } : { in: [] };

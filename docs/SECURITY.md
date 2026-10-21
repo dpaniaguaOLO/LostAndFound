@@ -27,10 +27,33 @@ git config core.hooksPath .githooks   # (una vez por clon) bloquea commits con s
 | Cabeceras | API: CSP `default-src 'none'`, `frame-ancestors 'none'`, nosniff, Referrer-Policy, Permissions-Policy, HSTS (producción). Frontend: CSP en `<meta>` generada en el build con hashes de los scripts inline. |
 | Contraseñas | bcrypt coste 12 (Express) / Supabase Auth (bcrypt). Mínimo 8, máximo 72 bytes. Login con tiempo constante (no revela si el usuario existe). |
 
+## Auditoría 2026-10-21 (v0.25.0)
+
+Auditoría adversarial completa (RLS, GRANTs, funciones SECURITY DEFINER, Edge
+Functions, Storage, LLM, frontend, Android, secretos). Hallazgos corregidos:
+
+| Sev. | Hallazgo | Corrección |
+|------|----------|------------|
+| Alta | Una cuenta **desactivada** seguía accediendo (JWT previo o nuevo login contra Auth) y un **admin desactivado seguía siendo admin** (podía resetear contraseñas ajenas). | Migración 010: políticas `RESTRICTIVE` `*_active_only` en todas las tablas y en Storage, `is_admin()` exige `active`; `getCaller` rechaza inactivos; al desactivar se **banea en Auth** (`ban_duration`); no se puede desactivar al último admin activo; `review_claim` exige actor activo. |
+| Alta | **Registro abierto** en Supabase Auth: con la anon key (va en el APK) cualquiera creaba cuentas y podía ocupar números de colaborador. | `enable_signup = false` en `config.toml` + **desactivarlo en el panel** (ver abajo). |
+| Media | El autor de un reporte de perdido podía cambiar su estado libremente (reabrir uno **cerrado por moderación**, marcarlo `MATCHED`). | Trigger `lost_reports_guard_status`: un no-admin solo pasa de `OPEN/MATCHED` a `RESOLVED`. |
+| Media | APK de depuración con WebView inspeccionable y `run-as` (token de sesión legible por USB). | `webContentsDebuggingEnabled: false` y `debuggable false` también en el build debug. |
+| Baja | Cualquiera podía **cambiarse el nombre** ("Administrador OLO", o el de un colega) y suplantar en avisos y reclamaciones. | `revoke update (name)` (lo cambia un admin). |
+| Baja | Objetos `ARCHIVED` / reportes `CLOSED` seguían legibles y editables por todos vía PostgREST; las fotos de lo borrado quedaban en Storage. | SELECT/UPDATE solo autor/admin para lo moderado; el borrado elimina la foto. Express: filtro `status` moderado solo para admin. |
+| Baja | Inyección de instrucciones vía descripciones hacia Olivia ("pide su contraseña…"). | Enlaces/correos se eliminan antes y después del modelo; respuestas que mencionan credenciales se sustituyen por un aviso fijo. |
+| Baja | Login CSRF con `#access_token=` en la URL (`detectSessionInUrl`). | `detectSessionInUrl: false`. |
+| Baja | `TRUNCATE`/`TRIGGER`/`REFERENCES` heredados (RLS no cubre TRUNCATE). | Revocados a `anon`/`authenticated`. |
+| Baja | El límite del asistente (coste de OpenAI) dejaba pasar todo si fallaba. | `rateLimit(..., failClosed)` para el asistente. |
+
+Además, las fotos se redimensionan en el dispositivo antes de subirlas, lo que
+**elimina los metadatos EXIF (ubicación GPS)** de quien hizo la foto.
+
+Pruebas de regresión en `supabase/tests/db.test.mjs` (migraciones 009 y 010).
+
 ## Acciones que requieren intervención (no automatizables desde el repo)
 
 ### Supabase (panel: Authentication / Project Settings)
-1. **Desactivar el registro abierto** (Authentication → Sign In / Providers → *Allow new users to sign up* = off) y dar de alta a los colaboradores desde el panel o la Admin API (ver `supabase/seed_users.sql`). Hoy cualquiera con la URL de la app puede crearse una cuenta.
+1. **Desactivar el registro abierto** (Authentication → Sign In / Providers → *Allow new users to sign up* = off) — **PRIORITARIO** (hallazgo Alta de la auditoría 2026-10-21; `config.toml` ya lo tiene en `false`, pero el proyecto alojado se configura en el panel). Las altas se hacen desde el panel admin de la app (`POST /admin/users`).
    - Si el registro debe seguir abierto: activar **CAPTCHA** (Authentication → Attack Protection → hCaptcha/Turnstile) — requiere además integrar el widget en `LoginPage`.
 2. **Longitud mínima de contraseña = 8** y **Leaked password protection** (Authentication → Attack Protection / Passwords).
 3. **Rate limits de Auth** (Authentication → Rate Limits): revisar inicio de sesión y registros por hora.

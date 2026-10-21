@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
     if (limited) return limited;
     // El asistente llama a un LLM de pago: tope horario adicional por usuario.
     if (path === '/ai/assistant') {
-      const hourly = await rateLimit(sb, `assistant:${caller.id}`, 120, 3600);
+      const hourly = await rateLimit(sb, `assistant:${caller.id}`, 120, 3600, true);
       if (hourly) return hourly;
     }
   } else if (method === 'POST' && path === '/claims') {
@@ -609,23 +609,40 @@ Deno.serve(async (req: Request) => {
       }
       const { data: target } = await sb
         .from('profiles')
-        .select('name, employee_id')
+        .select('name, employee_id, role, active')
         .eq('id', targetId)
         .single();
       if (!target) return json({ error: 'NOT_FOUND', message: 'Colaborador no encontrado' }, 404);
+      // Nunca dejar el sistema sin administradores activos.
+      if (!active && target.role === 'ADMIN' && target.active) {
+        const { count } = await sb
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'ADMIN')
+          .eq('active', true);
+        if ((count ?? 0) <= 1) {
+          return json({ error: 'BAD_REQUEST', message: 'No se puede desactivar al último administrador activo' }, 400);
+        }
+      }
+      // Bloqueo también en Supabase Auth: sin esto, el desactivado podía volver a
+      // obtener un token con su contraseña (Auth no conoce `profiles.active`).
+      const { error: banErr } = await sb.auth.admin.updateUserById(targetId, {
+        ban_duration: active ? 'none' : '876000h',
+      });
+      if (banErr) return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el acceso del colaborador' }, 500);
       const { data: updated, error } = await sb
         .from('profiles')
         .update({ active })
         .eq('id', targetId)
         .select('*')
         .single();
-      if (error) return json({ error: 'UPDATE_FAILED', message: error.message }, 500);
+      if (error) return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el colaborador' }, 500);
       // Si se desactiva, revoca sus sesiones activas para que el cierre sea inmediato.
       if (!active) {
         try {
           await sb.rpc('revoke_user_sessions', { p_user_id: targetId });
         } catch (_e) {
-          /* best-effort: el token caduca solo en <=1h si la RPC no existe */
+          /* best-effort: además getCaller y RLS ya rechazan a los inactivos */
         }
       }
       await writeAudit(

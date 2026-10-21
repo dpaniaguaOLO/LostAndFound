@@ -308,7 +308,7 @@ export function AdminPage() {
                       <StatusBadge status={c.status} label={CLAIM_STATUS_LABELS[c.status]} />
                     </div>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{c.message}</p>
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       Reclama: {c.claimant.name} · {formatDateTime(c.createdAt)}
                     </p>
                   </div>
@@ -387,7 +387,7 @@ export function AdminPage() {
                       — {ACTION_LABELS[e.action] ?? e.action}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">{e.summary}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">{formatDateTime(e.createdAt)}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateTime(e.createdAt)}</p>
                   </div>
                 </li>
               ))}

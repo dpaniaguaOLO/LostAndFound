@@ -18,7 +18,7 @@ function Thumb({ src, alt, label }: { src: string | null; alt: string; label: st
       {src ? (
         <img src={src} alt={alt} className="h-20 w-20 rounded-xl object-cover shadow-card" loading="lazy" />
       ) : (
-        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-olo-dark-800 dark:text-slate-600">
+        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-olo-dark-800 dark:text-slate-600">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm2 11 3.5-4 2.5 3 3-4L18 16H6Z"
@@ -27,7 +27,7 @@ function Thumb({ src, alt, label }: { src: string | null; alt: string; label: st
           </svg>
         </div>
       )}
-      <span className="text-center text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+      <span className="text-center text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
       </span>
     </div>

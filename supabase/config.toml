@@ -7,8 +7,11 @@ major_version = 15
 
 [auth]
 # Solo correo/contraseña por ahora (ver SUPABASE_SETUP.md para dominio corporativo).
-# App interna: en producción se recomienda false (alta de usuarios por admin). Ver docs/SECURITY.md.
-enable_signup = true
+# App interna: SIN registro abierto. Las cuentas las crea un admin (POST /admin/users).
+# Con true, cualquiera con la anon key (va en el APK) podía crear cuentas y ocupar
+# números de colaborador. En el proyecto alojado, desactivarlo también en el panel:
+# Authentication > Sign In / Providers > "Allow new users to sign up".
+enable_signup = false
 # Política de contraseñas (alineada con el backend: mínimo 8).
 minimum_password_length = 8
 # Caducidad del access token (s). Al revocar sesiones, el token vigente expira como mucho en este plazo.

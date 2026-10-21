@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <p className="flex-1 pt-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">{t.message}</p>
               <button
                 onClick={() => dismiss(t.id)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-olo-dark-850"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-olo-dark-850"
                 aria-label="Cerrar aviso"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>

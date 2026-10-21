@@ -13,6 +13,7 @@ function lazyPage<K extends string>(load: () => Promise<Record<K, ComponentType>
 }
 const AdminPage = lazyPage(() => import('./pages/AdminPage'), 'AdminPage');
 const ClaimsPage = lazyPage(() => import('./pages/ClaimsPage'), 'ClaimsPage');
+const EditItemPage = lazy(() => import('./pages/EditItemPage').then((m) => ({ default: m.EditItemPage })));
 const FoundItemDetailPage = lazyPage(() => import('./pages/FoundItemDetailPage'), 'FoundItemDetailPage');
 const LostReportDetailPage = lazyPage(() => import('./pages/LostReportDetailPage'), 'LostReportDetailPage');
 const MyThingsPage = lazyPage(() => import('./pages/MyThingsPage'), 'MyThingsPage');
@@ -35,6 +36,8 @@ export const router = createBrowserRouter([
       { index: true, element: <WallPage /> },
       { path: 'objetos/:id', element: page(<FoundItemDetailPage />) },
       { path: 'perdidos/:id', element: page(<LostReportDetailPage />) },
+      { path: 'objetos/:id/editar', element: page(<EditItemPage kind="found" />) },
+      { path: 'perdidos/:id/editar', element: page(<EditItemPage kind="lost" />) },
       { path: 'publicar', element: page(<PublishPage />) },
       { path: 'mis-objetos', element: page(<MyThingsPage />) },
       { path: 'reclamaciones', element: page(<ClaimsPage />) },

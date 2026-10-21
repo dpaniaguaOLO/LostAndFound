@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { LostReport } from '@laf/shared';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { BackButton, ConfirmDialog, DetailGrid, ErrorState, ItemImage, Notice, Spinner, StatusBadge } from '../components/ui';
+import { BackButton, ConfirmDialog, DetailGrid, ErrorState, Notice, Spinner, StatusBadge, ZoomableImage } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -89,7 +89,7 @@ export function LostReportDetailPage() {
 
       <div className="grid gap-5 md:grid-cols-2 md:gap-8">
         <div className="card overflow-hidden md:sticky md:top-24 md:self-start">
-          <ItemImage src={item.imageUrl} alt={item.title} rounded={false} />
+          <ZoomableImage src={item.imageUrl} alt={item.title} />
         </div>
 
         <div className="flex flex-col gap-5">
@@ -108,7 +108,7 @@ export function LostReportDetailPage() {
           />
 
           <div className="card p-4 sm:p-5">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Descripción</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Descripción</h2>
             <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{item.description}</p>
           </div>
 
@@ -130,16 +130,23 @@ export function LostReportDetailPage() {
             </Notice>
           )}
 
-          {isOwner && isActive && (
-            <button className="btn-primary" onClick={() => setConfirmResolve(true)}>
-              Ya lo recuperé
-            </button>
+          {(isOwner || isAdmin) && isActive && (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {isOwner && (
+                <button className="btn-primary" onClick={() => setConfirmResolve(true)}>
+                  Ya lo recuperé
+                </button>
+              )}
+              <Link to={`/perdidos/${item.id}/editar`} className="btn-secondary">
+                Editar
+              </Link>
+            </div>
           )}
 
           {/* Acciones de moderación (solo administradores) */}
           {isAdmin && (
             <div className="rounded-2xl border border-dashed border-slate-300 p-4 dark:border-olo-dark-700">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Administración
               </p>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">

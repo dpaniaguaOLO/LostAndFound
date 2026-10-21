@@ -27,6 +27,22 @@ function Icon({ name, className = 'h-[22px] w-[22px]' }: { name: keyof typeof ic
   );
 }
 
+/** Título legible de cada ruta (pestaña del navegador y anuncio accesible). */
+function pageTitle(pathname: string): string {
+  if (pathname === '/') return 'Muro';
+  if (pathname.endsWith('/editar')) return 'Editar publicación';
+  if (pathname.startsWith('/objetos/')) return 'Objeto encontrado';
+  if (pathname.startsWith('/perdidos/')) return 'Objeto perdido';
+  const map: Record<string, string> = {
+    '/publicar': 'Publicar',
+    '/mis-objetos': 'Mis objetos',
+    '/reclamaciones': 'Reclamaciones',
+    '/notificaciones': 'Notificaciones',
+    '/admin': 'Administración',
+  };
+  return map[pathname] ?? 'Página no encontrada';
+}
+
 // Navegación principal: Muro (todo lo de los colaboradores), Mis objetos
 // (lo mío), Publicar (encontrado o perdido) y Reclamaciones.
 const navItems = [
@@ -66,12 +82,30 @@ export function Layout() {
     };
   }, [pathname]);
 
-  // Cierra menús y vuelve arriba al cambiar de página.
+  // Cierra menús, vuelve arriba y actualiza el título al cambiar de página. El
+  // título también se anuncia a lectores de pantalla (en una SPA no hay recarga).
+  const [announce, setAnnounce] = useState('');
   useEffect(() => {
     setUserMenu(false);
     setSheet(false);
     window.scrollTo({ top: 0 });
+    const title = pageTitle(pathname);
+    document.title = `${title} · Lost & Found OLO`;
+    setAnnounce(title);
   }, [pathname]);
+
+  // Aviso de conexión: en el móvil es fácil quedarse sin red y no saberlo.
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
 
   // Sombra en la cabecera solo cuando hay scroll.
   useEffect(() => {
@@ -113,6 +147,9 @@ export function Layout() {
 
   return (
     <div className="min-h-screen">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {announce}
+      </p>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:shadow-elevated">
         Saltar al contenido
       </a>
@@ -206,6 +243,12 @@ export function Layout() {
           </div>
         </div>
       </header>
+
+      {!online && (
+        <div className="sticky top-14 z-20 animate-slide-down bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200 sm:top-16" role="status">
+          Sin conexión a internet. Los cambios no se guardarán hasta que vuelva la red.
+        </div>
+      )}
 
       {/* Margen inferior en móvil para no quedar bajo la barra de navegación. */}
       <main id="main" className="mx-auto max-w-6xl px-4 pb-32 pt-5 sm:px-6 sm:pt-8 md:pb-16">
@@ -323,7 +366,7 @@ function SheetLink({ to, icon, label, badge = 0 }: { to: string; icon: keyof typ
       {badge > 0 && (
         <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">{badge > 9 ? '9+' : badge}</span>
       )}
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="text-slate-400">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="text-slate-500">
         <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
     </Link>

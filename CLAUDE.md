@@ -320,6 +320,9 @@ prefiere archivar.
   con `sharp` (debe ser realmente una imagen). Si la petición falla, el archivo se borra.
 - **Fuerza bruta**: `POST /auth/login` bloquea 15 min tras 10 fallos por IP + número de
   colaborador (`lib/rateLimit.ts`, en memoria: no se comparte entre instancias).
+- **Cuentas desactivadas** (`profiles.active=false`): sin acceso en la BD (políticas
+  `RESTRICTIVE *_active_only`), `is_admin()` exige `active`, la Edge Function las rechaza en
+  `getCaller` y se banean en Auth. Toda tabla nueva necesita su política `*_active_only`.
 - **Supabase (RLS)**: el cliente no escribe en `claims` (solo la Edge Function `api` con
   `service_role`); un no-admin solo puede pasar su objeto a `RETURNED`; un no-admin no
   puede cambiar `role`, `employee_id` ni `email`; nunca se puede quitar el último ADMIN.
@@ -368,7 +371,10 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.24.0 (ver `VERSION`). 0.24.0: flujo reclamación → entrega completo
+- **Versión**: 0.25.0 (ver `VERSION`). 0.25.0: auditoría de seguridad (migración 010:
+  cuentas inactivas sin acceso, guard de estados en `lost_reports`, moderado solo visible a
+  autor/admin, nombre no editable), editar publicaciones, fotos optimizadas sin EXIF,
+  accesibilidad. Migraciones 009 y 010 **pendientes de `supabase db push`**. 0.24.0: 0.24.0: flujo reclamación → entrega completo
   (migración 009: trigger de devolución, `claims.lost_report_id`), aviso de coincidencia en
   Supabase, navegación desde coincidencias/Olivia. 0.23.1: icono y splash de Android con la marca OLO
   (opción "verde OLO"). 0.23.0: Olivia conversa (personalidad, guía de la

@@ -92,7 +92,10 @@ test('transiciones de estado de objetos para no-admins', async () => {
   const item = await newItem(B);
   assert.ok(await error(() => asUser(B, `update public.found_items set status = 'CLAIMED' where id = $1`, [item])));
   await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
-  assert.ok(await error(() => asUser(B, `update public.found_items set status = 'PUBLISHED' where id = $1`, [item])));
+  // Archivado por un admin: el autor no puede reabrirlo (desde la migración 010 ni
+  // siquiera puede editar la fila: el UPDATE no afecta a nada).
+  await error(() => asUser(B, `update public.found_items set status = 'PUBLISHED' where id = $1`, [item]));
+  assert.equal((await one(`select status from public.found_items where id = $1`, [item])).status, 'ARCHIVED');
   await asServer(`update public.found_items set status = 'PUBLISHED' where id = $1`, [item]);
   await asUser(B, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
   assert.equal((await one(`select status from public.found_items where id = $1`, [item])).status, 'RETURNED');
@@ -105,8 +108,9 @@ test('transiciones de estado de objetos para no-admins', async () => {
 test('perfiles: sin autopromoción, sin cambiar identificadores, siempre queda un admin', async () => {
   assert.ok(await error(() => asUser(B, `update public.profiles set role = 'ADMIN' where id = $1`, [B])));
   assert.ok(await error(() => asUser(B, `update public.profiles set employee_id = '9999' where id = $1`, [B])));
-  await asUser(B, `update public.profiles set name = 'Nombre nuevo' where id = $1`, [B]);
-  assert.equal((await one(`select name from public.profiles where id = $1`, [B])).name, 'Nombre nuevo');
+  // Migración 010: el nombre tampoco es editable por el usuario (anti-suplantación).
+  assert.ok(await error(() => asUser(B, `update public.profiles set name = 'Administrador OLO' where id = $1`, [B])));
+  assert.notEqual((await one(`select name from public.profiles where id = $1`, [B])).name, 'Administrador OLO');
   assert.ok(await error(() => asServer(`update public.profiles set role = 'EMPLOYEE' where id = $1`, [A])), 'último admin');
 });
 
@@ -267,4 +271,54 @@ test('reclamación: el reporte de perdido enlazado debe ser del reclamante', asy
   assert.ok(await error(() => asServer(
     `insert into public.claims (found_item_id, claimant_id, message, lost_report_id) values ($1, $2, 'x', $3)`,
     [item, C, lostOfD])));
+});
+
+
+// --- Migración 010: correcciones de la auditoría de seguridad -----------------
+test('cuenta desactivada: sin acceso a datos y un admin desactivado deja de ser admin', async () => {
+  const E = '00000000-0000-0000-0000-00000000000e';
+  await asServer(`insert into auth.users values ($1, '5005@x', $2)`, [E, { name: 'User 5005', employee_id: '5005' }]);
+  await asServer(`update public.profiles set role = 'ADMIN' where id = $1`, [E]);
+  const item = await newItem(B);
+  assert.equal((await asUser(E, `select public.is_admin() a`)).rows[0].a, true);
+  await asServer(`update public.profiles set active = false where id = $1`, [E]);
+
+  assert.equal((await asUser(E, `select public.is_admin() a`)).rows[0].a, false, 'ya no es admin');
+  assert.equal((await asUser(E, `select id from public.found_items`)).rows.length, 0, 'no lee objetos');
+  assert.ok(await error(() => asUser(E, `insert into public.found_items (title, description, category, found_at, reporter_id)
+                                         values ('x', 'yy', 'OTHER', now(), $1)`, [E])), 'no publica');
+  await asUser(E, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
+  assert.equal((await one(`select status from public.found_items where id = $1`, [item])).status, 'PUBLISHED', 'no modera');
+  assert.equal((await asUser(E, `select id from public.audit_logs`)).rows.length, 0);
+  // Activo de nuevo: recupera el acceso.
+  await asServer(`update public.profiles set active = true where id = $1`, [E]);
+  assert.ok((await asUser(E, `select id from public.found_items`)).rows.length > 0);
+  await asServer(`update public.profiles set role = 'EMPLOYEE' where id = $1`, [E]);
+});
+
+test('reportes de perdido: el autor solo puede marcarlos como resueltos', async () => {
+  const lost = await newLost(C);
+  assert.ok(await error(() => asUser(C, `update public.lost_reports set status = 'MATCHED' where id = $1`, [lost])));
+  await asUser(A, `update public.lost_reports set status = 'CLOSED' where id = $1`, [lost]);
+  // Cerrado por moderación: el autor no puede reabrirlo (ni lo ve como editable).
+  await error(() => asUser(C, `update public.lost_reports set status = 'OPEN' where id = $1`, [lost]));
+  assert.equal((await one(`select status from public.lost_reports where id = $1`, [lost])).status, 'CLOSED');
+  await asServer(`update public.lost_reports set status = 'OPEN' where id = $1`, [lost]);
+  await asUser(C, `update public.lost_reports set status = 'RESOLVED' where id = $1`, [lost]);
+  assert.equal((await one(`select status from public.lost_reports where id = $1`, [lost])).status, 'RESOLVED');
+});
+
+test('lo archivado/cerrado solo lo ven su autor y los admins', async () => {
+  const item = await newItem(B);
+  await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
+  assert.equal((await asUser(D, `select id from public.found_items where id = $1`, [item])).rows.length, 0);
+  assert.equal((await asUser(B, `select id from public.found_items where id = $1`, [item])).rows.length, 1);
+  assert.equal((await asUser(A, `select id from public.found_items where id = $1`, [item])).rows.length, 1);
+  // El autor ya no edita lo archivado.
+  await asUser(B, `update public.found_items set title = 'otro' where id = $1`, [item]);
+  assert.equal((await one(`select title from public.found_items where id = $1`, [item])).title, 'Paraguas');
+});
+
+test('authenticated no puede TRUNCATE (RLS no lo cubre)', async () => {
+  assert.ok(await error(() => asRole('authenticated', `truncate public.notifications`)));
 });

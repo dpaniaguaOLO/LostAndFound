@@ -43,7 +43,7 @@ export function Logo({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-olo-700 dark:text-olo-400">
             Lost &amp; Found
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">
             Overseas Logistics Operations
           </span>
         </span>

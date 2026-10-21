@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ITEM_CATEGORIES, type ItemCategory } from '@laf/shared';
 import { CATEGORY_LABELS, localDateString } from '../lib/format';
+import { MAX_UPLOAD_BYTES, prepareImage } from '../lib/image';
 
 export interface ItemFormValues {
   title: string;
@@ -9,13 +10,55 @@ export interface ItemFormValues {
   location: string;
   date: string; // yyyy-mm-dd (fecha local)
   image: File | null;
+  /** Al editar: quitar la foto que ya tenía la publicación. */
+  removeImage: boolean;
+}
+
+/** Valores iniciales al editar una publicación existente. */
+export interface ItemFormInitial {
+  title: string;
+  description: string;
+  category: ItemCategory;
+  location: string;
+  date: string;
+  imageUrl: string | null;
 }
 
 const MAX_DESCRIPTION = 2000;
 
+// Consejos de verificación (práctica habitual en servicios de objetos perdidos).
+export const FOUND_HINT =
+  'Consejo: no publiques detalles que solo el dueño sabría (contenido, números de serie, marcas ocultas). Úsalos para verificar a quien lo reclame.';
+export const LOST_HINT =
+  'Incluye marca, color y señas visibles. Guárdate algún detalle privado para demostrar que es tuyo al reclamarlo.';
+
 /**
- * Formulario compartido para publicar objetos encontrados y reportar perdidos.
- * `dateLabel` distingue "Fecha en que se encontró" vs "Fecha en que se perdió".
+ * Convierte los valores del formulario al FormData que esperan los servicios.
+ * `dateField`: foundAt | lostAt. Al editar, si la fecha no cambió (`originalDate`)
+ * no se reenvía, para conservar la hora exacta guardada.
+ */
+export function itemFormData(values: ItemFormValues, dateField: 'foundAt' | 'lostAt', originalDate?: string): FormData {
+  const fd = new FormData();
+  fd.set('title', values.title.trim());
+  fd.set('description', values.description.trim());
+  fd.set('category', values.category);
+  fd.set('location', values.location.trim());
+  if (values.image) fd.set('image', values.image);
+  if (values.removeImage && !values.image) fd.set('removeImage', '1');
+  if (values.date !== originalDate) {
+    // "YYYY-MM-DD" con new Date() se interpreta como medianoche UTC y en UTC-6
+    // se mostraría como el día anterior. Hoy -> instante actual; otro día ->
+    // mediodía local (lejos de los bordes del día en cualquier zona cercana).
+    const d = values.date === localDateString() ? new Date() : new Date(`${values.date}T12:00:00`);
+    fd.set(dateField, d.toISOString());
+  }
+  return fd;
+}
+
+/**
+ * Formulario compartido para publicar objetos encontrados y reportar perdidos,
+ * y para editarlos (`initial`). `dateLabel` distingue "Fecha en que se encontró"
+ * vs "Fecha en que se perdió".
  */
 export function ItemForm({
   dateLabel,
@@ -23,6 +66,9 @@ export function ItemForm({
   onSubmit,
   optionalLocation = false,
   allowCamera = true,
+  initial,
+  hint,
+  photoEditable = true,
 }: {
   dateLabel: string;
   submitLabel: string;
@@ -30,21 +76,35 @@ export function ItemForm({
   optionalLocation?: boolean;
   /** false al reportar un perdido: no tienes el objeto delante para fotografiarlo. */
   allowCamera?: boolean;
+  initial?: ItemFormInitial;
+  /** Consejo bajo la descripción (p. ej. no revelar detalles para verificar al dueño). */
+  hint?: string;
+  /**
+   * false cuando un admin edita una publicación ajena: la foto debe estar en la
+   * carpeta del autor (restricción de la BD), así que el admin no puede cambiarla.
+   */
+  photoEditable?: boolean;
 }) {
   // Fecha local (no UTC): con toISOString, en UTC-6 a partir de las 18:00 "hoy" sería mañana.
   const today = localDateString();
   const [values, setValues] = useState<ItemFormValues>({
-    title: '',
-    description: '',
-    category: 'OTHER',
-    location: '',
-    date: today,
+    title: initial?.title ?? '',
+    description: initial?.description ?? '',
+    category: initial?.category ?? 'OTHER',
+    location: initial?.location ?? '',
+    date: initial?.date ?? today,
     image: null,
+    removeImage: false,
   });
   const [preview, setPreview] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Foto mostrada: la nueva elegida, o la que ya tenía (si no se quitó).
+  const shownPhoto = preview ?? (!values.removeImage ? initial?.imageUrl ?? null : null);
 
   // Libera la URL temporal de la vista previa al cambiarla o al desmontar.
   useEffect(() => {
@@ -53,16 +113,34 @@ export function ItemForm({
     };
   }, [preview]);
 
-  function handleFile(file: File | null) {
-    setValues((v) => ({ ...v, image: file }));
-    setPreview(file ? URL.createObjectURL(file) : null);
+  async function handleFile(raw: File | null) {
     // Permite volver a elegir el mismo archivo tras quitarlo.
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setPhotoError(null);
+    if (!raw) {
+      setValues((v) => ({ ...v, image: null, removeImage: true }));
+      setPreview(null);
+      return;
+    }
+    if (!raw.type.startsWith('image/')) {
+      setPhotoError('Ese archivo no es una imagen. Usa JPG, PNG, WEBP o GIF.');
+      return;
+    }
+    setProcessing(true);
+    const file = await prepareImage(raw); // redimensiona y elimina datos EXIF/GPS
+    setProcessing(false);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setPhotoError('La foto es demasiado grande (máximo 5 MB). Prueba con otra.');
+      return;
+    }
+    setValues((v) => ({ ...v, image: file, removeImage: false }));
+    setPreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (processing) return;
     setSubmitting(true);
     try {
       await onSubmit(values);
@@ -74,6 +152,15 @@ export function ItemForm({
   return (
     <form onSubmit={handleSubmit} className="card flex flex-col gap-5 p-4 sm:p-6">
       {/* Foto primero: en móvil es lo más rápido de capturar */}
+      {!photoEditable ? (
+        shownPhoto && (
+          <div>
+            <span className="label">Fotografía</span>
+            <img src={shownPhoto} alt="Foto actual" className="aspect-[16/9] w-full rounded-2xl object-cover" />
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Solo quien publicó puede cambiar la foto.</p>
+          </div>
+        )
+      ) : (
       <div>
         <span className="label">Fotografía (opcional)</span>
 
@@ -96,9 +183,13 @@ export function ItemForm({
           onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
         />
 
-        {preview ? (
+        {processing ? (
+          <div className="skeleton flex aspect-[4/3] w-full items-center justify-center rounded-2xl text-sm font-medium text-slate-600 sm:aspect-[16/9]" role="status">
+            Preparando foto…
+          </div>
+        ) : shownPhoto ? (
           <div className="relative animate-scale-in overflow-hidden rounded-2xl">
-            <img src={preview} alt="Vista previa" className="aspect-[4/3] w-full object-cover sm:aspect-[16/9]" />
+            <img src={shownPhoto} alt="Vista previa de la foto" className="aspect-[4/3] w-full object-cover sm:aspect-[16/9]" />
             <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/60 to-transparent p-3">
               <button
                 type="button"
@@ -136,7 +227,13 @@ export function ItemForm({
             </PhotoButton>
           </div>
         )}
+        {photoError && (
+          <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-400" role="alert">
+            {photoError}
+          </p>
+        )}
       </div>
+      )}
 
       <div>
         <label className="label" htmlFor="title">
@@ -160,7 +257,7 @@ export function ItemForm({
           <label className="label" htmlFor="description">
             Descripción
           </label>
-          <span className="text-xs text-slate-400" aria-hidden>
+          <span className="text-xs text-slate-500" aria-hidden>
             {values.description.length}/{MAX_DESCRIPTION}
           </span>
         </div>
@@ -173,7 +270,13 @@ export function ItemForm({
           minLength={2}
           maxLength={MAX_DESCRIPTION}
           placeholder="Color, marca, detalles que ayuden a identificarlo…"
+          aria-describedby={hint ? 'description-hint' : undefined}
         />
+        {hint && (
+          <p id="description-hint" className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+            {hint}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
@@ -224,9 +327,9 @@ export function ItemForm({
         />
       </div>
 
-      <button className="btn-primary mt-1 w-full py-3 text-base sm:text-sm" type="submit" disabled={submitting}>
+      <button className="btn-primary mt-1 w-full py-3 text-base sm:text-sm" type="submit" disabled={submitting || processing}>
         {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />}
-        {submitting ? 'Publicando…' : submitLabel}
+        {submitting ? 'Guardando…' : submitLabel}
       </button>
     </form>
   );

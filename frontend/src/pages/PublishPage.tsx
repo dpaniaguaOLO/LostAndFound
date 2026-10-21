@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ItemForm, type ItemFormValues } from '../components/ItemForm';
+import { FOUND_HINT, ItemForm, itemFormData, LOST_HINT, type ItemFormValues } from '../components/ItemForm';
 import { PageHeader } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
-import { localDateString } from '../lib/format';
 import { services } from '../services';
 
 type Mode = 'found' | 'lost';
@@ -15,26 +14,13 @@ export function PublishPage() {
   const [mode, setMode] = useState<Mode>('found');
 
   async function handleSubmit(values: ItemFormValues) {
-    const fd = new FormData();
-    fd.set('title', values.title);
-    fd.set('description', values.description);
-    fd.set('category', values.category);
-    fd.set('location', values.location);
-    if (values.image) fd.set('image', values.image);
-    // "YYYY-MM-DD" con new Date() se interpreta como medianoche UTC y en UTC-6
-    // se mostraría como el día anterior. Hoy -> instante actual; otro día ->
-    // mediodía local (lejos de los bordes del día en cualquier zona cercana).
-    const iso = (values.date === localDateString() ? new Date() : new Date(`${values.date}T12:00:00`)).toISOString();
-
     try {
       if (mode === 'found') {
-        fd.set('foundAt', iso);
-        const created = await services.foundItems.create(fd);
+        const created = await services.foundItems.create(itemFormData(values, 'foundAt'));
         notify('Objeto encontrado publicado', 'success');
         navigate(`/objetos/${created.id}`);
       } else {
-        fd.set('lostAt', iso);
-        const created = await services.lostReports.create(fd);
+        const created = await services.lostReports.create(itemFormData(values, 'lostAt'));
         notify('Objeto perdido reportado', 'success');
         // Directo al detalle: ahí se ven de inmediato las posibles coincidencias.
         navigate(`/perdidos/${created.id}`);
@@ -111,6 +97,7 @@ export function PublishPage() {
         submitLabel={mode === 'found' ? 'Publicar objeto encontrado' : 'Reportar objeto perdido'}
         optionalLocation={mode === 'lost'}
         allowCamera={mode === 'found'}
+        hint={mode === 'found' ? FOUND_HINT : LOST_HINT}
         onSubmit={handleSubmit}
       />
     </div>

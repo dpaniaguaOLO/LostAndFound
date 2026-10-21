@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -19,6 +19,10 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    document.title = 'Iniciar sesión · Lost & Found OLO';
+  }, []);
 
   if (user) return <Navigate to="/" replace />;
 
@@ -180,7 +184,7 @@ export function LoginPage() {
             )}
           </div>
         ) : (
-          <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
             ¿Sin acceso? Pide a un administrador que cree tu cuenta.
           </p>
         )}

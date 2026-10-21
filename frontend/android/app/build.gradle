@@ -8,8 +8,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionName = VERSION del repo; versionCode = MAJOR*10000 + MINOR*100 + PATCH (siempre creciente).
-        versionCode 2400
-        versionName "0.24.0"
+        versionCode 2500
+        versionName "0.25.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,6 +18,12 @@ android {
         }
     }
     buildTypes {
+        // Los APK que se reparten son de tipo debug (firma de depuración). Se
+        // desactiva "debuggable" para que nadie con el teléfono por USB pueda usar
+        // run-as y leer los datos de la app (p. ej. el token de sesión).
+        debug {
+            debuggable false
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

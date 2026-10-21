@@ -5,6 +5,7 @@ import {
   FOUND_STATUS_LABELS,
   LOST_STATUS_LABELS,
   formatDate,
+  formatRelativeDay,
 } from '../lib/format';
 import { ItemImage, StatusBadge } from './ui';
 
@@ -27,7 +28,9 @@ function CardMeta({ category, location, date }: { category: string; location: st
           <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="2" />
           <path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
-        {date}
+        <time dateTime={date} title={formatDate(date)}>
+          {formatRelativeDay(date)}
+        </time>
       </span>
     </div>
   );
@@ -50,7 +53,7 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
           {item.title}
         </h3>
         <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
-        <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={formatDate(item.foundAt)} />
+        <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={item.foundAt} />
       </div>
     </Link>
   );
@@ -87,7 +90,7 @@ function LostReportCardBody({ item }: { item: LostReport }) {
           {item.title}
         </h3>
         <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
-        <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={formatDate(item.lostAt)} />
+        <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={item.lostAt} />
       </div>
     </>
   );
