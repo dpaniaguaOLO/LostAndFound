@@ -1,6 +1,8 @@
 # Changelog
 
-## [0.28.0] - 2026-10-22
+## [0.28.0] - 2026-10-22 — APK de prueba (debug)
+
+APK `LostAndFound-0.28.0.apk` (firmado con clave debug: aceptado para pruebas internas).
 
 ### Añadido
 - **Eliminar mis publicaciones**: el autor puede borrar sus objetos encontrados (si están
