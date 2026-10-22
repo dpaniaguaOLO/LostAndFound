@@ -23,6 +23,7 @@ import type {
   UserRole,
 } from '@laf/shared';
 import { syntheticEmail } from '../lib/config';
+import { NotAvailableError } from '../lib/errors';
 import { requireSupabase } from '../lib/supabase';
 import type {
   AuthService,
@@ -204,8 +205,9 @@ async function uploadPhoto(file: File): Promise<string> {
 async function updateItem(table: 'found_items' | 'lost_reports', id: string, form: FormData) {
   const sb = requireSupabase();
   const f = readItemForm(form);
-  const { data: current, error: readErr } = await sb.from(table).select('image_path').eq('id', id).single();
+  const { data: current, error: readErr } = await sb.from(table).select('image_path').eq('id', id).maybeSingle();
   if (readErr) throw readErr;
+  if (!current) throw new NotAvailableError();
   const oldPath = (current?.image_path as string | null) ?? null;
 
   const patch: Record<string, unknown> = {
@@ -360,8 +362,11 @@ const foundItems: FoundItemsService = {
 
   async get(id) {
     const sb = requireSupabase();
-    const { data, error } = await sb.from('found_items').select(REPORTER_SELECT).eq('id', id).single();
+    // maybeSingle: si fue eliminado (o archivado y no es tuyo) no hay fila; antes
+    // .single() lanzaba "Cannot coerce the result to a single JSON object".
+    const { data, error } = await sb.from('found_items').select(REPORTER_SELECT).eq('id', id).maybeSingle();
     if (error) throw error;
+    if (!data) throw new NotAvailableError('Este objeto ya no está disponible: pudo ser eliminado o retirado por un administrador.');
     return toFoundItem(data);
   },
 
@@ -457,8 +462,9 @@ const lostReports: LostReportsService = {
 
   async get(id) {
     const sb = requireSupabase();
-    const { data, error } = await sb.from('lost_reports').select(REPORTER_SELECT).eq('id', id).single();
+    const { data, error } = await sb.from('lost_reports').select(REPORTER_SELECT).eq('id', id).maybeSingle();
     if (error) throw error;
+    if (!data) throw new NotAvailableError('Este reporte ya no está disponible: pudo ser eliminado o cerrado por un administrador.');
     return toLostReport(data);
   },
 

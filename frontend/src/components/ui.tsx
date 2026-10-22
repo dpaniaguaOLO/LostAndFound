@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { statusBadgeClass } from '../lib/format';
 import { haptics } from '../lib/haptics';
 
@@ -91,6 +91,27 @@ export function EmptyState({
       <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
       {description && <p className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
+    </div>
+  );
+}
+
+/**
+ * Lo que se buscaba ya no existe o no es visible (eliminado/archivado). Sin
+ * "Reintentar", que no serviría: ofrece volver al muro.
+ */
+export function UnavailableState({ message }: { message: string }) {
+  return (
+    <div className="flex animate-fade-up flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center dark:border-olo-dark-800 dark:bg-olo-dark-900/60" role="status">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-olo-dark-850 dark:text-slate-400">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5v-7Zm0 0 8 4.5m0 0 8-4.5M12 13v7" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">No disponible</h2>
+      <p className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{message}</p>
+      <Link to="/" className="btn-primary mt-2">
+        Volver al muro
+      </Link>
     </div>
   );
 }

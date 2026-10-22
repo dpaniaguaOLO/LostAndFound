@@ -371,7 +371,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.26.0 (ver `VERSION`). 0.26.0: introducción para nuevos usuarios, barra de
+- **Versión**: 0.26.1 (ver `VERSION`). 0.26.1: migración 011 (auditoría y avisos al
+  eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
   acción móvil (`MobileActionBar`), hápticos (`lib/haptics.ts`), muro sin conexión
   (`lib/cache.ts`), "Para ti" en el muro. 0.25.0: 0.25.0: auditoría de seguridad (migración 010:
   cuentas inactivas sin acceso, guard de estados en `lost_reports`, moderado solo visible a

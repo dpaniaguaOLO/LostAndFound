@@ -322,3 +322,24 @@ test('lo archivado/cerrado solo lo ven su autor y los admins', async () => {
 test('authenticated no puede TRUNCATE (RLS no lo cubre)', async () => {
   assert.ok(await error(() => asRole('authenticated', `truncate public.notifications`)));
 });
+
+
+// --- Migración 011: auditoría y avisos de moderación --------------------------
+test('eliminar un objeto: avisa a los reclamantes y queda en la auditoría', async () => {
+  const item = await newItem(B);
+  await newClaim(item, C);
+  await asUser(A, `delete from public.found_items where id = $1`, [item]);
+  assert.equal((await one(`select count(*)::int n from public.found_items where id = $1`, [item])).n, 0);
+  assert.equal((await one(`select count(*)::int n from public.notifications where user_id = $1 and type = 'SYSTEM' and title = 'Objeto retirado'`, [C])).n >= 1, true);
+  assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_DELETED'`, [item])).n, 1);
+});
+
+test('archivar un objeto: cierra pendientes, avisa y audita; un no-admin no puede eliminar', async () => {
+  const item = await newItem(B);
+  const claim = await newClaim(item, D);
+  await asUser(B, `delete from public.found_items where id = $1`, [item]);
+  assert.equal((await one(`select count(*)::int n from public.found_items where id = $1`, [item])).n, 1, 'RLS: solo admin elimina');
+  await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
+  assert.equal((await one(`select status from public.claims where id = $1`, [claim])).status, 'REJECTED');
+  assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_ARCHIVED'`, [item])).n, 1);
+});

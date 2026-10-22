@@ -12,11 +12,12 @@ import {
   Notice,
   Spinner,
   StatusBadge,
+  UnavailableState,
   ZoomableImage,
 } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { getErrorMessage } from '../lib/errors';
+import { getErrorMessage, isNotAvailable } from '../lib/errors';
 import { CATEGORY_LABELS, FOUND_STATUS_LABELS, formatDate } from '../lib/format';
 import { services } from '../services';
 
@@ -29,6 +30,7 @@ export function FoundItemDetailPage() {
   const [item, setItem] = useState<FoundItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gone, setGone] = useState(false); // eliminado o retirado: no tiene sentido reintentar
 
   const [searchParams] = useSearchParams();
   const [claimOpen, setClaimOpen] = useState(false);
@@ -50,7 +52,10 @@ export function FoundItemDetailPage() {
     services.foundItems
       .get(id)
       .then(setItem)
-      .catch((err) => setError(getErrorMessage(err, 'Error al cargar el objeto')))
+      .catch((err) => {
+        setGone(isNotAvailable(err));
+        setError(getErrorMessage(err, 'Error al cargar el objeto'));
+      })
       .finally(() => setLoading(false));
   }
 
@@ -67,6 +72,7 @@ export function FoundItemDetailPage() {
   }, [claimOpen]);
 
   if (loading) return <Spinner />;
+  if (error && gone) return <UnavailableState message={error} />;
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!item) return null;
 

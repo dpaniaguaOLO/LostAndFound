@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.26.1] - 2026-10-22
+
+### Corregido
+- **"Cannot coerce the result to a single JSON object"** al abrir una notificación cuyo
+  objeto ya no existe (fue eliminado). Ahora se muestra "No disponible" con un botón para
+  volver al muro, en vez del error técnico y un "Reintentar" inútil.
+- **Moderación sin rastro en modo Supabase** (migración 011): eliminar o archivar objetos y
+  eliminar o cerrar reportes ahora queda en la auditoría (antes solo en Express).
+- Al **eliminar o archivar** un objeto con reclamaciones, los reclamantes reciben un aviso
+  ("Objeto retirado") y las pendientes se cierran, en vez de desaparecer sin explicación.
+- APK `0.26.1` (`versionCode 2601`). (Claude)
+
 ## [0.26.0] - 2026-10-21
 
 Principios de diseño de apps móviles aplicados (guía de CodersLink: compromiso gradual,

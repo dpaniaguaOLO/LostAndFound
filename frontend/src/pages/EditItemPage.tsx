@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { FOUND_HINT, ItemForm, itemFormData, LOST_HINT, type ItemFormInitial, type ItemFormValues } from '../components/ItemForm';
-import { BackButton, ErrorState, PageHeader, Spinner } from '../components/ui';
+import { BackButton, ErrorState, PageHeader, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { getErrorMessage } from '../lib/errors';
+import { getErrorMessage, isNotAvailable } from '../lib/errors';
 import { localDateString } from '../lib/format';
 import { services } from '../services';
 
@@ -21,6 +21,7 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
   const navigate = useNavigate();
   const [item, setItem] = useState<FoundItem | LostReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gone, setGone] = useState(false);
 
   const detailPath = `/${kind === 'found' ? 'objetos' : 'perdidos'}/${id}`;
 
@@ -28,11 +29,15 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
     if (!id) return;
     setError(null);
     const req = kind === 'found' ? services.foundItems.get(id) : services.lostReports.get(id);
-    req.then(setItem).catch((err) => setError(getErrorMessage(err, 'No se pudo cargar la publicación')));
+    req.then(setItem).catch((err) => {
+      setGone(isNotAvailable(err));
+      setError(getErrorMessage(err, 'No se pudo cargar la publicación'));
+    });
   }
 
   useEffect(load, [id, kind]);
 
+  if (error && gone) return <UnavailableState message={error} />;
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!item) return <Spinner />;
 
