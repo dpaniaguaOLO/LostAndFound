@@ -29,6 +29,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    // Nombre del APK para repartir: LostAndFound-<versión>.apk (sin "-debug").
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "LostAndFound-${variant.versionName}.apk"
+        }
+    }
 }
 
 repositories {
