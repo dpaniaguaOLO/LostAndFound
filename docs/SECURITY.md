@@ -53,7 +53,7 @@ Pruebas de regresión en `supabase/tests/db.test.mjs` (migraciones 009 y 010).
 ## Acciones que requieren intervención (no automatizables desde el repo)
 
 ### Supabase (panel: Authentication / Project Settings)
-1. **Desactivar el registro abierto** (Authentication → Sign In / Providers → *Allow new users to sign up* = off) — **PRIORITARIO** (hallazgo Alta de la auditoría 2026-10-21; `config.toml` ya lo tiene en `false`, pero el proyecto alojado se configura en el panel). Las altas se hacen desde el panel admin de la app (`POST /admin/users`).
+1. ✅ **Registro abierto desactivado** en el proyecto alojado (verificado el 2026-10-22: `GET /auth/v1/settings` → `disable_signup: true`). Si se crea otro proyecto, repetirlo en Authentication → Sign In / Providers → *Allow new users to sign up* = off. Las altas se hacen desde el panel admin de la app (`POST /admin/users`).
    - Si el registro debe seguir abierto: activar **CAPTCHA** (Authentication → Attack Protection → hCaptcha/Turnstile) — requiere además integrar el widget en `LoginPage`.
 2. **Longitud mínima de contraseña = 8** y **Leaked password protection** (Authentication → Attack Protection / Passwords).
 3. **Rate limits de Auth** (Authentication → Rate Limits): revisar inicio de sesión y registros por hora.
