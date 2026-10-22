@@ -376,7 +376,7 @@ prefiere archivar.
   (`lib/cache.ts`), "Para ti" en el muro. 0.25.0: 0.25.0: auditoría de seguridad (migración 010:
   cuentas inactivas sin acceso, guard de estados en `lost_reports`, moderado solo visible a
   autor/admin, nombre no editable), editar publicaciones, fotos optimizadas sin EXIF,
-  accesibilidad. Migraciones 009 y 010 **pendientes de `supabase db push`**. 0.24.0: 0.24.0: flujo reclamación → entrega completo
+  accesibilidad. Migraciones 008–010 aplicadas en Supabase y Edge Functions desplegadas (2026-10-22). 0.24.0: 0.24.0: flujo reclamación → entrega completo
   (migración 009: trigger de devolución, `claims.lost_report_id`), aviso de coincidencia en
   Supabase, navegación desde coincidencias/Olivia. 0.23.1: icono y splash de Android con la marca OLO
   (opción "verde OLO"). 0.23.0: Olivia conversa (personalidad, guía de la

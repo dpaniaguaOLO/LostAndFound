@@ -2,8 +2,8 @@
 
 > Instantánea del estado del proyecto. Actualizar tras hitos importantes.
 
-- **Versión actual**: 0.26.0 (rama `main`). 0.26.0 = principios de diseño móvil (introducción, barra de acción, hápticos, sin conexión, personalización). 0.25.0 0.25.0 = auditoría de seguridad + editar publicaciones + accesibilidad (migraciones 009 y 010 pendientes de `supabase db push`). 0.24.0 = flujo reclamación → entrega completo
-  (migración 009 pendiente de `supabase db push`), aviso de coincidencia en Supabase y
+- **Versión actual**: 0.26.0 (rama `main`). 0.26.0 = principios de diseño móvil (introducción, barra de acción, hápticos, sin conexión, personalización). 0.25.0 0.25.0 = auditoría de seguridad + editar publicaciones + accesibilidad (migraciones 008–010 aplicadas el 2026-10-22). 0.24.0 = flujo reclamación → entrega completo
+  (migración 009 aplicada), aviso de coincidencia en Supabase y
   navegación desde coincidencias/Olivia. 0.23.0 = Olivia
   conversa (personalidad, guía de la app, límites de tema, memoria corta) + APK debug. El trabajo de Supabase + Android +
   seguridad (0.11.0–0.19.0) ya está **mergeado en `main`** (PR #3). 0.20.0–0.21.x = asistente
