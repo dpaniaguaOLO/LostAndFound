@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.27.1] - 2026-10-22 — APK de prueba (debug)
+
+### Corregido
+- Ya no aparece un borde verde alrededor del contenido al entrar o cambiar de página: el
+  `<main>` recibe el foco (accesibilidad) pero sin dibujar el anillo de foco. (Claude)
+
 ## [0.27.0] - 2026-10-22 — APK de prueba (debug)
 
 Correcciones de la auditoría integral del 2026-10-22 (resumen en `docs/SECURITY.md`).

@@ -380,7 +380,7 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.27.0 (ver `VERSION`). 0.27.0: correcciones de la auditoría integral
+- **Versión**: 0.27.1 (ver `VERSION`). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
   2026-10-22 (migraciones 012/013 y Edge `api` desplegadas, accesibilidad, UX). 0.26.1: migración 011 (auditoría y avisos al
   eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
   acción móvil (`MobileActionBar`), hápticos (`lib/haptics.ts`), muro sin conexión

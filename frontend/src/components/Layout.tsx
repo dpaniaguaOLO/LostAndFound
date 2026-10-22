@@ -291,7 +291,7 @@ export function Layout() {
       )}
 
       {/* Margen inferior en móvil para no quedar bajo la barra de navegación. */}
-      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-32 pt-5 outline-none sm:px-6 sm:pt-8 md:pb-16">
+      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-32 pt-5 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:px-6 sm:pt-8 md:pb-16">
         <div key={pathname} className="animate-page-in">
           <Outlet />
         </div>
