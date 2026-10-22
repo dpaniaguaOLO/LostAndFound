@@ -50,6 +50,23 @@ Además, las fotos se redimensionan en el dispositivo antes de subirlas, lo que
 
 Pruebas de regresión en `supabase/tests/db.test.mjs` (migraciones 009 y 010).
 
+## Auditoría integral 2026-10-22
+
+Auditoría en 8 fases (inventario, línea base, seguridad, integridad, UX/a11y, rendimiento,
+Android, síntesis), solo lectura sobre producción. Hallazgos principales y estado:
+
+| ID | Sev. | Hallazgo | Estado |
+|----|------|----------|--------|
+| SEC-01 | P0 | El único ADMIN de producción usaba la contraseña demo publicada | **Riesgo aceptado** (2026-10-22): solo usuarios de prueba, sin datos reales ni acceso externo. **Rotar antes de cargar datos reales.** Docs/seed corregidos |
+| INT-01 | P1 | Restaurar sin precondición → dos reclamaciones aprobadas | Corregido y desplegado (mig. 012 + Edge `api` + Express) |
+| SEC-02 | P2 | Login por nº de colaborador expuesto a fuerza bruta | **Riesgo aceptado** por ahora (sin CAPTCHA); revisar leaked-password protection y rate limits de Auth antes de producción real |
+| INT-06 | P2 | Se podía quedar sin admins activos | Corregido y desplegado (mig. 012) |
+| SEC-04 | P2 | Storage legible entero (fotos archivadas/huérfanas, UUID de carpetas) | Corregido y desplegado (mig. 013); 4 fotos huérfanas eliminadas |
+| AND-01 | P2 | APK firmado con clave debug | **Aceptado** para pruebas internas; keystore de release antes de distribuir |
+| OPS-01 | P3 | Sin copias de seguridad programadas de la BD | **Aceptado** (entorno de pruebas) |
+
+Detalle completo, matriz de permisos y equivalencia de backends en el informe de auditoría.
+
 ## Acciones que requieren intervención (no automatizables desde el repo)
 
 ### Supabase (panel: Authentication / Project Settings)

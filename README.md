@@ -39,12 +39,16 @@ npm run dev:backend     # API  -> http://localhost:4000
 npm run dev:frontend    # SPA  -> http://localhost:5173
 ```
 
-Abre `http://localhost:5173` e inicia sesión con una cuenta demo:
+Abre `http://localhost:5173` e inicia sesión con una cuenta demo **del backend local**
+(Express/SQLite, creadas por `npm run db:seed`):
 
-| Cuenta | Rol | Contraseña |
+| N° de colaborador | Rol | Contraseña |
 |--------|-----|-----------|
-| `admin@empresa.com` | Administrador | `password123` |
-| `empleado@empresa.com` | Empleado | `password123` |
+| `1001` | Administrador | `password123` |
+| `2002` | Empleado | `password123` |
+
+> ⚠ Estas credenciales son **públicas** y solo valen para la base local de desarrollo.
+> Nunca las uses en el proyecto Supabase alojado (ver `docs/SECURITY.md`).
 
 ## Scripts útiles (raíz)
 

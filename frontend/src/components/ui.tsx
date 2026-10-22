@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { statusBadgeClass } from '../lib/format';
 import { haptics } from '../lib/haptics';
+import { registerLayer } from '../lib/layers';
 
 /** Indicador de carga centrado. */
 export function Spinner({ label = 'Cargando…' }: { label?: string }) {
@@ -88,7 +89,7 @@ export function EmptyState({
           <path d="M8.5 11h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </div>
-      <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h3>
+      <h2 className="text-base font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
       {description && <p className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
@@ -171,12 +172,27 @@ export function StatusBadge({ status, label }: { status: string; label: string }
   );
 }
 
+/** Panel controlado por un <Tabs id={id}>: envuelve el contenido de la pestaña activa. */
+export function TabPanel({ id = 'tabs', active, children }: { id?: string; active: string; children: ReactNode }) {
+  return (
+    <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${active}`}>
+      {children}
+    </div>
+  );
+}
+
 /** Barra de pestañas segmentada (ancho completo en móvil). */
 export function Tabs<T extends string>({
+  id = 'tabs',
+  label,
   tabs,
   value,
   onChange,
 }: {
+  /** Prefijo de ids: enlaza cada pestaña con su <TabPanel id={…}> (WCAG 1.3.1 / 4.1.2). */
+  id?: string;
+  /** Nombre accesible del grupo de pestañas. */
+  label?: string;
   tabs: { key: T; label: string; count?: number }[];
   value: T;
   onChange: (key: T) => void;
@@ -199,6 +215,7 @@ export function Tabs<T extends string>({
   return (
     <div
       role="tablist"
+      aria-label={label}
       onKeyDown={onKeyDown}
       className="mb-5 flex w-full max-w-full overflow-x-auto rounded-xl border border-slate-200/80 bg-slate-100/80 p-1 no-scrollbar dark:border-olo-dark-800 dark:bg-olo-dark-900 sm:inline-flex sm:w-auto"
     >
@@ -208,6 +225,8 @@ export function Tabs<T extends string>({
           <button
             key={t.key}
             role="tab"
+            id={`${id}-tab-${t.key}`}
+            aria-controls={`${id}-panel`}
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             onClick={() => {
@@ -218,7 +237,7 @@ export function Tabs<T extends string>({
               'flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-sm font-semibold transition duration-200 sm:flex-none sm:px-4 ' +
               (active
                 ? 'bg-white text-olo-700 shadow-card dark:bg-olo-dark-800 dark:text-olo-300'
-                : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200')
+                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200')
             }
           >
             {t.label}
@@ -257,7 +276,7 @@ export function ItemImage({ src, alt, rounded = true }: { src: string | null; al
             fill="currentColor"
           />
         </svg>
-        <span className="sr-only">{alt} (sin imagen)</span>
+        {alt && <span className="sr-only">{alt} (sin imagen)</span>}
       </div>
     );
   }
@@ -287,11 +306,20 @@ export function ZoomableImage({ src, alt }: { src: string | null; alt: string })
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+      // Único control del visor: Tab no debe salir a la página de fondo (aria-modal).
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        closeRef.current?.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
+    const unregister = registerLayer(() => setOpen(false)); // botón atrás de Android
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      unregister();
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
       prev?.focus?.();
@@ -449,6 +477,7 @@ export function Modal({
     const touch = !window.matchMedia('(pointer: fine)').matches;
     (first && !(isTextField && touch) ? first : panel)?.focus();
 
+    const unregister = registerLayer(() => onCloseRef.current()); // botón atrás de Android
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         onCloseRef.current();
@@ -470,6 +499,7 @@ export function Modal({
     }
     document.addEventListener('keydown', onKey);
     return () => {
+      unregister();
       document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKey);
       previouslyFocused?.focus?.(); // devolver el foco a quien abrió el diálogo
@@ -506,19 +536,31 @@ export function ConfirmDialog({
   message: string;
   confirmLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  /** Si devuelve una promesa, los botones quedan bloqueados hasta que termine. */
+  onConfirm: () => void | Promise<unknown>;
   onCancel: () => void;
 }) {
+  // Evita el doble envío por doble toque mientras la petición está en curso (UX-07).
+  const [busy, setBusy] = useState(false);
+  async function confirm() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onConfirm();
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <Modal open={open} label={title} onClose={onCancel}>
+    <Modal open={open} label={title} onClose={busy ? () => undefined : onCancel}>
       <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">{message}</p>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button className="btn-secondary" onClick={onCancel}>
+        <button className="btn-secondary" onClick={onCancel} disabled={busy}>
           Cancelar
         </button>
-        <button className={danger ? 'btn-danger' : 'btn-primary'} onClick={onConfirm}>
-          {confirmLabel}
+        <button className={danger ? 'btn-danger' : 'btn-primary'} onClick={() => void confirm()} disabled={busy}>
+          {busy ? 'Procesando…' : confirmLabel}
         </button>
       </div>
     </Modal>

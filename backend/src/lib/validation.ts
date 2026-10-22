@@ -70,6 +70,17 @@ export const createLostReportSchema = z.object({
   lostAt: pastDate('lostAt'),
 });
 
+// Edición: mismos campos, pero la fecha es opcional (el cliente solo la envía si
+// cambió, para conservar la hora exacta) y se puede pedir quitar la foto.
+export const updateFoundItemSchema = createFoundItemSchema.extend({
+  foundAt: pastDate('foundAt').optional(),
+  removeImage: z.literal('1').optional(),
+});
+export const updateLostReportSchema = createLostReportSchema.extend({
+  lostAt: pastDate('lostAt').optional(),
+  removeImage: z.literal('1').optional(),
+});
+
 export const createClaimSchema = z.object({
   foundItemId: z.string().min(1).max(64),
   message: z.string().trim().min(2).max(1000),

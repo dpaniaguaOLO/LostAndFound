@@ -69,6 +69,7 @@ export function ItemForm({
   initial,
   hint,
   photoEditable = true,
+  error = null,
 }: {
   dateLabel: string;
   submitLabel: string;
@@ -84,6 +85,8 @@ export function ItemForm({
    * carpeta del autor (restricción de la BD), así que el admin no puede cambiarla.
    */
   photoEditable?: boolean;
+  /** Error del servidor al guardar: se muestra junto al botón (persistente, WCAG 3.3.1). */
+  error?: string | null;
 }) {
   // Fecha local (no UTC): con toISOString, en UTC-6 a partir de las 18:00 "hoy" sería mañana.
   const today = localDateString();
@@ -326,6 +329,12 @@ export function ItemForm({
           placeholder={optionalLocation ? 'Si no sabes dónde, déjalo en blanco' : 'Ej. Recepción, piso 3'}
         />
       </div>
+
+      {error && (
+        <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+          {error}
+        </p>
+      )}
 
       <button className="btn-primary mt-1 w-full py-3 text-base sm:text-sm" type="submit" disabled={submitting || processing}>
         {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />}

@@ -118,9 +118,11 @@ export function NotificationsPage() {
               <span className="min-w-0 flex-1">
                 <span className="flex items-start justify-between gap-2">
                   <span className={'text-sm ' + (n.read ? 'font-medium text-slate-600 dark:text-slate-300' : 'font-bold text-slate-900 dark:text-slate-50')}>
+                    {/* El estado no puede depender solo del color/negrita (WCAG 1.4.1). */}
+                    {!n.read && <span className="sr-only">Sin leer: </span>}
                     {n.title}
                   </span>
-                  {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-olo-500 ring-4 ring-olo-500/15" aria-label="Sin leer" />}
+                  {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-olo-500 ring-4 ring-olo-500/15" aria-hidden />}
                 </span>
                 <span className="mt-0.5 block text-sm text-slate-600 dark:text-slate-400">{n.body}</span>
                 <span className="mt-2 flex items-center justify-between gap-2">

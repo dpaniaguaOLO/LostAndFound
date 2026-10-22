@@ -7,7 +7,7 @@
 --
 --   Opción A (CLI, recomendada) — Admin API con la service_role key:
 --     POST https://<PROJECT>.supabase.co/auth/v1/admin/users
---     body: {"email":"1001@lostandfound.olo","password":"password123",
+--     body: {"email":"1001@lostandfound.olo","password":"<CONTRASEÑA_ROBUSTA_ÚNICA>",
 --            "email_confirm":true,
 --            "user_metadata":{"name":"Admin OLO","employee_id":"1001"}}
 --
@@ -15,7 +15,12 @@
 --     y añade en User Metadata: { "name": "...", "employee_id": "..." }
 --
 -- Login en la app por NÚMERO DE COLABORADOR: 1001 (admin) y 2002 (empleado).
--- Contraseña de ambas: password123 (cámbiala en un entorno real).
+--
+-- ⚠ SEGURIDAD: NUNCA uses en un proyecto alojado la contraseña demo del backend
+-- local (la que aparece en backend/prisma/seed.ts): es pública. En la auditoría
+-- del 2026-10-22 el admin de producción la seguía usando (hallazgo P0). Usa una
+-- contraseña robusta y única por cuenta, y después de crear el primer admin da
+-- de alta al resto desde el panel de la app (POST /admin/users).
 
 -- ---------------------------------------------------------------------------
 -- Arreglo de metadatos (usar solo si creaste por panel y el perfil quedó mal).

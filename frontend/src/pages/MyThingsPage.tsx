@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { FoundItem, LostReport } from '@laf/shared';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
 import { MatchSuggestions } from '../components/MatchSuggestions';
-import { CardGridSkeleton, EmptyState, ErrorState, PageHeader, Tabs } from '../components/ui';
+import { CardGridSkeleton, EmptyState, ErrorState, PageHeader, TabPanel, Tabs } from '../components/ui';
 import { getErrorMessage } from '../lib/errors';
 import { services } from '../services';
 
@@ -46,6 +46,8 @@ export function MyThingsPage() {
       <PageHeader title="Mis objetos" subtitle="Los objetos que tú perdiste o encontraste." />
 
       <Tabs<Tab>
+        id="mine"
+        label="Tipo de publicación"
         tabs={[
           { key: 'lost', label: 'Perdidos', count: loading ? undefined : lost.length },
           { key: 'found', label: 'Encontrados', count: loading ? undefined : found.length },
@@ -54,6 +56,7 @@ export function MyThingsPage() {
         onChange={changeTab}
       />
 
+      <TabPanel id="mine" active={tab}>
       {loading ? (
         <CardGridSkeleton count={3} />
       ) : error ? (
@@ -87,6 +90,7 @@ export function MyThingsPage() {
               ))}
         </div>
       )}
+      </TabPanel>
     </div>
   );
 }

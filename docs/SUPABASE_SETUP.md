@@ -78,10 +78,11 @@ que pasar `name` y `employee_id` en los metadatos para que el perfil se cree bie
 
 ```sql
 -- Crea un colaborador. Repite cambiando número, nombre y contraseña.
+-- ⚠ Nunca reutilices la contraseña demo del backend local: es pública.
 select auth.admin_create_user(
   '{
      "email": "1001@lostandfound.olo",
-     "password": "password123",
+     "password": "<CONTRASEÑA_ROBUSTA_ÚNICA>",
      "email_confirm": true,
      "user_metadata": { "name": "Admin OLO", "employee_id": "1001" }
    }'::jsonb
@@ -134,10 +135,11 @@ bundle de la app Android.
 
 ## 6. Operaciones sensibles → Edge Functions
 
-El emparejado por IA (NLP + firma visual) y el asistente **siguen en el backend Express**
-(es cómputo, no SQL). Cuando se migre a Supabase, las operaciones que requieran privilegios
-(crear notificaciones, escribir audit logs, aprobar reclamaciones con validación de flujo)
-deben ir en **Edge Functions** que usen `service_role`, nunca en el cliente.
+Las operaciones que requieren privilegios (crear notificaciones, escribir audit logs,
+aprobar reclamaciones con validación de flujo) y la IA (NLP y asistente) van en la **Edge
+Function `api`** con `service_role`, nunca en el cliente (ver la sección 7). La firma
+visual de imágenes solo existe en el backend Express: en modo Supabase el emparejado no
+usa la imagen.
 
 Hay **dos Edge Functions** en `supabase/functions/`. Ambas se despliegan con la Supabase
 CLI (tras `supabase login` y `supabase link`):

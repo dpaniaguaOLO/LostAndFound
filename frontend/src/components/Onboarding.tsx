@@ -39,7 +39,7 @@ export function Onboarding({ open, onClose }: { open: boolean; onClose: () => vo
   return (
     <Modal open={open} label="Introducción a Lost & Found" onClose={close}>
       <div className="flex flex-col items-center text-center" aria-live="polite">
-        <div key={step} className="mb-5 flex h-20 w-20 animate-scale-in items-center justify-center rounded-3xl bg-gradient-to-br from-olo-400 to-olo-600 text-white shadow-glow-lg">
+        <div key={step} className="mb-5 flex h-20 w-20 animate-scale-in items-center justify-center rounded-3xl bg-gradient-to-br from-olo-600 to-olo-700 text-white shadow-glow-lg">
           {s.icon ? (
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d={s.icon} />

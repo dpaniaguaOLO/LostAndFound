@@ -34,7 +34,7 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
 
 **Stack**
 - Monorepo con **npm workspaces**.
-- Frontend: **React 18 + Vite 5 + TypeScript** (strict) + **Tailwind CSS 3** + **React Router 6**.
+- Frontend: **React 18 + Vite 6 + TypeScript** (strict) + **Tailwind CSS 3** + **React Router 7**.
 - Backend: **Node + Express 4 + TypeScript** (ESM) + **Prisma 5** + **SQLite** (desarrollo).
 - Tipos/contratos compartidos: paquete **`@laf/shared`** (única fuente de verdad).
 - Identidad visual alineada con **OLO** (verde de marca `#00a785`, tipografía Open Sans,
@@ -108,8 +108,9 @@ por defecto 12h).
 `/uploads/<archivo>`. En producción debería moverse a almacenamiento privado (S3 o
 equivalente) con URLs firmadas (ver §F y §G).
 
-**Servicios externos**: ninguno activo por ahora. **Supabase** está *preparado pero no
-conectado* (ver más abajo y `docs/SUPABASE_SETUP.md`).
+**Servicios externos**: **Supabase** (modo activo en producción: PostgreSQL, Auth,
+Storage y Edge Functions; ver más abajo y `docs/SUPABASE_SETUP.md`) y **OpenAI**
+(`gpt-4o-mini`, solo desde la Edge Function `api` para Olivia; ver `docs/LLM.md`).
 
 **Infraestructura / despliegue**: aún no definido.
 
@@ -144,8 +145,10 @@ romper ni eliminar nada de lo existente. Documentación completa en
   - Puente nativo `frontend/src/lib/native.ts` (StatusBar, Keyboard, botón atrás); *no-op*
     en web. Safe-areas vía `viewport-fit=cover` + utilidades CSS `safe-*`.
   - Scripts: `build:mobile`, `cap:sync`, `cap:open`.
-- **La IA (NLP + firma visual + asistente) se queda en el backend Express.** Es cómputo,
-  no SQL; las operaciones con privilegios irían en Edge Functions (`service_role`).
+- **La IA (NLP + asistente) vive en la Edge Function `api`** en modo Supabase (port de
+  `backend/src/lib/` en `supabase/functions/_shared/`) y en Express en modo REST. La **firma
+  visual solo se calcula en Express**: en modo Supabase nadie escribe `image_signature`, así
+  que las coincidencias no usan la imagen (auditoría 2026-10-22, UX-04).
 
 ---
 
@@ -282,12 +285,18 @@ prefiere archivar.
   perdido del propio reclamante; al aprobar pasa a `MATCHED`.
 - Un usuario no puede tener dos reclamaciones `PENDING` sobre el mismo objeto.
 - Al aprobar una reclamación: el objeto pasa a `CLAIMED` y las demás reclamaciones
-  pendientes del mismo objeto se rechazan automáticamente (transacción).
+  pendientes del mismo objeto se rechazan automáticamente (transacción). Un objeto tiene
+  como mucho **una** reclamación `APPROVED` (índice único en Supabase mig. 012 y en Prisma).
+- Restaurar (admin) solo desde `ARCHIVED`/`CLOSED`; un encontrado con reclamación aprobada
+  vuelve a `CLAIMED` (no a `PUBLISHED`).
+- Siempre queda al menos un **ADMIN activo** (trigger `prevent_role_escalation`, mig. 012).
 - Marcar devuelto: solo el autor del hallazgo o un admin.
 - Categorías válidas (`ItemCategory`): ELECTRONICS, CLOTHING, ACCESSORIES, DOCUMENTS,
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
-**Migraciones**: `20261019141016_init` (esquema inicial completo).
+**Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
+`supabase/migrations/` (001–013, todas aplicadas en el proyecto alojado; 012 y 013 el
+2026-10-22).
 
 ---
 
@@ -371,7 +380,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.26.1 (ver `VERSION`). 0.26.1: migración 011 (auditoría y avisos al
+- **Versión**: 0.27.0 (ver `VERSION`). 0.27.0: correcciones de la auditoría integral
+  2026-10-22 (migraciones 012/013 y Edge `api` desplegadas, accesibilidad, UX). 0.26.1: migración 011 (auditoría y avisos al
   eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
   acción móvil (`MobileActionBar`), hápticos (`lib/haptics.ts`), muro sin conexión
   (`lib/cache.ts`), "Para ti" en el muro. 0.25.0: 0.25.0: auditoría de seguridad (migración 010:
@@ -392,14 +402,14 @@ prefiere archivar.
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
 - **En desarrollo**: —
-- **Problemas conocidos**: ver riesgos en §F; aún sin pruebas automatizadas.
-- **Pruebas ejecutadas** (manuales, vía proxy): health, login (empleado/admin), listado
-  del muro, crear reclamación, aprobar reclamación (objeto → CLAIMED, resto rechazadas),
-  notificación al reclamante, stats de admin, verificación de 401 sin token. Builds de
-  `shared`, `backend` y `frontend` sin errores.
-- **Próximos pasos recomendados**: pruebas automatizadas (Vitest + Supertest / RTL),
-  emparejado perdido↔encontrado, recuperación de contraseña, migración a PostgreSQL y
-  almacenamiento de imágenes en la nube para producción.
+- **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
+  (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
+  pruebas de frontend ni de las Edge Functions (Deno).
+- **Pruebas automatizadas** (`npm test`): `backend/src/**/*.test.ts` (Express contra SQLite
+  temporal, incl. `security.e2e.test.ts`) y `supabase/tests/db.test.mjs` (todas las
+  migraciones sobre PostgreSQL en memoria con PGlite: RLS, RPC, triggers).
+- **Próximos pasos recomendados**: ver el plan de la auditoría (firma release del APK,
+  CAPTCHA/limites de Auth, CI, backups/monitorización, prueba en dispositivo Android).
 
 ---
 
@@ -438,8 +448,9 @@ npm run build:frontend       # incluye tsc --noEmit (typecheck estricto)
 npm run build:backend        # tsc
 ```
 
-**Cuentas demo** (tras el seed): número de colaborador `1001` (ADMIN) y `2002` (EMPLOYEE),
-contraseña `password123`.
+**Cuentas demo — SOLO backend local** (Express/SQLite, tras `npm run db:seed`): número de
+colaborador `1001` (ADMIN) y `2002` (EMPLOYEE), contraseña `password123`. Son públicas:
+**nunca** se usan en el proyecto Supabase alojado (auditoría 2026-10-22, hallazgo P0).
 
 **Resetear la base de datos de desarrollo** (desde `backend/`):
 ```bash

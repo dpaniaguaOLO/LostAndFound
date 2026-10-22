@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { haptics } from '../lib/haptics';
 
 type ToastKind = 'success' | 'error' | 'info';
@@ -34,8 +34,23 @@ const STYLES: Record<ToastKind, { box: string; icon: string; path: string }> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Temporizadores por aviso: se pausan con el ratón o el foco encima (WCAG 2.2.1).
+  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
-  const dismiss = useCallback((id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)), []);
+  const dismiss = useCallback((id: number) => {
+    clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const schedule = useCallback(
+    (id: number, ms: number) => {
+      clearTimeout(timers.current.get(id));
+      timers.current.set(id, setTimeout(() => dismiss(id), ms));
+    },
+    [dismiss],
+  );
+  const pause = useCallback((id: number) => clearTimeout(timers.current.get(id)), []);
 
   const notify = useCallback(
     (message: string, kind: ToastKind = 'info') => {
@@ -45,9 +60,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       else if (kind === 'error') haptics.error();
       // Máximo 3 a la vista para no tapar la pantalla en móvil.
       setToasts((prev) => [...prev.slice(-2), { id, kind, message }]);
-      setTimeout(() => dismiss(id), kind === 'error' ? 6000 : 4000);
+      schedule(id, kind === 'error' ? 8000 : 4500);
     },
-    [dismiss],
+    [schedule],
   );
 
   return (
@@ -56,14 +71,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Móvil: arriba (no compite con la barra inferior ni el teclado). Escritorio: abajo a la derecha. */}
       <div
         className="pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-auto sm:items-end sm:px-0"
-        aria-live="polite"
       >
+        {/* Cada aviso ya es una región viva (role status/alert): sin aria-live en el
+            contenedor, que hacía que algunos lectores los anunciaran dos veces. */}
         {toasts.map((t) => {
           const s = STYLES[t.kind];
           return (
             <div
               key={t.id}
               role={t.kind === 'error' ? 'alert' : 'status'}
+              onMouseEnter={() => pause(t.id)}
+              onMouseLeave={() => schedule(t.id, 2500)}
+              onFocus={() => pause(t.id)}
+              onBlur={() => schedule(t.id, 2500)}
               className={`pointer-events-auto flex w-full max-w-sm animate-toast-in items-start gap-3 rounded-2xl border bg-white/95 p-3 pr-2 shadow-elevated backdrop-blur dark:bg-olo-dark-900/95 ${s.box}`}
             >
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${s.icon}`} aria-hidden>

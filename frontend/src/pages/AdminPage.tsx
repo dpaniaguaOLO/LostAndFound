@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
+import { ClaimReviewDialog } from '../components/ClaimReviewDialog';
 import { CreateUserCard } from '../components/CreateUserCard';
 import { PasswordResetCard } from '../components/PasswordResetCard';
-import { ConfirmDialog, ErrorState, ItemImage, PageHeader, Spinner, StatusBadge, Tabs } from '../components/ui';
+import { ConfirmDialog, ErrorState, ItemImage, PageHeader, Spinner, StatusBadge, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
 import { CATEGORY_LABELS, CLAIM_STATUS_LABELS, formatDate, formatDateTime } from '../lib/format';
+import { services } from '../services';
 import { adminService, type AdminStats } from '../services/admin';
 
 type Stats = AdminStats;
@@ -62,6 +64,11 @@ export function AdminPage() {
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
   const [archived, setArchived] = useState<ArchivedResponse | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null);
+  const [confirmRole, setConfirmRole] = useState<{ user: User; role: 'ADMIN' | 'EMPLOYEE' } | null>(null);
+  const [reviewing, setReviewing] = useState<{ claim: Claim; decision: 'APPROVED' | 'REJECTED' } | null>(null);
+  const [userFilter, setUserFilter] = useState('');
+  // Error al cargar una pestaña: antes se mostraba como "no hay datos" (UX-08).
+  const [tabError, setTabError] = useState<Partial<Record<Tab, string>>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,19 +90,32 @@ export function AdminPage() {
 
   // Carga perezosa de reclamaciones / historial al abrir su pestaña.
   useEffect(() => {
-    if (tab === 'claims' && claims === null) {
-      adminService.allClaims().then(setClaims).catch(() => setClaims([]));
+    const fail = (t: Tab) => (err: unknown) =>
+      setTabError((prev) => ({ ...prev, [t]: getErrorMessage(err, 'No se pudo cargar esta sección') }));
+    if (tabError[tab]) return; // esperar a "Reintentar"
+    if (tab === 'claims' && claims === null) adminService.allClaims().then(setClaims).catch(fail('claims'));
+    if (tab === 'audit' && audit === null) adminService.audit().then(setAudit).catch(fail('audit'));
+    if (tab === 'archived' && archived === null) adminService.archived().then(setArchived).catch(fail('archived'));
+  }, [tab, claims, audit, archived, tabError]);
+
+  function retryTab() {
+    setTabError((prev) => ({ ...prev, [tab]: undefined }));
+  }
+
+  // Revisión de reclamaciones ajenas desde la bandeja global (UX-01).
+  async function confirmReview(note: string) {
+    if (!reviewing) return;
+    const { claim, decision } = reviewing;
+    setReviewing(null);
+    try {
+      await services.claims.review(claim.id, decision, note || undefined);
+      notify(decision === 'APPROVED' ? 'Reclamación aprobada' : 'Reclamación rechazada', 'success');
+    } catch (err) {
+      notify(getErrorMessage(err, 'No se pudo revisar la reclamación'), 'error');
+    } finally {
+      setClaims(null); // recargar la bandeja con el estado real
     }
-    if (tab === 'audit' && audit === null) {
-      adminService.audit().then(setAudit).catch(() => setAudit([]));
-    }
-    if (tab === 'archived' && archived === null) {
-      adminService
-        .archived()
-        .then(setArchived)
-        .catch(() => setArchived({ found: [], lost: [] }));
-    }
-  }, [tab, claims, audit, archived]);
+  }
 
   async function restore(kind: 'found' | 'lost', id: string) {
     try {
@@ -142,11 +162,11 @@ export function AdminPage() {
     return (
       <>
         {u.role === 'ADMIN' ? (
-          <button className="btn-secondary" onClick={() => changeRole(u, 'EMPLOYEE')}>
+          <button className="btn-secondary" onClick={() => setConfirmRole({ user: u, role: 'EMPLOYEE' })}>
             Quitar admin
           </button>
         ) : (
-          <button className="btn-secondary" onClick={() => changeRole(u, 'ADMIN')}>
+          <button className="btn-secondary" onClick={() => setConfirmRole({ user: u, role: 'ADMIN' })}>
             Hacer admin
           </button>
         )}
@@ -178,6 +198,11 @@ export function AdminPage() {
       </div>
     );
 
+  const q = userFilter.trim().toLowerCase();
+  const visibleUsers = q
+    ? users.filter((u) => u.name.toLowerCase().includes(q) || u.employeeId.toLowerCase().includes(q))
+    : users;
+
   const cards = [
     { label: 'Usuarios', value: stats?.users ?? 0 },
     { label: 'Objetos encontrados', value: stats?.foundItems ?? 0 },
@@ -191,6 +216,8 @@ export function AdminPage() {
       <PageHeader title="Panel administrativo" subtitle="Supervisión del sistema, reclamaciones e historial." />
 
       <Tabs<Tab>
+        id="admin"
+        label="Secciones de administración"
         tabs={[
           { key: 'overview', label: 'Resumen' },
           { key: 'claims', label: 'Reclamaciones' },
@@ -201,6 +228,7 @@ export function AdminPage() {
         onChange={setTab}
       />
 
+      <TabPanel id="admin" active={tab}>
       {/* --- RESUMEN --- */}
       {tab === 'overview' && (
         <>
@@ -221,8 +249,25 @@ export function AdminPage() {
           <h2 className="section-title mb-3">Usuarios</h2>
 
           {/* Móvil: tarjetas (una tabla de 6 columnas no cabe en 360px) */}
+          <div className="mb-3 sm:max-w-xs">
+            <label className="sr-only" htmlFor="user-filter">
+              Buscar colaborador
+            </label>
+            <input
+              id="user-filter"
+              type="search"
+              className="input"
+              placeholder="Buscar por nombre o número…"
+              value={userFilter}
+              onChange={(e) => setUserFilter(e.target.value)}
+            />
+          </div>
+          {visibleUsers.length === 0 && (
+            <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">Ningún colaborador coincide con la búsqueda.</p>
+          )}
+
           <ul className="flex flex-col gap-2.5 md:hidden">
-            {users.map((u) => (
+            {visibleUsers.map((u) => (
               <li key={u.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -254,7 +299,7 @@ export function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {visibleUsers.map((u) => (
                   <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-olo-dark-800">
                     <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.employeeId}</td>
@@ -285,7 +330,9 @@ export function AdminPage() {
       {/* --- RECLAMACIONES (bandeja global) --- */}
       {tab === 'claims' && (
         <div>
-          {claims === null ? (
+          {tabError.claims ? (
+            <ErrorState message={tabError.claims} onRetry={retryTab} />
+          ) : claims === null ? (
             <Spinner />
           ) : claims.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">No hay reclamaciones registradas.</p>
@@ -311,7 +358,23 @@ export function AdminPage() {
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                       Reclama: {c.claimant.name} · {formatDateTime(c.createdAt)}
                     </p>
+                    {c.reviewNote && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nota: {c.reviewNote}</p>}
                   </div>
+                  {/* Un admin puede resolver cualquier reclamación pendiente. */}
+                  {c.status === 'PENDING' && (
+                    <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+                      <button className="btn-secondary" onClick={() => setReviewing({ claim: c, decision: 'REJECTED' })}>
+                        Rechazar
+                      </button>
+                      <button
+                        className="btn-primary"
+                        disabled={c.foundItem?.status !== undefined && c.foundItem.status !== 'PUBLISHED'}
+                        onClick={() => setReviewing({ claim: c, decision: 'APPROVED' })}
+                      >
+                        Aprobar
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -322,7 +385,9 @@ export function AdminPage() {
       {/* --- ARCHIVADOS (moderación) --- */}
       {tab === 'archived' && (
         <div>
-          {archived === null ? (
+          {tabError.archived ? (
+            <ErrorState message={tabError.archived} onRetry={retryTab} />
+          ) : archived === null ? (
             <Spinner />
           ) : archived.found.length === 0 && archived.lost.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -372,7 +437,9 @@ export function AdminPage() {
       {/* --- HISTORIAL (auditoría) --- */}
       {tab === 'audit' && (
         <div>
-          {audit === null ? (
+          {tabError.audit ? (
+            <ErrorState message={tabError.audit} onRetry={retryTab} />
+          ) : audit === null ? (
             <Spinner />
           ) : audit.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">Todavía no hay eventos registrados.</p>
@@ -395,6 +462,7 @@ export function AdminPage() {
           )}
         </div>
       )}
+      </TabPanel>
 
       <ConfirmDialog
         open={confirmDeactivate !== null}
@@ -406,8 +474,34 @@ export function AdminPage() {
         }
         confirmLabel="Desactivar"
         danger
-        onConfirm={() => confirmDeactivate && toggleActive(confirmDeactivate)}
+        onConfirm={async () => {
+          if (confirmDeactivate) await toggleActive(confirmDeactivate);
+        }}
         onCancel={() => setConfirmDeactivate(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRole !== null}
+        title={confirmRole?.role === 'ADMIN' ? 'Hacer administrador' : 'Quitar administrador'}
+        message={
+          confirmRole?.role === 'ADMIN'
+            ? `${confirmRole.user.name} podrá gestionar usuarios, contraseñas, reclamaciones y moderar publicaciones.`
+            : `${confirmRole?.user.name ?? ''} perderá el acceso al panel de administración.`
+        }
+        confirmLabel={confirmRole?.role === 'ADMIN' ? 'Hacer admin' : 'Quitar admin'}
+        danger={confirmRole?.role === 'ADMIN'}
+        onConfirm={async () => {
+          if (confirmRole) await changeRole(confirmRole.user, confirmRole.role);
+          setConfirmRole(null);
+        }}
+        onCancel={() => setConfirmRole(null)}
+      />
+
+      <ClaimReviewDialog
+        claim={reviewing?.claim ?? null}
+        decision={reviewing?.decision ?? null}
+        onConfirm={confirmReview}
+        onCancel={() => setReviewing(null)}
       />
     </div>
   );

@@ -22,6 +22,7 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
   const [item, setItem] = useState<FoundItem | LostReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [gone, setGone] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const detailPath = `/${kind === 'found' ? 'objetos' : 'perdidos'}/${id}`;
 
@@ -56,6 +57,7 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
 
   async function handleSubmit(values: ItemFormValues) {
     if (!id) return;
+    setFormError(null);
     try {
       const fd = itemFormData(values, kind === 'found' ? 'foundAt' : 'lostAt', initial.date);
       if (kind === 'found') await services.foundItems.update(id, fd);
@@ -63,7 +65,7 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
       notify('Cambios guardados', 'success');
       navigate(detailPath, { replace: true });
     } catch (err) {
-      notify(getErrorMessage(err, 'No se pudieron guardar los cambios'), 'error');
+      setFormError(getErrorMessage(err, 'No se pudieron guardar los cambios'));
     }
   }
 
@@ -82,6 +84,7 @@ export function EditItemPage({ kind }: { kind: 'found' | 'lost' }) {
         allowCamera={kind === 'found'}
         photoEditable={isOwner}
         hint={kind === 'found' ? FOUND_HINT : LOST_HINT}
+        error={formError}
         onSubmit={handleSubmit}
       />
     </div>

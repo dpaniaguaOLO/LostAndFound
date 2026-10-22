@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.27.0] - 2026-10-22 — APK de prueba (debug)
+
+Correcciones de la auditoría integral del 2026-10-22 (resumen en `docs/SECURITY.md`).
+**Desplegado**: migraciones 012 y 013 aplicadas en el proyecto alojado, Edge Function `api`
+redesplegada y 4 fotos huérfanas eliminadas de Storage. APK `LostAndFound-0.27.0.apk`
+(firmado con clave debug: aceptado para pruebas internas). (Claude)
+
+### Seguridad e integridad
+- **INT-01 (P1)** Restaurar solo desde ARCHIVED/CLOSED y al estado coherente (CLAIMED si
+  hay reclamación aprobada); índice único: como mucho una reclamación APPROVED por objeto
+  (Supabase mig. 012 y Prisma). Antes se podían aprobar dos sobre el mismo objeto.
+- **INT-06** Siempre queda al menos un ADMIN **activo**, serializado con lock consultivo;
+  activar/desactivar actualiza el perfil antes que Auth y revierte si falla el baneo.
+- **SEC-04 / INT-05** Fotos: solo las propias, las de publicaciones visibles o siendo admin
+  (mig. 013); la foto recién subida se borra si falla el guardado.
+- **FUN-02** Un admin puede cambiar la foto de una publicación ajena (sube a la carpeta del
+  autor).
+- **SEC-01 (documental)** Las credenciales demo quedan restringidas al backend local; el
+  seed de Supabase ya no trae contraseña fija. *La contraseña del admin de producción debe
+  cambiarla un responsable.*
+- **REST** (FUN-01, INT-02/03/04): editar funciona (multipart, fecha opcional, foto); sin
+  reclamaciones pendientes duplicadas (índice parcial); lo archivado/cerrado solo lo ven su
+  autor y los admins; el autor no reabre lo moderado; archivar/eliminar cierran pendientes
+  y avisan; el asistente solo lista perdidos abiertos.
+- **FUN-04** `VITE_DATA_BACKEND` inválido o Supabase incompleto: el build falla y en
+  desarrollo se muestra el error (antes caía a REST en silencio).
+
+### Accesibilidad (WCAG 2.2 AA)
+- Contraste: botones principales (texto blanco sobre olo-700/800), placeholders, bordes de
+  campos (≥3:1), cabecera y burbujas de Olivia, navegación inferior, contador, pestañas.
+- Panel de Olivia con foco gestionado (trampa en móvil, retorno al botón) y anuncio solo de
+  las respuestas; foto ampliada sin fuga de foco; menú de usuario como disclosure.
+- Errores persistentes en línea (login, publicar/editar, reclamar) con `role="alert"`;
+  avisos que se pausan con ratón/foco y sin doble anuncio.
+- Pestañas con `tabpanel`/`aria-controls`; selector de Publicar con `aria-pressed`;
+  encabezados sin saltos; `<main>` en login; foco al contenido al navegar;
+  `scroll-padding` para que el foco no quede tapado; "Sin leer" anunciado.
+
+### Experiencia de uso
+- El admin puede aprobar/rechazar cualquier reclamación desde el panel; rechazar pide
+  confirmación y permite un motivo; cambiar rol y cancelar solicitud piden confirmación;
+  los diálogos se bloquean mientras se procesa.
+- "Recordar este dispositivo" funciona en modo Supabase (sessionStorage si no se marca).
+- Botón atrás de Android cierra primero el diálogo/chat/foto abiertos.
+- No se vuelve a ofrecer "Reclamar" si ya hay una solicitud pendiente.
+- Panel admin: errores de carga visibles con "Reintentar"; búsqueda de colaboradores.
+- El texto de coincidencias ya no promete comparación por imagen y aclara que es orientativo.
+- La campana cuenta las no leídas sin descargar la lista.
+
 ## [0.26.1] - 2026-10-22
 
 ### Corregido

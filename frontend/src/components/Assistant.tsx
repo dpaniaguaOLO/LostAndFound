@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { AssistantTurn, FoundItem, LostReport } from '@laf/shared';
 import { getErrorMessage } from '../lib/errors';
+import { registerLayer } from '../lib/layers';
 import { CATEGORY_LABELS } from '../lib/format';
 import { aiService } from '../services/ai';
 import { OliviaAvatar } from './OliviaAvatar';
@@ -43,21 +44,64 @@ export function Assistant() {
   const [messages, setMessages] = useState<Msg[]>([{ role: 'assistant', text: WELCOME }]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  // En móvil el panel es modal (fondo atenuado): se atrapa el foco y se marca
+  // aria-modal. En escritorio convive con la página (no modal).
+  const [isModal, setIsModal] = useState(false);
+  // Última respuesta de Olivia, para anunciarla a lectores de pantalla (solo eso,
+  // no toda la conversación ni los mensajes propios).
+  const lastAnswer = [...messages].reverse().find((m) => m.role === 'assistant' && messages.length > 1)?.text ?? '';
 
   // Desplaza al final cuando llega un mensaje o empieza/termina la carga.
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: reduce ? 'auto' : 'smooth' });
   }, [messages, loading, open]);
 
-  // Al abrir: foco en el campo (solo con puntero fino, para no sacar el teclado
-  // en móvil sin que el usuario lo pida) y cierre con Escape.
+  // Al cerrar, devolver el foco al botón flotante (que se vuelve a montar).
+  useEffect(() => {
+    if (!open && wasOpen.current) fabRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+
+  // Al abrir: foco dentro del panel (en el campo solo con puntero fino, para no
+  // sacar el teclado en móvil), cierre con Escape y trampa de foco si es modal.
   useEffect(() => {
     if (!open) return;
+    const modal = !window.matchMedia('(min-width: 640px)').matches;
+    setIsModal(modal);
     if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    else closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab' || !modal || !panelRef.current) return;
+      const items = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled])'),
+      );
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    const unregister = registerLayer(() => setOpen(false)); // botón atrás de Android
+    return () => {
+      unregister();
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   async function ask(question: string) {
@@ -98,6 +142,7 @@ export function Assistant() {
       {/* Botón flotante: sobre la barra inferior en móvil; etiqueta visible en sm+ */}
       {!open && (
         <button
+          ref={fabRef}
           onClick={() => setOpen(true)}
           className="group fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex animate-scale-in items-center gap-2 rounded-full transition-[bottom] duration-300 md:bottom-6 md:right-6 [[data-actionbar]_&]:bottom-[calc(10rem+env(safe-area-inset-bottom))] md:[[data-actionbar]_&]:bottom-6"
           aria-label="Hablar con Olivia, la asistente"
@@ -124,21 +169,24 @@ export function Assistant() {
           <div className="fixed inset-0 z-40 animate-fade-in bg-slate-950/40 backdrop-blur-sm sm:hidden" onClick={() => setOpen(false)} aria-hidden />
 
           <section
+            ref={panelRef}
             role="dialog"
+            aria-modal={isModal || undefined}
             aria-label="Chat con Olivia"
             className="fixed inset-x-0 bottom-0 z-50 flex h-[88dvh] animate-slide-up flex-col overflow-hidden rounded-t-3xl border border-slate-200/80 bg-white shadow-elevated dark:border-olo-dark-800 dark:bg-olo-dark-900 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[min(36rem,calc(100dvh-7rem))] sm:w-[24rem] sm:origin-bottom-right sm:animate-scale-in sm:rounded-3xl"
           >
             {/* Cabecera */}
-            <header className="relative flex items-center gap-3 bg-gradient-to-br from-olo-500 to-olo-700 px-4 py-3.5 text-white">
+            <header className="relative flex items-center gap-3 bg-gradient-to-br from-olo-700 to-olo-800 px-4 py-3.5 text-white dark:from-olo-800 dark:to-olo-900">
               <div className="relative">
                 <OliviaAvatar decorative className="h-10 w-10 shrink-0 rounded-full ring-2 ring-white/40" />
                 <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-olo-600 bg-emerald-300" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-bold leading-tight">Olivia</p>
-                <p className="text-xs text-white/80">{loading ? 'Escribiendo…' : 'Asistente de OLO · en línea'}</p>
+                <p className="text-xs text-white/95">{loading ? 'Escribiendo…' : 'Asistente de OLO · en línea'}</p>
               </div>
               <button
+                ref={closeRef}
                 onClick={() => setOpen(false)}
                 className="flex h-10 w-10 items-center justify-center rounded-full text-white/90 transition hover:bg-white/15 active:scale-90"
                 aria-label="Cerrar chat"
@@ -150,11 +198,15 @@ export function Assistant() {
             </header>
 
             {/* Conversación */}
-            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/60 p-4 dark:bg-olo-dark-950/40" aria-live="polite">
+            {/* Solo se anuncia la última respuesta de Olivia (no los mensajes propios). */}
+            <p className="sr-only" aria-live="polite" aria-atomic="true">
+              {loading ? '' : lastAnswer}
+            </p>
+            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/60 p-4 dark:bg-olo-dark-950/40">
               {messages.map((m, i) =>
                 m.role === 'user' ? (
                   <div key={i} className="flex animate-fade-up justify-end">
-                    <p className="max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-olo-500 to-olo-600 px-3.5 py-2.5 text-sm text-white shadow-glow dark:text-slate-950">
+                    <p className="max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-olo-700 to-olo-800 px-3.5 py-2.5 text-sm text-white shadow-glow dark:from-olo-400 dark:to-olo-500 dark:text-slate-950">
                       {m.text}
                     </p>
                   </div>
@@ -255,7 +307,7 @@ export function Assistant() {
               />
               <button
                 type="submit"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-500 to-olo-600 text-white shadow-glow transition hover:shadow-glow-lg active:scale-90 disabled:opacity-50 disabled:shadow-none dark:text-slate-950"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-600 to-olo-700 text-white shadow-glow transition hover:shadow-glow-lg active:scale-90 disabled:opacity-50 disabled:shadow-none dark:from-olo-400 dark:to-olo-500 dark:text-slate-950"
                 disabled={loading || input.trim().length < 2}
                 aria-label="Enviar pregunta"
               >

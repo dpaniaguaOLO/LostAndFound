@@ -37,6 +37,7 @@ export function FoundItemDetailPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [claimSent, setClaimSent] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   // Reporte de perdido propio al que corresponde el objeto (viene de ?perdido= al
   // llegar desde una coincidencia). Al entregarlo, ese reporte se marca resuelto.
   const [myLost, setMyLost] = useState<LostReport[]>([]);
@@ -60,6 +61,20 @@ export function FoundItemDetailPage() {
   }
 
   useEffect(load, [id]);
+
+  // ¿Ya tengo una solicitud pendiente sobre este objeto? Así no se ofrece
+  // "Reclamar" otra vez al volver a la página (el servidor lo rechazaría, UX-06).
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    services.claims
+      .mine()
+      .then((list) => active && setClaimSent(list.some((c) => c.foundItemId === id && c.status === 'PENDING')))
+      .catch(() => undefined); // si falla, se mantiene el comportamiento anterior
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   // Al abrir el formulario de reclamación: mis reportes de perdido abiertos, para
   // enlazar la reclamación (solo Supabase guarda el enlace).
@@ -91,6 +106,7 @@ export function FoundItemDetailPage() {
     e.preventDefault();
     if (!item) return;
     setSubmitting(true);
+    setClaimError(null);
     try {
       await services.claims.create(item.id, message, lostReportId || null);
       notify('Solicitud enviada. Te avisaremos cuando la revisen.', 'success');
@@ -98,7 +114,8 @@ export function FoundItemDetailPage() {
       setMessage('');
       setClaimSent(true);
     } catch (err) {
-      notify(getErrorMessage(err, 'No se pudo enviar'), 'error');
+      // Error persistente junto al formulario (WCAG 3.3.1); el toast desaparece solo.
+      setClaimError(getErrorMessage(err, 'No se pudo enviar'));
     } finally {
       setSubmitting(false);
     }
@@ -257,18 +274,29 @@ export function FoundItemDetailPage() {
       <Modal open={claimOpen} label="Reclamar objeto" onClose={() => setClaimOpen(false)}>
         <form onSubmit={submitClaim}>
           <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50">Reclamar «{item.title}»</h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Describe por qué este objeto es tuyo para ayudar a verificar la devolución.
+          <p id="claim-help" className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Describe por qué este objeto es tuyo: menciona algún detalle que solo el dueño conocería.
           </p>
+          <label className="label mt-4" htmlFor="claim-message">
+            Mensaje para quien lo encontró
+          </label>
           <textarea
-            className="input mt-4 min-h-28"
+            id="claim-message"
+            className="input min-h-28"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ej. Es mi cartera café con mi credencial dentro…"
             required
             minLength={2}
             maxLength={1000}
+            aria-describedby={claimError ? 'claim-help claim-error' : 'claim-help'}
+            aria-invalid={claimError ? true : undefined}
           />
+          {claimError && (
+            <p id="claim-error" role="alert" className="mt-2 text-sm font-medium text-red-700 dark:text-red-300">
+              {claimError}
+            </p>
+          )}
           {myLost.length > 0 && (
             <div className="mt-4">
               <label className="label" htmlFor="claim-lost">

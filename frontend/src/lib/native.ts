@@ -11,6 +11,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Keyboard } from '@capacitor/keyboard';
+import { closeTopLayer } from './layers';
 
 /** ¿La app corre como app nativa (Android) y no en un navegador web? */
 export const isNative = Capacitor.isNativePlatform();
@@ -54,8 +55,10 @@ export async function initNative(): Promise<void> {
     /* noop */
   }
 
-  // Botón atrás físico de Android: si no hay historial, minimiza en vez de salir.
+  // Botón atrás físico de Android: primero cierra la capa abierta (diálogo, chat,
+  // foto); si no hay, vuelve atrás; sin historial, minimiza en vez de salir.
   App.addListener('backButton', ({ canGoBack }) => {
+    if (closeTopLayer()) return;
     if (canGoBack) {
       window.history.back();
     } else {

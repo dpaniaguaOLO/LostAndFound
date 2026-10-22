@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { hashPassword } from '../lib/auth.js';
-import { badRequest, notFound } from '../lib/http.js';
+import { badRequest, conflict, notFound } from '../lib/http.js';
 import { queryInt } from '../lib/query.js';
 import { byUser, rateLimit } from '../lib/rateLimit.js';
 import { serializeFoundItem, serializeLostReport, serializeUser } from '../lib/serialize.js';
@@ -51,12 +51,16 @@ adminRouter.patch(
     const { role } = parseOrThrow(setRoleSchema, req.body);
     const user = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!user) throw notFound('Usuario no encontrado');
-    // Nunca dejar el sistema sin administradores.
-    if (user.role === 'ADMIN' && role !== 'ADMIN') {
-      const admins = await prisma.user.count({ where: { role: 'ADMIN' } });
-      if (admins <= 1) throw badRequest('No se puede quitar el rol al último administrador');
-    }
-    const updated = await prisma.user.update({ where: { id: user.id }, data: { role } });
+    // Nunca dejar el sistema sin administradores. Se comprueba DESPUÉS de escribir y
+    // dentro de la transacción: SQLite serializa las escrituras, así que dos
+    // degradaciones simultáneas no pueden ver ambas "otro admin" y dejar cero.
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({ where: { id: user.id }, data: { role } });
+      if (user.role === 'ADMIN' && role !== 'ADMIN' && (await tx.user.count({ where: { role: 'ADMIN' } })) === 0) {
+        throw badRequest('No se puede quitar el rol al último administrador');
+      }
+      return u;
+    });
     await writeAudit(
       req.auth!.sub,
       'USER_ROLE_CHANGED',
@@ -143,7 +147,9 @@ adminRouter.get(
 );
 
 // POST /api/admin/restore — devuelve un objeto archivado a circulación.
-// body: { kind: 'found'|'lost', id }. found => PUBLISHED, lost => OPEN.
+// body: { kind: 'found'|'lost', id }. Solo desde ARCHIVED/CLOSED (antes reabría
+// también objetos CLAIMED/RETURNED y permitía una segunda reclamación aprobada).
+// Un encontrado con reclamación APPROVED vuelve a CLAIMED; si no, a PUBLISHED.
 adminRouter.post(
   '/restore',
   asyncHandler(async (req, res) => {
@@ -151,12 +157,21 @@ adminRouter.post(
     if (kind === 'found') {
       const item = await prisma.foundItem.findUnique({ where: { id } });
       if (!item) throw notFound('Objeto no encontrado');
-      await prisma.foundItem.update({ where: { id }, data: { status: 'PUBLISHED' } });
+      if (item.status !== 'ARCHIVED') throw conflict('Solo se pueden restaurar elementos archivados');
+      const approved = await prisma.claim.count({ where: { foundItemId: id, status: 'APPROVED' } });
+      // Condicionado al estado: si otro admin lo cambió entretanto, no se pisa.
+      const { count } = await prisma.foundItem.updateMany({
+        where: { id, status: 'ARCHIVED' },
+        data: { status: approved ? 'CLAIMED' : 'PUBLISHED' },
+      });
+      if (count === 0) throw conflict('El elemento cambió mientras se restauraba');
       await writeAudit(req.auth!.sub, 'FOUND_ITEM_RESTORED', 'FoundItem', id, `Restauró "${item.title}"`);
     } else {
       const item = await prisma.lostReport.findUnique({ where: { id } });
       if (!item) throw notFound('Reporte no encontrado');
-      await prisma.lostReport.update({ where: { id }, data: { status: 'OPEN' } });
+      if (item.status !== 'CLOSED') throw conflict('Solo se pueden restaurar elementos archivados');
+      const { count } = await prisma.lostReport.updateMany({ where: { id, status: 'CLOSED' }, data: { status: 'OPEN' } });
+      if (count === 0) throw conflict('El elemento cambió mientras se restauraba');
       await writeAudit(req.auth!.sub, 'LOST_REPORT_RESTORED', 'LostReport', id, `Restauró "${item.title}"`);
     }
     res.json({ ok: true });

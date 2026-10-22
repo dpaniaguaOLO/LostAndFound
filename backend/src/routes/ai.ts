@@ -141,7 +141,9 @@ aiRouter.post(
       count = rows.length;
       foundItems = rows.map(serializeFoundItem);
     } else {
-      const w = { ...where };
+      // Misma visibilidad que el muro: solo perdidos abiertos (antes listaba también
+      // los CLOSED por moderación y los RESOLVED, INT-03).
+      const w = { ...where, status: { in: ['OPEN', 'MATCHED'] } };
       if (intent.since) (w as Record<string, unknown>).lostAt = { gte: intent.since };
       const rows = await prisma.lostReport.findMany({
         where: w,

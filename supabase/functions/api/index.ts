@@ -570,14 +570,16 @@ Deno.serve(async (req: Request) => {
       }
       const { data: target } = await sb.from('profiles').select('*').eq('id', id).single();
       if (!target) return json({ error: 'NOT_FOUND', message: 'Usuario no encontrado' }, 404);
-      // Nunca dejar el sistema sin administradores (también lo impone un trigger).
-      if (target.role === 'ADMIN' && role !== 'ADMIN') {
+      // Nunca dejar el sistema sin administradores ACTIVOS (el trigger
+      // prevent_role_escalation lo impone de forma serializada; esto es un aviso temprano).
+      if (target.role === 'ADMIN' && target.active && role !== 'ADMIN') {
         const { count } = await sb
           .from('profiles')
           .select('id', { count: 'exact', head: true })
-          .eq('role', 'ADMIN');
+          .eq('role', 'ADMIN')
+          .eq('active', true);
         if ((count ?? 0) <= 1) {
-          return json({ error: 'BAD_REQUEST', message: 'No se puede quitar el rol al último administrador' }, 400);
+          return json({ error: 'BAD_REQUEST', message: 'No se puede quitar el rol al último administrador activo' }, 400);
         }
       }
       const { data: updated, error } = await sb
@@ -586,7 +588,10 @@ Deno.serve(async (req: Request) => {
         .eq('id', id)
         .select('*')
         .single();
-      if (error) throw error;
+      if (error) {
+        if (error.hint === '400') return json({ error: 'BAD_REQUEST', message: error.message }, 400);
+        throw error;
+      }
       await writeAudit(
         sb,
         caller.id,
@@ -624,19 +629,28 @@ Deno.serve(async (req: Request) => {
           return json({ error: 'BAD_REQUEST', message: 'No se puede desactivar al último administrador activo' }, 400);
         }
       }
-      // Bloqueo también en Supabase Auth: sin esto, el desactivado podía volver a
-      // obtener un token con su contraseña (Auth no conoce `profiles.active`).
-      const { error: banErr } = await sb.auth.admin.updateUserById(targetId, {
-        ban_duration: active ? 'none' : '876000h',
-      });
-      if (banErr) return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el acceso del colaborador' }, 500);
+      // 1) Perfil primero: el trigger prevent_role_escalation valida (serializado)
+      //    que quede otro admin activo. Si lo rechaza, no se ha tocado Auth.
       const { data: updated, error } = await sb
         .from('profiles')
         .update({ active })
         .eq('id', targetId)
         .select('*')
         .single();
-      if (error) return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el colaborador' }, 500);
+      if (error) {
+        if (error.hint === '400') return json({ error: 'BAD_REQUEST', message: error.message }, 400);
+        return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el colaborador' }, 500);
+      }
+      // 2) Bloqueo también en Supabase Auth: sin esto, el desactivado podía volver a
+      //    obtener un token con su contraseña (Auth no conoce `profiles.active`).
+      //    Si falla, se revierte el perfil para no dejar un estado a medias.
+      const { error: banErr } = await sb.auth.admin.updateUserById(targetId, {
+        ban_duration: active ? 'none' : '876000h',
+      });
+      if (banErr) {
+        await sb.from('profiles').update({ active: !active }).eq('id', targetId);
+        return json({ error: 'UPDATE_FAILED', message: 'No se pudo actualizar el acceso del colaborador' }, 500);
+      }
       // Si se desactiva, revoca sus sesiones activas para que el cierre sea inmediato.
       if (!active) {
         try {
@@ -693,7 +707,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // POST /admin/restore — devuelve un objeto archivado a circulación.
-    //   { kind: 'found'|'lost', id } -> found=>PUBLISHED, lost=>OPEN.
+    //   { kind: 'found'|'lost', id }
+    // Solo desde ARCHIVED / CLOSED (antes reabría también objetos CLAIMED o
+    // RETURNED y permitía una segunda reclamación aprobada, INT-01). Se restaura al
+    // estado coherente con sus reclamaciones: un encontrado con reclamación
+    // APPROVED vuelve a CLAIMED; un perdido enlazado a una aprobada, a MATCHED.
     if (method === 'POST' && path === '/admin/restore') {
       const body = await req.json().catch(() => ({}));
       const kind = body.kind;
@@ -702,15 +720,29 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'BAD_REQUEST', message: 'kind (found|lost) e id requeridos' }, 400);
       }
       const table = kind === 'found' ? 'found_items' : 'lost_reports';
-      const newStatus = kind === 'found' ? 'PUBLISHED' : 'OPEN';
+      const fromStatus = kind === 'found' ? 'ARCHIVED' : 'CLOSED';
+      const { data: current } = await sb.from(table).select('id, status').eq('id', id).maybeSingle();
+      if (!current) return json({ error: 'NOT_FOUND', message: 'Objeto no encontrado' }, 404);
+      if (current.status !== fromStatus) {
+        return json({ error: 'CONFLICT', message: 'Solo se pueden restaurar elementos archivados' }, 409);
+      }
+      const { count: approved } = await sb
+        .from('claims')
+        .select('id', { count: 'exact', head: true })
+        .eq(kind === 'found' ? 'found_item_id' : 'lost_report_id', id)
+        .eq('status', 'APPROVED');
+      const newStatus =
+        kind === 'found' ? (approved ? 'CLAIMED' : 'PUBLISHED') : (approved ? 'MATCHED' : 'OPEN');
+      // Condicionado al estado leído: si otro admin lo cambió entretanto, no se pisa.
       const { data, error } = await sb
         .from(table)
         .update({ status: newStatus })
         .eq('id', id)
+        .eq('status', fromStatus)
         .select('id, title')
         .maybeSingle();
       if (error) throw error;
-      if (!data) return json({ error: 'NOT_FOUND', message: 'Objeto no encontrado' }, 404);
+      if (!data) return json({ error: 'CONFLICT', message: 'El elemento cambió mientras se restauraba' }, 409);
       await writeAudit(
         sb,
         caller.id,

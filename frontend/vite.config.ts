@@ -61,8 +61,30 @@ function contentSecurityPolicy(mode: string): Plugin {
   };
 }
 
+/**
+ * Valida la selección de backend al compilar (auditoría FUN-04): un valor
+ * inválido o `supabase` sin URL/clave hacían que la app cayera EN SILENCIO al
+ * backend REST (y en un APK, sin servidor alcanzable). Mejor fallar el build.
+ */
+function validateDataBackend(mode: string): Plugin {
+  return {
+    name: 'laf-validate-data-backend',
+    apply: 'build',
+    buildStart() {
+      const env = loadEnv(mode, process.cwd(), 'VITE_');
+      const backend = env.VITE_DATA_BACKEND;
+      if (backend && backend !== 'rest' && backend !== 'supabase') {
+        this.error(`VITE_DATA_BACKEND="${backend}" no es válido: usa "rest" o "supabase".`);
+      }
+      if (backend === 'supabase' && (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY)) {
+        this.error('VITE_DATA_BACKEND="supabase" requiere VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
+      }
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), contentSecurityPolicy(mode)],
+  plugins: [react(), validateDataBackend(mode), contentSecurityPolicy(mode)],
   build: {
     // Sin source maps públicos en producción (no exponer el código fuente original).
     sourcemap: false,

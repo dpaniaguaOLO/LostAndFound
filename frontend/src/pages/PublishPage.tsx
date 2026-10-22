@@ -15,7 +15,10 @@ export function PublishPage() {
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>(searchParams.get('tipo') === 'perdido' ? 'lost' : 'found');
 
+  const [formError, setFormError] = useState<string | null>(null);
+
   async function handleSubmit(values: ItemFormValues) {
+    setFormError(null);
     try {
       if (mode === 'found') {
         const created = await services.foundItems.create(itemFormData(values, 'foundAt'));
@@ -28,7 +31,7 @@ export function PublishPage() {
         navigate(`/perdidos/${created.id}`);
       }
     } catch (err) {
-      notify(getErrorMessage(err, 'No se pudo publicar'), 'error');
+      setFormError(getErrorMessage(err, 'No se pudo publicar'));
     }
   }
 
@@ -52,15 +55,14 @@ export function PublishPage() {
       <PageHeader title="Publicar" subtitle="¿Encontraste un objeto o perdiste algo? Elige una opción y completa los datos." />
 
       {/* Selector de tipo de publicación */}
-      <div className="mb-6 grid grid-cols-2 gap-3" role="tablist" aria-label="Tipo de publicación">
+      <div className="mb-6 grid grid-cols-2 gap-3" role="group" aria-label="Tipo de publicación">
         {options.map((o) => {
           const active = mode === o.key;
           return (
             <button
               key={o.key}
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={active}
               onClick={() => setMode(o.key)}
               className={
                 'flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition duration-200 active:scale-[0.98] ' +
@@ -100,6 +102,7 @@ export function PublishPage() {
         optionalLocation={mode === 'lost'}
         allowCamera={mode === 'found'}
         hint={mode === 'found' ? FOUND_HINT : LOST_HINT}
+        error={formError}
         onSubmit={handleSubmit}
       />
     </div>

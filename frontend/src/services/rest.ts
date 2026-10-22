@@ -102,6 +102,8 @@ const claims: ClaimsService = {
 
 const notifications: NotificationsService = {
   list: () => api<Notification[]>('/notifications'),
+  // El backend REST no tiene un endpoint de recuento: se cuenta sobre la lista.
+  unreadCount: async () => (await api<Notification[]>('/notifications')).filter((n) => !n.read).length,
   markRead: async (id) => {
     await api(`/notifications/${id}/read`, { method: 'PATCH' });
   },

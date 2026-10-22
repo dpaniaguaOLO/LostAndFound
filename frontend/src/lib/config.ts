@@ -57,6 +57,22 @@ export function syntheticEmail(employeeId: string): string {
 export const useSupabase = config.dataBackend === 'supabase' && config.supabase.configured;
 
 /**
+ * Error de configuración que impide arrancar con el backend correcto (FUN-04).
+ * El build ya lo comprueba (vite.config.ts); esto cubre `vite dev`. Sin esta
+ * comprobación, un valor inválido o Supabase incompleto caían a REST en silencio.
+ */
+export const configError: string | null = (() => {
+  const raw = readEnv('VITE_DATA_BACKEND');
+  if (raw && raw !== 'rest' && raw !== 'supabase') {
+    return `VITE_DATA_BACKEND="${raw}" no es válido: usa "rest" o "supabase".`;
+  }
+  if (raw === 'supabase' && !config.supabase.configured) {
+    return 'VITE_DATA_BACKEND="supabase" requiere VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.';
+  }
+  return null;
+})();
+
+/**
  * ¿Se permite el auto-registro desde la pantalla de login?
  * En modo Supabase (app interna, opción 2 con email sintético) las altas las hace
  * un administrador, así que el auto-registro queda deshabilitado. En modo REST se

@@ -198,8 +198,9 @@ export function LostReportDetailPage() {
             Coincidencias sugeridas por la IA
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
-            Objetos encontrados que podrían ser este, comparados por imagen, descripción,
-            categoría, ubicación y fecha.
+            Objetos encontrados que podrían ser este, comparados por descripción, categoría,
+            ubicación y fecha. El porcentaje es una estimación orientativa, no una prueba:
+            confírmalo viendo el objeto antes de reclamarlo.
           </p>
         </div>
         <MatchSuggestions lostReportId={item.id} defaultOpen />

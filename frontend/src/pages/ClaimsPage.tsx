@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Claim } from '@laf/shared';
-import { ConfirmDialog, EmptyState, ErrorState, ListSkeleton, Notice, PageHeader, StatusBadge, Tabs } from '../components/ui';
+import { ClaimReviewDialog } from '../components/ClaimReviewDialog';
+import { ConfirmDialog, EmptyState, ErrorState, ListSkeleton, Notice, PageHeader, StatusBadge, TabPanel, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
 import { CLAIM_STATUS_LABELS, formatDateTime } from '../lib/format';
@@ -9,8 +10,8 @@ import { services } from '../services';
 
 type Tab = 'incoming' | 'mine';
 
-/** Acción pendiente de confirmar en el diálogo. */
-type Pending = { kind: 'approve' | 'return'; claim: Claim } | null;
+/** Acción pendiente de confirmar en el diálogo simple (entregar / cancelar). */
+type Pending = { kind: 'return' | 'cancel'; claim: Claim } | null;
 
 export function ClaimsPage() {
   const { notify } = useToast();
@@ -22,6 +23,8 @@ export function ClaimsPage() {
   // con "ya fue procesada").
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Pending>(null);
+  // Aprobar / rechazar (con motivo opcional) se confirma en ClaimReviewDialog.
+  const [reviewing, setReviewing] = useState<{ claim: Claim; decision: 'APPROVED' | 'REJECTED' } | null>(null);
 
   function load() {
     setLoading(true);
@@ -49,20 +52,28 @@ export function ClaimsPage() {
     }
   }
 
-  const reject = (c: Claim) =>
-    run(c, () => services.claims.review(c.id, 'REJECTED'), 'Reclamación rechazada', 'No se pudo rechazar');
-  const approve = (c: Claim) =>
-    run(c, () => services.claims.review(c.id, 'APPROVED'), 'Reclamación aprobada. Coordina la entrega.', 'No se pudo aprobar');
   const markReturned = (c: Claim) =>
     run(c, () => services.foundItems.markReturned(c.foundItemId), 'Entrega registrada. Avisamos al dueño.', 'No se pudo registrar la entrega');
   const cancel = (c: Claim) =>
     run(c, () => services.claims.cancel(c.id), 'Reclamación cancelada', 'No se pudo cancelar');
 
+  async function confirmReview(note: string) {
+    if (!reviewing) return;
+    const { claim, decision } = reviewing;
+    setReviewing(null);
+    await run(
+      claim,
+      () => services.claims.review(claim.id, decision, note || undefined),
+      decision === 'APPROVED' ? 'Reclamación aprobada. Coordina la entrega.' : 'Reclamación rechazada',
+      decision === 'APPROVED' ? 'No se pudo aprobar' : 'No se pudo rechazar',
+    );
+  }
+
   function onConfirm() {
     if (!confirm) return;
     const { kind, claim } = confirm;
     setConfirm(null);
-    void (kind === 'approve' ? approve(claim) : markReturned(claim));
+    void (kind === 'return' ? markReturned(claim) : cancel(claim));
   }
 
   return (
@@ -70,6 +81,8 @@ export function ClaimsPage() {
       <PageHeader title="Reclamaciones" subtitle="Gestiona las solicitudes de objetos que publicaste y las que tú hiciste." />
 
       <Tabs<Tab>
+        id="claims"
+        label="Reclamaciones"
         tabs={[
           { key: 'incoming', label: 'Recibidas' },
           { key: 'mine', label: 'Mías' },
@@ -81,6 +94,7 @@ export function ClaimsPage() {
         }}
       />
 
+      <TabPanel id="claims" active={tab}>
       {loading && claims.length === 0 ? (
         <ListSkeleton />
       ) : error ? (
@@ -181,13 +195,13 @@ export function ClaimsPage() {
                 {/* Acciones */}
                 {incoming && claim.status === 'PENDING' && (
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-                    <button className="btn-secondary" disabled={busy} onClick={() => reject(claim)}>
+                    <button className="btn-secondary" disabled={busy} onClick={() => setReviewing({ claim, decision: 'REJECTED' })}>
                       Rechazar
                     </button>
                     <button
                       className="btn-primary"
                       disabled={busy || itemStatus !== 'PUBLISHED'}
-                      onClick={() => setConfirm({ kind: 'approve', claim })}
+                      onClick={() => setReviewing({ claim, decision: 'APPROVED' })}
                     >
                       Aprobar
                     </button>
@@ -202,7 +216,7 @@ export function ClaimsPage() {
                 )}
                 {!incoming && claim.status === 'PENDING' && (
                   <div className="flex sm:justify-end">
-                    <button className="btn-secondary w-full sm:w-auto" disabled={busy} onClick={() => cancel(claim)}>
+                    <button className="btn-secondary w-full sm:w-auto" disabled={busy} onClick={() => setConfirm({ kind: 'cancel', claim })}>
                       Cancelar solicitud
                     </button>
                   </div>
@@ -212,18 +226,26 @@ export function ClaimsPage() {
           })}
         </div>
       )}
+      </TabPanel>
 
       <ConfirmDialog
         open={confirm !== null}
-        title={confirm?.kind === 'approve' ? 'Aprobar reclamación' : 'Registrar entrega'}
+        title={confirm?.kind === 'cancel' ? 'Cancelar solicitud' : 'Registrar entrega'}
         message={
-          confirm?.kind === 'approve'
-            ? `Confirmas que el objeto es de ${confirm.claim.claimant.name || 'esta persona'}. Las demás solicitudes pendientes de este objeto se rechazarán automáticamente y se les avisará.`
+          confirm?.kind === 'cancel'
+            ? 'Tu solicitud de reclamación se retirará. Podrás enviar otra más adelante si el objeto sigue disponible.'
             : '¿Ya entregaste el objeto a su dueño? Le avisaremos y quedará registrado en el historial.'
         }
-        confirmLabel={confirm?.kind === 'approve' ? 'Aprobar' : 'Sí, ya lo entregué'}
+        confirmLabel={confirm?.kind === 'cancel' ? 'Sí, cancelar' : 'Sí, ya lo entregué'}
         onConfirm={onConfirm}
         onCancel={() => setConfirm(null)}
+      />
+
+      <ClaimReviewDialog
+        claim={reviewing?.claim ?? null}
+        decision={reviewing?.decision ?? null}
+        onConfirm={confirmReview}
+        onCancel={() => setReviewing(null)}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { Logo } from '../components/Logo';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { allowSelfRegister } from '../lib/config';
+import { allowSelfRegister, useSupabase } from '../lib/config';
 import { getErrorMessage } from '../lib/errors';
 
 export function LoginPage() {
@@ -19,6 +19,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = 'Iniciar sesión · Lost & Found OLO';
@@ -29,6 +30,7 @@ export function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setLoginError(null);
     try {
       if (mode === 'login') {
         await login({ employeeId, password }, remember);
@@ -38,14 +40,15 @@ export function LoginPage() {
       notify('Sesión iniciada', 'success');
       navigate('/');
     } catch (err) {
-      notify(getErrorMessage(err, 'No se pudo completar la operación'), 'error');
+      // Persistente y anunciado junto al formulario (WCAG 3.3.1), no solo un toast efímero.
+      setLoginError(getErrorMessage(err, 'No se pudo completar la operación'));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       {/* Fondo: manchas de color de marca difuminadas */}
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
         <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-olo-300/30 blur-3xl dark:bg-olo-500/15" />
@@ -165,6 +168,12 @@ export function LoginPage() {
             </label>
           )}
 
+          {loginError && (
+            <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              {loginError}
+            </p>
+          )}
+
           <button className="btn-primary mt-1 w-full py-3 text-base sm:text-sm" type="submit" disabled={submitting}>
             {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />}
             {submitting ? 'Procesando…' : mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
@@ -189,14 +198,15 @@ export function LoginPage() {
           </p>
         )}
 
-        {/* Credenciales demo solo en desarrollo: no deben aparecer en builds de producción (APK). */}
-        {import.meta.env.DEV && (
+        {/* Credenciales demo solo en desarrollo y solo con el backend local (Express):
+            en modo Supabase apuntarían a cuentas reales. */}
+        {import.meta.env.DEV && !useSupabase && (
           <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-3 text-center text-xs text-slate-500 dark:border-olo-dark-700 dark:bg-olo-dark-850 dark:text-slate-400">
             Cuentas de prueba: colaborador <strong>1001</strong> (admin) /{' '}
             <strong>2002</strong> (colaborador) — contraseña <strong>password123</strong>
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

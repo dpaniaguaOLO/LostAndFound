@@ -247,3 +247,53 @@ test('rate limiting: login por IP/usuario y endpoints de IA por usuario', async 
   assert.equal(ai!.status, 429);
   assert.equal((await call('POST', '/api/ai/assistant', { token: tokens.ana, body: { question: 'objetos encontrados' } })).status, 200, 'otro usuario no se ve afectado');
 });
+
+// --- Auditoría 2026-10-22: INT-01 (restaurar) e INT-06 (último admin) -----------
+test('restaurar: solo desde ARCHIVED y respetando la reclamación aprobada', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Termo azul' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mío' } })).data;
+  assert.equal((await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.ana, body: { status: 'APPROVED' } })).status, 200);
+  assert.equal((await call('POST', '/api/admin/restore', { token: tokens.admin, body: { kind: 'found', id: item.id } })).status, 409, 'no archivado');
+  assert.equal((await call('PATCH', `/api/found-items/${item.id}/archive`, { token: tokens.admin })).status, 200);
+  assert.equal((await call('POST', '/api/admin/restore', { token: tokens.admin, body: { kind: 'found', id: item.id } })).status, 200);
+  assert.equal((await call('GET', `/api/found-items/${item.id}`, { token: tokens.ana })).data.status, 'CLAIMED', 'vuelve a CLAIMED, no a PUBLISHED');
+  const second = await call('POST', '/api/claims', { token: tokens.carla, body: { foundItemId: item.id, message: 'También mío' } });
+  assert.equal(second.status, 400, 'no se puede abrir una segunda reclamación');
+});
+
+test('no se puede quitar el rol al último administrador', async () => {
+  const r = await call('PATCH', `/api/admin/users/${ids.admin}/role`, { token: tokens.admin, body: { role: 'EMPLOYEE' } });
+  assert.equal(r.status, 400);
+  assert.equal((await call('GET', '/api/admin/stats', { token: tokens.admin })).status, 200, 'sigue siendo admin');
+});
+
+// --- Auditoría 2026-10-22: paridad del backend REST (FUN-01, INT-02/03/04) ------
+test('FUN-01: editar con multipart funciona (sin reenviar la fecha)', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Bufanda' }) })).data;
+  const f = new FormData();
+  for (const [k, v] of Object.entries({ title: 'Bufanda gris', description: 'De lana', category: 'CLOTHING', location: 'Lobby' })) f.set(k, v);
+  const r = await call('PATCH', `/api/found-items/${item.id}`, { token: tokens.ana, form: f });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.title, 'Bufanda gris');
+  assert.equal(r.data.foundAt, item.foundAt, 'la fecha se conserva si no se envía');
+});
+
+test('INT-02: reclamaciones simultáneas del mismo usuario no se duplican', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Reloj' }) })).data;
+  const res = await Promise.all([1, 2, 3].map(() =>
+    call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mío' } })));
+  assert.equal(res.filter((r) => r.status === 201).length, 1, res.map((r) => r.status).join(','));
+  const pending = await prisma.claim.count({ where: { foundItemId: item.id, status: 'PENDING' } });
+  assert.equal(pending, 1);
+});
+
+test('INT-03/04: lo archivado se oculta, no lo reabre el autor y cierra las pendientes', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Mochila' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mía' } })).data;
+  assert.equal((await call('PATCH', `/api/found-items/${item.id}/archive`, { token: tokens.admin })).status, 200);
+  assert.equal((await prisma.claim.findUnique({ where: { id: claim.id } }))!.status, 'REJECTED', 'pendiente cerrada');
+  assert.ok((await call('GET', '/api/notifications', { token: tokens.beto })).data.some((n: any) => n.title === 'Objeto retirado'));
+  assert.equal((await call('GET', `/api/found-items/${item.id}`, { token: tokens.carla })).status, 404, 'tercero no lo ve');
+  assert.equal((await call('GET', `/api/found-items/${item.id}`, { token: tokens.ana })).status, 200, 'el autor sí');
+  assert.equal((await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.ana })).status, 403, 'no lo reabre');
+});

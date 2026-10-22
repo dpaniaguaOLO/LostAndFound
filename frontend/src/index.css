@@ -10,6 +10,10 @@
     font-family: 'Open Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
+    /* WCAG 2.4.11: al moverse con Tab, el foco no debe quedar tapado por la
+       cabecera fija ni por la navegación inferior / barra de acción / Olivia. */
+    scroll-padding-top: 5rem;
+    scroll-padding-bottom: 10rem;
   }
   body {
     /* Claro: tinta de marca sobre neutro claro con un leve halo verde arriba.
@@ -73,9 +77,11 @@
   .btn {
     @apply inline-flex min-h-11 select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 ease-out-expo active:scale-[0.97] disabled:pointer-events-none disabled:opacity-55 sm:min-h-10 sm:py-2;
   }
-  /* Acción principal = verde de marca OLO con degradado y halo (se aclara en oscuro) */
+  /* Acción principal = verde de marca OLO con degradado y halo (se aclara en oscuro).
+     Claro: texto blanco sobre olo-700→olo-800 (5,74–8,2:1). Con olo-500/600 daba
+     3,1–4,1:1 y no cumplía WCAG 1.4.3 (auditoría A11Y-01). */
   .btn-primary {
-    @apply btn bg-gradient-to-b from-olo-500 to-olo-600 text-white shadow-glow hover:from-olo-600 hover:to-olo-700 hover:shadow-glow-lg dark:from-olo-400 dark:to-olo-500 dark:text-slate-950 dark:hover:from-olo-300 dark:hover:to-olo-400;
+    @apply btn bg-gradient-to-b from-olo-700 to-olo-800 text-white shadow-glow hover:from-olo-800 hover:to-olo-900 hover:shadow-glow-lg dark:from-olo-400 dark:to-olo-500 dark:text-slate-950 dark:hover:from-olo-300 dark:hover:to-olo-400;
   }
   .btn-secondary {
     @apply btn border border-slate-200 bg-white text-slate-700 shadow-card hover:border-slate-300 hover:bg-slate-50 dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:text-slate-200 dark:hover:border-olo-dark-700 dark:hover:bg-olo-dark-850;
@@ -84,16 +90,18 @@
     @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-850;
   }
   .btn-danger {
-    @apply btn bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_6px_20px_-6px_rgb(220_38_38/0.5)] hover:from-red-600 hover:to-red-700;
+    @apply btn bg-gradient-to-b from-red-600 to-red-700 text-white shadow-[0_6px_20px_-6px_rgb(220_38_38/0.5)] hover:from-red-700 hover:to-red-800;
   }
   .icon-btn {
     @apply inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 active:scale-95 dark:text-slate-300 dark:hover:bg-olo-dark-850 sm:h-10 sm:w-10;
   }
 
   /* --- Formularios ---
-     16px en móvil para que iOS no haga zoom al enfocar; 14px desde sm. */
+     16px en móvil para que iOS no haga zoom al enfocar; 14px desde sm.
+     Contraste (auditoría A11Y-02/12): borde ≥3:1 (WCAG 1.4.11) y placeholder
+     ≥4,5:1 en claro y oscuro. */
   .input {
-    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-ink shadow-inner-soft transition placeholder:text-slate-400 hover:border-slate-300 focus:border-olo-500 focus:outline-none focus:ring-4 focus:ring-olo-500/15 dark:border-olo-dark-800 dark:bg-olo-dark-850 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-olo-dark-700 dark:focus:border-olo-400 dark:focus:ring-olo-400/15 sm:py-2 sm:text-sm;
+    @apply w-full rounded-xl border border-[#868f9e] bg-white px-3.5 py-2.5 text-base text-ink shadow-inner-soft transition placeholder:text-slate-500 hover:border-slate-500 focus:border-olo-600 focus:outline-none focus:ring-4 focus:ring-olo-500/20 dark:border-[#6b7584] dark:bg-olo-dark-850 dark:text-slate-100 dark:placeholder:text-slate-400 dark:hover:border-slate-400 dark:focus:border-olo-400 dark:focus:ring-olo-400/20 sm:py-2 sm:text-sm;
   }
   select.input {
     @apply cursor-pointer appearance-none bg-no-repeat pr-10;

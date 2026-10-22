@@ -3,12 +3,23 @@ import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { serializeFoundItem } from '../lib/serialize.js';
-import { createFoundItemSchema, parseOrThrow } from '../lib/validation.js';
+import { createFoundItemSchema, parseOrThrow, updateFoundItemSchema } from '../lib/validation.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
 import { notify } from '../lib/notify.js';
+
+/** Aviso a un reclamante cuyo objeto se retira (archivado o eliminado). */
+function removedNotice(userId: string, title: string, reason: string) {
+  return {
+    userId,
+    type: 'SYSTEM',
+    title: 'Objeto retirado',
+    body: `"${title}" ${reason}, así que tu reclamación ya no sigue en curso.`,
+    relatedItemId: null,
+  };
+}
 import { likeSafe, pagination, queryString } from '../lib/query.js';
 import { byUser, rateLimit } from '../lib/rateLimit.js';
 
@@ -78,6 +89,10 @@ foundItemsRouter.get(
       include: reporterSelect,
     });
     if (!item) throw notFound('Objeto no encontrado');
+    // Archivado (moderado): solo lo ven su autor y los admins (como la RLS de Supabase).
+    if (item.status === 'ARCHIVED' && item.reporterId !== req.auth!.sub && req.auth!.role !== 'ADMIN') {
+      throw notFound('Objeto no encontrado');
+    }
     res.json(serializeFoundItem(item));
   }),
 );
@@ -131,6 +146,8 @@ foundItemsRouter.patch(
     const isAdmin = req.auth!.role === 'ADMIN';
     if (!isOwner && !isAdmin) throw forbidden('Solo el autor o un administrador puede marcar la devoluciÃ³n');
     if (item.status === 'RETURNED') throw badRequest('El objeto ya fue marcado como devuelto');
+    // Lo archivado por moderación no lo reabre su autor (como el trigger de Supabase).
+    if (item.status === 'ARCHIVED' && !isAdmin) throw forbidden('El objeto está archivado');
 
     // Igual que el trigger found_items_on_returned de Supabase: avisar al reclamante
     // aprobado y cerrar (con aviso) las reclamaciones pendientes, que ya no pueden prosperar.
@@ -185,14 +202,33 @@ foundItemsRouter.patch(
 foundItemsRouter.patch(
   '/:id',
   authenticate,
+  // multipart: el frontend envía el mismo FormData que al publicar (antes sin este
+  // middleware req.body llegaba vacío y la edición fallaba SIEMPRE con 400, FUN-01).
+  uploadImage,
   asyncHandler(async (req, res) => {
     const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
     const isOwner = item.reporterId === req.auth!.sub;
     const isAdmin = req.auth!.role === 'ADMIN';
     if (!isOwner && !isAdmin) throw forbidden('No puedes editar este objeto');
+    // Lo moderado (archivado) solo lo edita un admin, como la RLS de Supabase.
+    if (item.status === 'ARCHIVED' && !isAdmin) throw forbidden('No puedes editar un objeto archivado');
 
-    const body = parseOrThrow(createFoundItemSchema, req.body);
+    const body = parseOrThrow(updateFoundItemSchema, req.body);
+    let imageUrl = item.imageUrl;
+    let imageSignature = item.imageSignature;
+    if (req.file) {
+      imageUrl = publicUrlFor(req.file.filename);
+      try {
+        imageSignature = serializeSignature(await computeSignature(diskPathFor(req.file.filename)));
+      } catch (e) {
+        console.error('[visual-signature]', e);
+        imageSignature = null;
+      }
+    } else if (body.removeImage) {
+      imageUrl = null;
+      imageSignature = null;
+    }
     const updated = await prisma.foundItem.update({
       where: { id: item.id },
       data: {
@@ -200,10 +236,13 @@ foundItemsRouter.patch(
         description: body.description,
         category: body.category,
         location: body.location,
-        foundAt: new Date(body.foundAt),
+        ...(body.foundAt ? { foundAt: new Date(body.foundAt) } : {}),
+        imageUrl,
+        imageSignature,
       },
       include: reporterSelect,
     });
+    if (imageUrl !== item.imageUrl) await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'FOUND_ITEM_EDITED', 'FoundItem', item.id, item.title);
     res.json(serializeFoundItem(updated));
   }),
@@ -217,12 +256,22 @@ foundItemsRouter.patch(
   asyncHandler(async (req, res) => {
     const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
-    const updated = await prisma.foundItem.update({
-      where: { id: item.id },
-      data: { status: 'ARCHIVED' },
-      include: reporterSelect,
+    // Igual que el trigger found_items_on_archived de Supabase (INT-04): las
+    // pendientes se cierran y se avisa a los reclamantes en curso.
+    const actorId = req.auth!.sub;
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.foundItem.update({ where: { id: item.id }, data: { status: 'ARCHIVED' }, include: reporterSelect });
+      const active = await tx.claim.findMany({ where: { foundItemId: item.id, status: { in: ['PENDING', 'APPROVED'] } } });
+      await tx.claim.updateMany({
+        where: { foundItemId: item.id, status: 'PENDING' },
+        data: { status: 'REJECTED', reviewNote: 'El objeto fue retirado por un administrador' },
+      });
+      for (const c of active) {
+        await tx.notification.create({ data: removedNotice(c.claimantId, item.title, 'fue retirado del muro por un administrador') });
+      }
+      return u;
     });
-    await writeAudit(req.auth!.sub, 'FOUND_ITEM_ARCHIVED', 'FoundItem', item.id, item.title);
+    await writeAudit(actorId, 'FOUND_ITEM_ARCHIVED', 'FoundItem', item.id, item.title);
     res.json(serializeFoundItem(updated));
   }),
 );
@@ -235,11 +284,16 @@ foundItemsRouter.delete(
   asyncHandler(async (req, res) => {
     const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
-    // Borra primero las reclamaciones asociadas para respetar la relaciÃ³n.
-    await prisma.$transaction([
-      prisma.claim.deleteMany({ where: { foundItemId: item.id } }),
-      prisma.foundItem.delete({ where: { id: item.id } }),
-    ]);
+    // Avisa a los reclamantes en curso y borra las reclamaciones asociadas
+    // (como el trigger found_items_on_delete de Supabase, INT-04).
+    await prisma.$transaction(async (tx) => {
+      const active = await tx.claim.findMany({ where: { foundItemId: item.id, status: { in: ['PENDING', 'APPROVED'] } } });
+      for (const c of active) {
+        await tx.notification.create({ data: removedNotice(c.claimantId, item.title, 'fue eliminado por un administrador') });
+      }
+      await tx.claim.deleteMany({ where: { foundItemId: item.id } });
+      await tx.foundItem.delete({ where: { id: item.id } });
+    });
     await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'FOUND_ITEM_DELETED', 'FoundItem', item.id, item.title);
     res.json({ ok: true });

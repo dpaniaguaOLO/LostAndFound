@@ -215,7 +215,8 @@ export function MatchSuggestions({
                     <>
                       <button
                         onClick={() => setExpanded(expanded === s.item.id ? null : s.item.id)}
-                        className="mt-2 text-xs font-medium text-olo-700 hover:underline dark:text-olo-400"
+                        className="mt-2 min-h-6 text-xs font-medium text-olo-700 hover:underline dark:text-olo-400"
+                        aria-expanded={expanded === s.item.id}
                       >
                         {expanded === s.item.id ? 'Ocultar desglose' : 'Ver por qué coincide'}
                       </button>

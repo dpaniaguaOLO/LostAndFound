@@ -41,14 +41,23 @@ claimsRouter.post(
     });
     if (existing) throw badRequest('Ya tienes una reclamación pendiente para este objeto');
 
-    const claim = await prisma.claim.create({
-      data: {
-        foundItemId: item.id,
-        claimantId: req.auth!.sub,
-        message: body.message,
-      },
-      include: claimInclude,
-    });
+    // El índice único parcial Claim_unique_pending (migración 20261022120000) cierra
+    // la carrera entre la comprobación anterior y este INSERT (INT-02).
+    const claim = await prisma.claim
+      .create({
+        data: {
+          foundItemId: item.id,
+          claimantId: req.auth!.sub,
+          message: body.message,
+        },
+        include: claimInclude,
+      })
+      .catch((e: unknown) => {
+        if ((e as { code?: string }).code === 'P2002') {
+          throw badRequest('Ya tienes una reclamación pendiente para este objeto');
+        }
+        throw e;
+      });
 
     // Notifica a quien publicó el objeto.
     await notify({

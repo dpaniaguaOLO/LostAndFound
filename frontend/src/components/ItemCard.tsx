@@ -41,7 +41,7 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
   return (
     <Link to={`/objetos/${item.id}`} className="card-interactive group flex flex-col overflow-hidden">
       <div className="relative">
-        <ItemImage src={item.imageUrl} alt={item.title} />
+        <ItemImage src={item.imageUrl} alt="" />
         <div className="absolute left-3 top-3">
           <span className="rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
             <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
@@ -49,9 +49,9 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
+        <h2 className="text-base line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
           {item.title}
-        </h3>
+        </h2>
         <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
         <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={item.foundAt} />
       </div>
@@ -78,7 +78,7 @@ function LostReportCardBody({ item }: { item: LostReport }) {
   return (
     <>
       <div className="relative">
-        <ItemImage src={item.imageUrl} alt={item.title} />
+        <ItemImage src={item.imageUrl} alt="" />
         <div className="absolute left-3 top-3">
           <span className="rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
             <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
@@ -86,9 +86,9 @@ function LostReportCardBody({ item }: { item: LostReport }) {
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
+        <h2 className="text-base line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
           {item.title}
-        </h3>
+        </h2>
         <p className="line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{item.description}</p>
         <CardMeta category={CATEGORY_LABELS[item.category]} location={item.location} date={item.lostAt} />
       </div>

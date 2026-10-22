@@ -24,7 +24,7 @@ import type {
 } from '@laf/shared';
 import { syntheticEmail } from '../lib/config';
 import { NotAvailableError } from '../lib/errors';
-import { requireSupabase } from '../lib/supabase';
+import { requireSupabase, setRememberDevice } from '../lib/supabase';
 import type {
   AuthService,
   ClaimsService,
@@ -183,18 +183,28 @@ const EXT_BY_TYPE: Record<string, string> = {
   'image/gif': 'gif',
 };
 
-async function uploadPhoto(file: File): Promise<string> {
+/**
+ * Sube una foto a "<carpeta>/<uuid>.<ext>". La carpeta es la del AUTOR de la
+ * publicación (`ownerId`): la BD exige que la foto esté en la carpeta del autor
+ * (CHECK image_owner_chk), también cuando edita un admin (FUN-02).
+ */
+async function uploadPhoto(file: File, ownerId?: string): Promise<string> {
   const sb = requireSupabase();
-  const uid = await currentUserId();
+  const folder = ownerId ?? (await currentUserId());
   const ext = EXT_BY_TYPE[file.type];
   if (!ext) throw new Error('Formato de imagen no permitido. Usa JPG, PNG, WEBP o GIF.');
-  const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
   const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, file, {
     contentType: file.type,
     upsert: false,
   });
   if (error) throw error;
   return path;
+}
+
+/** Borra (best-effort) una foto recién subida cuyo guardado en la BD falló. */
+function discardUpload(path: string | null): void {
+  if (path) void requireSupabase().storage.from(PHOTO_BUCKET).remove([path]).catch(() => undefined);
 }
 
 /**
@@ -205,10 +215,14 @@ async function uploadPhoto(file: File): Promise<string> {
 async function updateItem(table: 'found_items' | 'lost_reports', id: string, form: FormData) {
   const sb = requireSupabase();
   const f = readItemForm(form);
-  const { data: current, error: readErr } = await sb.from(table).select('image_path').eq('id', id).maybeSingle();
+  const { data: current, error: readErr } = await sb
+    .from(table)
+    .select('image_path, reporter_id')
+    .eq('id', id)
+    .maybeSingle();
   if (readErr) throw readErr;
   if (!current) throw new NotAvailableError();
-  const oldPath = (current?.image_path as string | null) ?? null;
+  const oldPath = (current.image_path as string | null) ?? null;
 
   const patch: Record<string, unknown> = {
     title: f.title,
@@ -218,11 +232,15 @@ async function updateItem(table: 'found_items' | 'lost_reports', id: string, for
   };
   const date = table === 'found_items' ? f.foundAt : f.lostAt;
   if (date) patch[table === 'found_items' ? 'found_at' : 'lost_at'] = date;
-  if (f.image) patch.image_path = await uploadPhoto(f.image);
+  const newPath = f.image ? await uploadPhoto(f.image, current.reporter_id as string) : null;
+  if (newPath) patch.image_path = newPath;
   else if (form.get('removeImage') === '1') patch.image_path = null;
 
   const { data, error } = await sb.from(table).update(patch).eq('id', id).select(REPORTER_SELECT).single();
-  if (error) throw error;
+  if (error) {
+    discardUpload(newPath); // sin esto la foto quedaba huérfana (INT-05)
+    throw error;
+  }
   if (oldPath && 'image_path' in patch && patch.image_path !== oldPath) {
     void sb.storage.from(PHOTO_BUCKET).remove([oldPath]).catch(() => undefined);
   }
@@ -276,8 +294,9 @@ const auth: AuthService = {
     return user;
   },
 
-  async login(employeeId, password) {
+  async login(employeeId, password, remember = true) {
     const sb = requireSupabase();
+    setRememberDevice(remember);
     // Opción 2 (email sintético): el email se deriva del número de colaborador,
     // así el login no depende de una consulta previa a profiles (que además
     // estaría bloqueada por RLS antes de autenticar).
@@ -400,7 +419,10 @@ const foundItems: FoundItemsService = {
       })
       .select(REPORTER_SELECT)
       .single();
-    if (error) throw error;
+    if (error) {
+      discardUpload(imagePath); // la foto ya subida no debe quedar huérfana (INT-05)
+      throw error;
+    }
     return toFoundItem(data);
   },
 
@@ -498,7 +520,10 @@ const lostReports: LostReportsService = {
       })
       .select(REPORTER_SELECT)
       .single();
-    if (error) throw error;
+    if (error) {
+      discardUpload(imagePath); // la foto ya subida no debe quedar huérfana (INT-05)
+      throw error;
+    }
     // Aviso automático si ya hay un encontrado muy parecido (Edge Function, en
     // segundo plano: si falla no debe impedir que el reporte quede creado).
     void sb.functions
@@ -628,6 +653,16 @@ const notifications: NotificationsService = {
       relatedItemId: (n.related_item_id as string | null) ?? null,
       createdAt: n.created_at as string,
     }));
+  },
+  async unreadCount() {
+    // HEAD + count: solo el número (la RLS limita a las propias). Antes se
+    // descargaban hasta 100 filas completas en cada navegación (PERF-01).
+    const { count, error } = await requireSupabase()
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('read', false);
+    if (error) throw error;
+    return count ?? 0;
   },
   async markRead(id) {
     const { error } = await requireSupabase().from('notifications').update({ read: true }).eq('id', id);

@@ -70,6 +70,8 @@ export interface ClaimsService {
 
 export interface NotificationsService {
   list(): Promise<Notification[]>;
+  /** Solo el número de no leídas (para la campana; no descarga las notificaciones). */
+  unreadCount(): Promise<number>;
   markRead(id: string): Promise<void>;
   markAllRead(): Promise<void>;
 }

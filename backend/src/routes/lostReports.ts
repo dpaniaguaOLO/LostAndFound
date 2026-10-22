@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { forbidden, notFound } from '../lib/http.js';
+import { badRequest, forbidden, notFound } from '../lib/http.js';
 import { serializeLostReport } from '../lib/serialize.js';
-import { createLostReportSchema, parseOrThrow } from '../lib/validation.js';
+import { createLostReportSchema, parseOrThrow, updateLostReportSchema } from '../lib/validation.js';
 import { notifyBestMatchForLost } from '../lib/matchNotify.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
@@ -78,6 +78,10 @@ lostReportsRouter.get(
       include: reporterSelect,
     });
     if (!item) throw notFound('Reporte no encontrado');
+    // Cerrado (moderado): solo lo ven su autor y los admins (como la RLS de Supabase).
+    if (item.status === 'CLOSED' && item.reporterId !== req.auth!.sub && req.auth!.role !== 'ADMIN') {
+      throw notFound('Reporte no encontrado');
+    }
     res.json(serializeLostReport(item));
   }),
 );
@@ -140,8 +144,14 @@ lostReportsRouter.patch(
     const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Reporte no encontrado');
     const isOwner = item.reporterId === req.auth!.sub;
-    if (!isOwner && req.auth!.role !== 'ADMIN') {
+    const isAdmin = req.auth!.role === 'ADMIN';
+    if (!isOwner && !isAdmin) {
       throw forbidden('Solo el autor o un administrador puede resolver el reporte');
+    }
+    // Como el trigger lost_reports_guard_status de Supabase: el autor solo resuelve
+    // un reporte abierto (no reabre lo cerrado por moderación, INT-03).
+    if (!isAdmin && item.status !== 'OPEN' && item.status !== 'MATCHED') {
+      throw badRequest('Este reporte ya no está abierto');
     }
     const updated = await prisma.lostReport.update({
       where: { id: item.id },
@@ -176,13 +186,31 @@ lostReportsRouter.patch(
 lostReportsRouter.patch(
   '/:id',
   authenticate,
+  // multipart: sin este middleware req.body llegaba vacío y editar fallaba (FUN-01).
+  uploadImage,
   asyncHandler(async (req, res) => {
     const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Reporte no encontrado');
     const isOwner = item.reporterId === req.auth!.sub;
-    if (!isOwner && req.auth!.role !== 'ADMIN') throw forbidden('No puedes editar este reporte');
+    const isAdmin = req.auth!.role === 'ADMIN';
+    if (!isOwner && !isAdmin) throw forbidden('No puedes editar este reporte');
+    if (item.status === 'CLOSED' && !isAdmin) throw forbidden('No puedes editar un reporte cerrado');
 
-    const body = parseOrThrow(createLostReportSchema, req.body);
+    const body = parseOrThrow(updateLostReportSchema, req.body);
+    let imageUrl = item.imageUrl;
+    let imageSignature = item.imageSignature;
+    if (req.file) {
+      imageUrl = publicUrlFor(req.file.filename);
+      try {
+        imageSignature = serializeSignature(await computeSignature(diskPathFor(req.file.filename)));
+      } catch (e) {
+        console.error('[visual-signature]', e);
+        imageSignature = null;
+      }
+    } else if (body.removeImage) {
+      imageUrl = null;
+      imageSignature = null;
+    }
     const updated = await prisma.lostReport.update({
       where: { id: item.id },
       data: {
@@ -190,10 +218,13 @@ lostReportsRouter.patch(
         description: body.description,
         category: body.category,
         location: body.location ?? '',
-        lostAt: new Date(body.lostAt),
+        ...(body.lostAt ? { lostAt: new Date(body.lostAt) } : {}),
+        imageUrl,
+        imageSignature,
       },
       include: reporterSelect,
     });
+    if (imageUrl !== item.imageUrl) await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'LOST_REPORT_EDITED', 'LostReport', item.id, item.title);
     res.json(serializeLostReport(updated));
   }),

@@ -343,3 +343,68 @@ test('archivar un objeto: cierra pendientes, avisa y audita; un no-admin no pued
   assert.equal((await one(`select status from public.claims where id = $1`, [claim])).status, 'REJECTED');
   assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_ARCHIVED'`, [item])).n, 1);
 });
+
+
+// --- Migración 012: integridad de reclamaciones y administradores ------------
+test('INT-01: un objeto no puede tener dos reclamaciones aprobadas', async () => {
+  const item = await newItem(B);
+  const c1 = await newClaim(item, C);
+  await review(c1, B, 'APPROVED');
+  // Simula el escenario de la restauración defectuosa: objeto otra vez PUBLISHED.
+  await asServer(`update public.found_items set status = 'PUBLISHED' where id = $1`, [item]);
+  const c2 = await newClaim(item, D);
+  const err = await error(() => review(c2, B, 'APPROVED'));
+  assert.ok(err, 'la segunda aprobación debe fallar');
+  assert.equal((await one(`select count(*)::int n from public.claims where found_item_id = $1 and status = 'APPROVED'`, [item])).n, 1);
+});
+
+test('INT-06: siempre queda al menos un administrador ACTIVO', async () => {
+  const F = '00000000-0000-0000-0000-0000000000f1';
+  const G = '00000000-0000-0000-0000-0000000000f2';
+  await asServer(`insert into auth.users values ($1, '6006@x', $2), ($3, '7007@x', $4)`,
+    [F, { name: 'F', employee_id: '6006' }, G, { name: 'G', employee_id: '7007' }]);
+  // Escenario aislado: F único admin activo; G admin desactivado; A temporalmente empleado.
+  await asServer(`update public.profiles set role = 'ADMIN' where id in ($1, $2)`, [F, G]);
+  await asServer(`update public.profiles set active = false where id = $1`, [G]);
+  await asServer(`update public.profiles set role = 'EMPLOYEE' where id = $1`, [A]);
+
+  assert.ok(await error(() => asServer(`update public.profiles set role = 'EMPLOYEE' where id = $1`, [F])),
+    'no se puede degradar al último admin activo aunque exista uno inactivo');
+  assert.ok(await error(() => asServer(`update public.profiles set active = false where id = $1`, [F])),
+    'no se puede desactivar al último admin activo');
+  // Con otro admin activo, sí se puede.
+  await asServer(`update public.profiles set role = 'ADMIN' where id = $1`, [A]);
+  await asServer(`update public.profiles set role = 'EMPLOYEE' where id = $1`, [F]);
+  assert.equal((await one(`select role from public.profiles where id = $1`, [F])).role, 'EMPLOYEE');
+});
+
+
+// --- Migración 013: visibilidad de fotos ---------------------------------------
+test('SEC-04: solo se leen las fotos propias, de publicaciones visibles, o siendo admin', async () => {
+  const photo = (n) => `${B}/${n}.jpg`;
+  for (const n of ['visible', 'archivada', 'huerfana']) {
+    await asServer(`insert into storage.objects (bucket_id, name) values ('item-photos', $1)`, [photo(n)]);
+  }
+  const visible = (await one(`insert into public.found_items (title, description, category, found_at, reporter_id, image_path)
+                              values ('Gorra', 'roja', 'CLOTHING', now(), $1, $2) returning id`, [B, photo('visible')])).id;
+  const archived = (await one(`insert into public.found_items (title, description, category, found_at, reporter_id, image_path)
+                               values ('DNI', 'documento', 'DOCUMENTS', now(), $1, $2) returning id`, [B, photo('archivada')])).id;
+  await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [archived]);
+
+  const canRead = async (user, n) =>
+    (await asUser(user, `select 1 from storage.objects where bucket_id = 'item-photos' and name = $1`, [photo(n)])).rows.length === 1;
+  assert.equal(await canRead(D, 'visible'), true, 'foto de una publicación visible');
+  assert.equal(await canRead(D, 'archivada'), false, 'foto de algo archivado: oculta a terceros');
+  assert.equal(await canRead(D, 'huerfana'), false, 'foto sin publicación: oculta a terceros');
+  assert.equal(await canRead(B, 'huerfana'), true, 'el dueño ve sus fotos');
+  assert.equal(await canRead(A, 'archivada'), true, 'el admin ve todo');
+  // Listar el bucket ya no revela las carpetas (UUID) de otros usuarios.
+  const listed = (await asUser(D, `select name from storage.objects where bucket_id = 'item-photos'`)).rows.map((r) => r.name);
+  assert.ok(!listed.includes(photo('huerfana')) && !listed.includes(photo('archivada')));
+  void visible;
+});
+
+test('FUN-02: un admin puede subir a la carpeta del autor; un empleado no', async () => {
+  await asUser(A, `insert into storage.objects (bucket_id, name) values ('item-photos', $1)`, [`${B}/por-admin.jpg`]);
+  assert.ok(await error(() => asUser(D, `insert into storage.objects (bucket_id, name) values ('item-photos', $1)`, [`${B}/intruso.jpg`])));
+});

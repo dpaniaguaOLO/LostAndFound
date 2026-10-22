@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
-import { CardGridSkeleton, EmptyState, ErrorState, Notice, PageHeader, Tabs } from '../components/ui';
+import { CardGridSkeleton, EmptyState, ErrorState, Notice, PageHeader, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { cacheGet, cacheSet } from '../lib/cache';
 import { getErrorMessage } from '../lib/errors';
@@ -183,9 +183,10 @@ export function WallPage() {
 
   return (
     <div>
+      {/* El h1 describe la página (WCAG 2.4.6); el saludo va en el subtítulo. */}
       <PageHeader
-        title={firstName ? `${greeting()}, ${firstName}` : 'Muro'}
-        subtitle="Objetos publicados por los colaboradores en las instalaciones."
+        title="Muro de objetos"
+        subtitle={`${firstName ? `${greeting()}, ${firstName}. ` : ''}Objetos publicados por los colaboradores en las instalaciones.`}
         action={
           <Link to="/publicar" className="btn-primary hidden md:inline-flex">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -199,6 +200,8 @@ export function WallPage() {
       <ForYou />
 
       <Tabs<Tab>
+        id="wall"
+        label="Tipo de publicación"
         tabs={[
           { key: 'found', label: 'Encontrados', count: found?.total },
           { key: 'lost', label: 'Perdidos', count: lost?.total },
@@ -207,6 +210,7 @@ export function WallPage() {
         onChange={setTab}
       />
 
+      <TabPanel id="wall" active={tab}>
       <Filters value={filters} onChange={setFilters} />
 
       {offlineSince && (
@@ -275,6 +279,7 @@ export function WallPage() {
           )}
         </>
       )}
+      </TabPanel>
     </div>
   );
 }
