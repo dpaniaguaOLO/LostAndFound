@@ -325,3 +325,20 @@ test('el autor elimina sus publicaciones, salvo con entrega en curso o moderadas
   await call('PATCH', `/api/lost-reports/${closed.id}/close`, { token: tokens.admin });
   assert.equal((await call('DELETE', `/api/lost-reports/${closed.id}`, { token: tokens.ana })).status, 403, 'cerrado: solo admin');
 });
+
+test('asistente: "¿qué se devolvió esta semana?" usa la fecha de devolución', async () => {
+  // Encontrado hace un mes y devuelto hoy: cuenta como devuelto esta semana.
+  const old = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const item = (await call('POST', '/api/found-items', { token: tokens.beto, form: itemForm({ title: 'Bufanda azul', foundAt: old }) })).data;
+  const returned = await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.beto });
+  assert.equal(returned.status, 200);
+  assert.ok(returned.data.returnedAt, 'returnedAt en la respuesta');
+
+  const r = await call('POST', '/api/ai/assistant', { token: tokens.beto, body: { question: '¿Qué objetos se devolvieron esta semana?' } });
+  assert.equal(r.status, 200);
+  assert.ok(r.data.foundItems.some((f: any) => f.id === item.id && f.status === 'RETURNED'));
+  assert.match(r.data.answer, /devuelto/);
+  // Sin "devuelto", el asistente sigue mostrando solo lo disponible del muro.
+  const wall = await call('POST', '/api/ai/assistant', { token: tokens.beto, body: { question: 'bufanda' } });
+  assert.ok(!wall.data.foundItems.some((f: any) => f.id === item.id));
+});

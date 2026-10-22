@@ -25,7 +25,8 @@ import { matchItems, type MatchableItem, semanticSearch } from '../_shared/match
 import { tokenize } from '../_shared/nlp.ts';
 import { parseSignature } from '../_shared/visual.ts';
 import { composeAnswer, isSmallTalk, parseIntent, smallTalkAnswer } from '../_shared/assistant.ts';
-import { type AssistantItem, assistantReply, type ChatTurn } from '../_shared/llm.ts';
+import { assistantAgent, type ChatTurn, llmConfigured } from '../_shared/llm.ts';
+import { canSee, type ToolContext } from '../_shared/assistantTools.ts';
 import {
   primeSignedUrls,
   serializeClaim,
@@ -80,6 +81,30 @@ function rankByQuestion(rows: Row[], question: string): Row[] {
     .filter((x) => x.score > 0);
   if (hits.length === 0) return rows;
   return hits.sort((a, b) => b.score - a.score || a.i - b.i).map((x) => x.r);
+}
+
+/**
+ * Tarjetas de la respuesta de Olivia: los ids ya vienen validados contra lo que
+ * consultaron las herramientas, pero se releen y se vuelve a comprobar la
+ * visibilidad (pudo cambiar entre medias). Conserva el orden que eligió el modelo.
+ */
+async function assistantCards(sb: ReturnType<typeof adminClient>, ctx: ToolContext, ids: string[]) {
+  const load = async (table: 'found_items' | 'lost_reports', wanted: string[]) => {
+    if (!wanted.length) return [] as Row[];
+    const { data, error } = await sb.from(table).select(REPORTER_SELECT).in('id', wanted);
+    if (error) throw error;
+    const byId = new Map(((data ?? []) as Row[]).filter((r) => canSee(ctx, r)).map((r) => [r.id as string, r]));
+    return wanted.map((id) => byId.get(id)).filter((r): r is Row => !!r);
+  };
+  const [found, lost] = await Promise.all([
+    load('found_items', ids.filter((id) => ctx.seen.get(id) === 'found')),
+    load('lost_reports', ids.filter((id) => ctx.seen.get(id) === 'lost')),
+  ]);
+  await primeSignedUrls(sb, [...found, ...lost].map((r) => r.image_path));
+  return {
+    foundItems: await Promise.all(found.map((r) => serializeFoundItem(sb, r))),
+    lostReports: await Promise.all(lost.map((r) => serializeLostReport(sb, r))),
+  };
 }
 
 function toMatchable(r: Row): MatchableItem {
@@ -286,28 +311,38 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'BAD_REQUEST', message: `La pregunta debe tener entre 2 y ${MAX_QUERY} caracteres` }, 400);
       }
       const history = parseHistory(body.history);
-      const intent = parseIntent(question);
 
-      // Charla evidente ("¿cómo te llamas?"): sin consulta a la BD ni tarjetas.
+      // 1) Olivia con herramientas de consulta (LLM). Las herramientas aplican la
+      //    visibilidad del usuario; las tarjetas solo pueden ser objetos consultados.
+      if (llmConfigured()) {
+        const ctx: ToolContext = { sb, caller, seen: new Map() };
+        const reply = await assistantAgent(question, history, ctx);
+        if (reply) {
+          const cards = await assistantCards(sb, ctx, reply.show);
+          return json({
+            answer: reply.text,
+            kind: cards.foundItems.length ? 'found' : cards.lostReports.length ? 'lost' : 'chat',
+            ...cards,
+          });
+        }
+      }
+
+      // 2) Respaldo sin LLM (no configurado, error o timeout): motor de palabras clave.
+      const intent = parseIntent(question);
       if (isSmallTalk(question, intent)) {
-        const reply = await assistantReply(question, [], history);
-        return json({
-          answer: reply?.text ?? smallTalkAnswer(question),
-          kind: 'chat',
-          foundItems: [],
-          lostReports: [],
-        });
+        return json({ answer: smallTalkAnswer(question), kind: 'chat', foundItems: [], lostReports: [] });
       }
 
       const isFound = intent.kind === 'found';
-      const dateCol = isFound ? 'found_at' : 'lost_at';
+      // "Devueltos esta semana" filtra por la fecha de devolución, no la de hallazgo.
+      const dateCol = intent.returned ? (isFound ? 'returned_at' : 'updated_at') : isFound ? 'found_at' : 'lost_at';
 
-      // Misma visibilidad que el muro: encontrados disponibles y perdidos abiertos.
+      // Por defecto, misma visibilidad que el muro; con "devuelto/reclamado/recuperado", ese estado.
       let q = sb
         .from(isFound ? 'found_items' : 'lost_reports')
         .select(REPORTER_SELECT)
-        .in('status', isFound ? ['PUBLISHED', 'CLAIMED'] : ['OPEN', 'MATCHED'])
-        .order(dateCol, { ascending: false })
+        .in('status', intent.statuses ?? (isFound ? ['PUBLISHED', 'CLAIMED'] : ['OPEN', 'MATCHED']))
+        .order(dateCol, { ascending: false, nullsFirst: false })
         .limit(ASSISTANT_CANDIDATES);
       if (intent.categories.length) q = q.in('category', intent.categories);
       if (intent.location) q = q.ilike('location', `%${intent.location}%`);
@@ -322,27 +357,8 @@ Deno.serve(async (req: Request) => {
       const serialized = await Promise.all(
         rows.map((r) => (isFound ? serializeFoundItem(sb, r) : serializeLostReport(sb, r))),
       );
-
-      // El LLM solo redacta sobre los datos ya filtrados; si no está configurado
-      // o falla, se usa el motor de palabras clave (composeAnswer).
-      const llmItems: AssistantItem[] = rows.map((r) => ({
-        kind: intent.kind,
-        title: r.title as string,
-        category: r.category as string,
-        location: (r.location as string) ?? '',
-        date: r[dateCol] as string,
-        description: (r.description as string) ?? '',
-      }));
-      const reply = await assistantReply(question, llmItems, history);
-
-      // Si el modelo concluye que no era una búsqueda (charla o fuera de tema),
-      // no se muestran tarjetas: solo su respuesta.
-      if (reply && reply.type !== 'busqueda') {
-        return json({ answer: reply.text, kind: 'chat', foundItems: [], lostReports: [] });
-      }
-
       return json({
-        answer: reply?.text ?? composeAnswer(intent, rows.length),
+        answer: composeAnswer(intent, rows.length),
         kind: intent.kind,
         foundItems: isFound ? serialized : [],
         lostReports: isFound ? [] : serialized,

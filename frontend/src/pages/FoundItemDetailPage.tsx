@@ -183,6 +183,9 @@ export function FoundItemDetailPage() {
               ['Categoría', CATEGORY_LABELS[item.category]],
               ['Ubicación', item.location],
               ['Encontrado el', formatDate(item.foundAt)],
+              ...(item.status === 'RETURNED' && item.returnedAt
+                ? ([['Devuelto el', formatDate(item.returnedAt)]] as [string, string][])
+                : []),
               ['Publicado por', item.reporter.name],
             ]}
           />

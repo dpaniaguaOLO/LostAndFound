@@ -15,6 +15,8 @@ export interface Intent {
   since: Date | null; // filtro temporal inferido
   sinceLabel: string | null; // etiqueta legible del rango ("hoy", "esta semana"…)
   keywords: string[]; // tokens restantes para buscar en texto
+  statuses: string[] | null; // estados pedidos ("devueltos", "reclamados"); null = los del muro
+  returned: boolean; // pregunta por devoluciones: la fecha es la de devolución
 }
 
 // Palabras que, en la pregunta, mapean a una categoría del sistema.
@@ -112,6 +114,8 @@ export function parseIntent(question: string): Intent {
     sinceLabel = 'este mes';
   }
 
+  const { statuses, returned } = parseStatus(lower, kind);
+
   // Palabras clave de contenido (quita las que ya se usaron como señales)
   const usedWords = new Set<string>(Object.keys(CATEGORY_HINTS));
   const keywords = toks.filter((t) => !usedWords.has(t));
@@ -123,12 +127,27 @@ export function parseIntent(question: string): Intent {
     since,
     sinceLabel,
     keywords,
+    statuses,
+    returned,
   };
+}
+
+/** Estado por el que pregunta ("¿qué se devolvió?", "¿qué está reclamado?"). */
+function parseStatus(lower: string, kind: ItemKind): { statuses: string[] | null; returned: boolean } {
+  if (/devuel|devolv|entregad|entreg[oó]|recuper/.test(lower)) {
+    return { statuses: [kind === 'found' ? 'RETURNED' : 'RESOLVED'], returned: true };
+  }
+  if (kind === 'found' && /reclamad/.test(lower)) return { statuses: ['CLAIMED'], returned: false };
+  return { statuses: null, returned: false };
 }
 
 /** Redacta una respuesta legible a partir de la intención y el conteo de resultados. */
 export function composeAnswer(intent: Intent, count: number): string {
-  const tipo = intent.kind === 'found' ? 'encontrado(s)' : 'reportado(s) como perdido(s)';
+  const tipo = intent.returned
+    ? intent.kind === 'found' ? 'devuelto(s) a su dueño' : 'perdido(s) ya recuperado(s)'
+    : intent.statuses?.includes('CLAIMED')
+      ? 'reclamado(s) pendiente(s) de entrega'
+      : intent.kind === 'found' ? 'encontrado(s)' : 'reportado(s) como perdido(s)';
   const parts: string[] = [];
   if (count === 0) {
     parts.push(`No hay objetos ${tipo}`);

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.29.0] - 2026-10-22
+
+### Añadido
+- **Olivia responde cualquier pregunta sobre la app**: en vez de una búsqueda fija sobre
+  lo disponible, el modelo consulta con herramientas de solo lectura (`assistantTools.ts`):
+  objetos en cualquier estado y por fecha de hallazgo, publicación o devolución ("¿qué se
+  devolvió esta semana?"), totales y resumen por estado, tus publicaciones, reclamaciones
+  hechas y recibidas, notificaciones, coincidencias de tus perdidos e historial (admin).
+  Cada herramienta replica la RLS (lo moderado ajeno, reclamaciones y avisos de otros no se
+  ven) y las tarjetas solo pueden ser objetos consultados y visibles. Sin LLM, el motor de
+  palabras clave también entiende "devueltos/recuperados/reclamados". (Claude)
+- **Fecha de devolución** (`returnedAt`): migración 015 (Supabase, trigger) y Prisma
+  (`20261022150000_returned_at`); se muestra en el detalle ("Devuelto el"). Los objetos ya
+  devueltos toman su última modificación como fecha aproximada.
+- Tarjetas del chat con el estado (Devuelto, Reclamado…) y nuevas sugerencias.
+- Pruebas: `supabase/tests/assistant.test.mjs` (10) y casos en `db.test.mjs` y
+  `security.e2e.test.ts`.
+
 ## [0.28.0] - 2026-10-22 — APK de prueba (debug)
 
 APK `LostAndFound-0.28.0.apk` (firmado con clave debug: aceptado para pruebas internas).

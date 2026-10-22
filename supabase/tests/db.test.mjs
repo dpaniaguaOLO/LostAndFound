@@ -445,3 +445,15 @@ test('el autor elimina su reporte de perdido salvo si está cerrado; un tercero 
   await asUser(C, `delete from public.lost_reports where id = $1`, [closed]);
   assert.equal(await count(closed), 1, 'cerrado por moderación: solo admin');
 });
+
+
+// --- Migración 015: fecha de devolución ---------------------------------------
+test('returned_at: la fija el trigger al devolver y el cliente no puede escribirla', async () => {
+  const item = await newItem(B);
+  assert.equal((await one(`select returned_at from public.found_items where id = $1`, [item])).returned_at, null);
+  assert.ok(await error(() => asUser(B, `update public.found_items set returned_at = now() where id = $1`, [item])));
+  await asUser(B, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
+  assert.ok((await one(`select returned_at from public.found_items where id = $1`, [item])).returned_at);
+  await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
+  assert.equal((await one(`select returned_at from public.found_items where id = $1`, [item])).returned_at, null);
+});

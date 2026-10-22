@@ -15,6 +15,10 @@ export interface Intent {
   since: Date | null;
   sinceLabel: string | null;
   keywords: string[];
+  /** Estados pedidos ("devueltos", "reclamados", "recuperados"); null = los del muro. */
+  statuses: string[] | null;
+  /** Pregunta por devoluciones/recuperaciones: la fecha es la de devolución. */
+  returned: boolean;
 }
 
 const CATEGORY_HINTS: Record<string, string> = {
@@ -99,10 +103,21 @@ export function parseIntent(question: string): Intent {
     sinceLabel = 'este mes';
   }
 
+  const { statuses, returned } = parseStatus(lower, kind);
+
   const usedWords = new Set<string>(Object.keys(CATEGORY_HINTS));
   const keywords = toks.filter((t) => !usedWords.has(t));
 
-  return { kind, categories: Array.from(categories), location, since, sinceLabel, keywords };
+  return { kind, categories: Array.from(categories), location, since, sinceLabel, keywords, statuses, returned };
+}
+
+/** Estado por el que pregunta ("¿qué se devolvió?", "¿qué está reclamado?"). */
+function parseStatus(lower: string, kind: ItemKind): { statuses: string[] | null; returned: boolean } {
+  if (/devuel|devolv|entregad|entreg[oó]|recuper/.test(lower)) {
+    return { statuses: [kind === 'found' ? 'RETURNED' : 'RESOLVED'], returned: true };
+  }
+  if (kind === 'found' && /reclamad/.test(lower)) return { statuses: ['CLAIMED'], returned: false };
+  return { statuses: null, returned: false };
 }
 
 // --- Charla (sin búsqueda) -------------------------------------------------
@@ -163,7 +178,11 @@ export function smallTalkAnswer(question: string): string {
 }
 
 export function composeAnswer(intent: Intent, count: number): string {
-  const tipo = intent.kind === 'found' ? 'encontrado(s)' : 'reportado(s) como perdido(s)';
+  const tipo = intent.returned
+    ? intent.kind === 'found' ? 'devuelto(s) a su dueño' : 'perdido(s) ya recuperado(s)'
+    : intent.statuses?.includes('CLAIMED')
+      ? 'reclamado(s) pendiente(s) de entrega'
+      : intent.kind === 'found' ? 'encontrado(s)' : 'reportado(s) como perdido(s)';
   const parts: string[] = [];
   if (count === 0) parts.push(`No hay objetos ${tipo}`);
   else if (count === 1) parts.push(`Hay 1 objeto ${tipo}`);

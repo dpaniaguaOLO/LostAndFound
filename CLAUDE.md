@@ -54,7 +54,10 @@ Facilita recuperar objetos perdidos y encontrados dentro de las instalaciones.
   se puede sustituir por embeddings en el futuro sin tocar las rutas.
   - **Aviso automático**: al crear un reporte perdido (`POST /lost-reports`), se ejecuta el
     emparejado y, si la mejor coincidencia ≥55%, se notifica al dueño (`matchNotify.ts`).
-  - **Asistente de búsqueda** (`assistant.ts`): intención por palabras clave, sin LLM.
+  - **Asistente de búsqueda** (`assistant.ts`): intención por palabras clave, sin LLM (modo
+    REST y respaldo). En modo Supabase, **Olivia** (LLM) responde con herramientas de solo
+    lectura (`supabase/functions/_shared/assistantTools.ts`) que replican la RLS; ver
+    `docs/LLM.md`. Toda herramienta nueva debe aplicar la visibilidad del usuario.
   - **Búsqueda visual ligera** (`visual.ts`, rama `feature/ia-visual`): firma de imagen
     (dHash + histograma de color con `sharp`) guardada en `imageSignature`. Añade una señal
     de similitud visual al emparejado cuando ambos objetos tienen foto. Sin modelos pesados
@@ -254,7 +257,9 @@ Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `S
 
 **User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
 
-**FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, imageSignature?, status, reporterId→User, createdAt, updatedAt`.
+**FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, imageSignature?, status, returnedAt?, reporterId→User, createdAt, updatedAt`.
+- `returnedAt` (`returned_at` en Supabase, mig. 015): cuándo pasó a `RETURNED` (trigger en
+  Supabase; la ruta `/return` en Express). Se limpia si sale de `RETURNED`.
 - `status`: `PUBLISHED → CLAIMED → RETURNED`, o `ARCHIVED`.
 - `imageSignature`: firma visual JSON (rama `feature/ia-visual`).
 
@@ -298,7 +303,7 @@ prefiere archivar.
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–014, todas aplicadas en el proyecto alojado; 012–014 el
+`supabase/migrations/` (001–015; 001–014 aplicadas en el proyecto alojado, 012–014 el
 2026-10-22).
 
 ---
@@ -383,7 +388,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.28.0 (ver `VERSION`). 0.28.0: el autor puede eliminar sus publicaciones
+- **Versión**: 0.29.0 (ver `VERSION`). 0.29.0: Olivia consulta con herramientas (devueltos,
+  estados, reclamaciones, notificaciones, resumen, coincidencias, historial admin) y fecha de
+  devolución `returned_at` (migración 015). 0.28.0: el autor puede eliminar sus publicaciones
   (migración 014, aplicada en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
   2026-10-22 (migraciones 012/013 y Edge `api` desplegadas, accesibilidad, UX). 0.26.1: migración 011 (auditoría y avisos al
   eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
@@ -410,8 +417,10 @@ prefiere archivar.
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).
 - **Pruebas automatizadas** (`npm test`): `backend/src/**/*.test.ts` (Express contra SQLite
-  temporal, incl. `security.e2e.test.ts`) y `supabase/tests/db.test.mjs` (todas las
-  migraciones sobre PostgreSQL en memoria con PGlite: RLS, RPC, triggers).
+  temporal, incl. `security.e2e.test.ts`), `supabase/tests/db.test.mjs` (todas las
+  migraciones sobre PostgreSQL en memoria con PGlite: RLS, RPC, triggers) y
+  `supabase/tests/assistant.test.mjs` (herramientas y bucle de Olivia con Node 24 sobre los
+  `.ts` de las Edge Functions, con OpenAI y Supabase simulados).
 - **Próximos pasos recomendados**: ver el plan de la auditoría (firma release del APK,
   CAPTCHA/limites de Auth, CI, backups/monitorización, prueba en dispositivo Android).
 

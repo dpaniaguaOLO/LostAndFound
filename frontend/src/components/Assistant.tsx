@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { AssistantTurn, FoundItem, LostReport } from '@laf/shared';
 import { getErrorMessage } from '../lib/errors';
 import { registerLayer } from '../lib/layers';
-import { CATEGORY_LABELS } from '../lib/format';
+import { CATEGORY_LABELS, FOUND_STATUS_LABELS, LOST_STATUS_LABELS } from '../lib/format';
 import { aiService } from '../services/ai';
 import { OliviaAvatar } from './OliviaAvatar';
 
@@ -17,17 +17,17 @@ interface Msg {
 
 const SUGGESTIONS = [
   '¿Qué se encontró esta semana?',
-  '¿Hay llaves en la cafetería?',
+  '¿Qué objetos se devolvieron este mes?',
+  '¿Tengo reclamaciones pendientes?',
   '¿Cómo reclamo un objeto?',
-  '¿Qué puedes hacer?',
 ];
 
 // Turnos previos enviados como contexto (el servidor también limita a 6).
 const HISTORY_TURNS = 6;
 
 const WELCOME =
-  'Hola, soy Olivia 👋 tu asistente aquí en OLO. Pregúntame por objetos encontrados o ' +
-  'perdidos, o cómo usar la app, y te ayudo.';
+  'Hola, soy Olivia 👋 tu asistente aquí en OLO. Pregúntame lo que quieras de la app: ' +
+  'objetos encontrados, perdidos o devueltos, tus publicaciones, tus reclamaciones o cómo usarla.';
 
 // Debe coincidir con MAX_QUERY del servidor (supabase/functions/api).
 const MAX_QUESTION = 300;
@@ -235,7 +235,10 @@ export function Assistant() {
                                 className="group flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 transition hover:border-olo-300 hover:shadow-card active:scale-[0.98] dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:hover:border-olo-500/50"
                               >
                                 <ResultThumb src={it.imageUrl} />
-                                <ResultText title={it.title} meta={`${CATEGORY_LABELS[it.category]} · ${it.location}`} />
+                                <ResultText
+                                  title={it.title}
+                                  meta={`${it.status !== 'PUBLISHED' ? `${FOUND_STATUS_LABELS[it.status]} · ` : ''}${CATEGORY_LABELS[it.category]} · ${it.location}`}
+                                />
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-olo-500">
                                   <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                                 </svg>
@@ -250,7 +253,10 @@ export function Assistant() {
                                 className="group flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-2 transition hover:border-olo-300 hover:shadow-card active:scale-[0.98] dark:border-olo-dark-800 dark:bg-olo-dark-900 dark:hover:border-olo-500/50"
                               >
                                 <ResultThumb src={it.imageUrl} />
-                                <ResultText title={it.title} meta={`Perdido · ${CATEGORY_LABELS[it.category]}${it.location ? ` · ${it.location}` : ''}`} />
+                                <ResultText
+                                  title={it.title}
+                                  meta={`Perdido${it.status !== 'OPEN' ? ` (${LOST_STATUS_LABELS[it.status].toLowerCase()})` : ''} · ${CATEGORY_LABELS[it.category]}${it.location ? ` · ${it.location}` : ''}`}
+                                />
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-olo-500">
                                   <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                                 </svg>

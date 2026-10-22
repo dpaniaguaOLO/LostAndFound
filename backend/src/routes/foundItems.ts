@@ -155,7 +155,7 @@ foundItemsRouter.patch(
     const [updated, approved, pending] = await prisma.$transaction(async (tx) => {
       const u = await tx.foundItem.update({
         where: { id: item.id },
-        data: { status: 'RETURNED' },
+        data: { status: 'RETURNED', returnedAt: new Date() },
         include: reporterSelect,
       });
       const a = await tx.claim.findFirst({
@@ -260,7 +260,7 @@ foundItemsRouter.patch(
     // pendientes se cierran y se avisa a los reclamantes en curso.
     const actorId = req.auth!.sub;
     const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.foundItem.update({ where: { id: item.id }, data: { status: 'ARCHIVED' }, include: reporterSelect });
+      const u = await tx.foundItem.update({ where: { id: item.id }, data: { status: 'ARCHIVED', returnedAt: null }, include: reporterSelect });
       const active = await tx.claim.findMany({ where: { foundItemId: item.id, status: { in: ['PENDING', 'APPROVED'] } } });
       await tx.claim.updateMany({
         where: { foundItemId: item.id, status: 'PENDING' },

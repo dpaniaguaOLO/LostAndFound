@@ -1,10 +1,39 @@
-# Olivia — Asistente con IA (Fase 1)
+# Olivia — Asistente con IA
 
 **Olivia** es la asistente de Lost & Found (OLO). Usa un modelo de lenguaje (OpenAI) para
 responder preguntas en lenguaje natural con un tono cálido y cercano, tuteando al
-colaborador. Esta es la **Fase 1: solo lectura** — el LLM no accede a la base de datos ni
-ejecuta acciones; solo redacta una respuesta a partir de datos que el servidor ya seleccionó
-y filtró por permisos.
+colaborador. Es de **solo lectura**: desde la v0.29.0 consulta datos mediante herramientas
+(function calling) que ejecuta el servidor con los permisos del usuario; nunca escribe nada.
+
+## Herramientas (v0.29.0)
+
+Definidas y ejecutadas en `supabase/functions/_shared/assistantTools.ts`; el bucle del
+modelo está en `_shared/llm.ts` (`assistantAgent`, máx. 5 rondas, 8 llamadas y 25 s).
+
+| Herramienta | Qué responde |
+|---|---|
+| `buscar_objetos` | Encontrados/perdidos en cualquier estado, con categoría, lugar, texto, rango de fechas (hallazgo/pérdida, publicación o **devolución**) y "solo los míos". Devuelve `total` + muestra. |
+| `resumen` | Cuántos hay por estado y, en un rango, publicados/devueltos/recuperados. Admin: usuarios y reclamaciones pendientes. |
+| `reclamaciones` | Hechas por el usuario, recibidas sobre sus objetos, o todas (solo admin). |
+| `notificaciones` | Las propias y cuántas sin leer. |
+| `coincidencias` | Encontrados parecidos a un reporte de perdido propio (motor de `matching.ts`). |
+| `historial` | Auditoría (solo admin). |
+
+Seguridad: la Edge Function consulta con `service_role`, así que **cada herramienta replica
+la RLS** (lo `ARCHIVED`/`CLOSED` ajeno no se ve, reclamaciones solo propias o recibidas,
+notificaciones propias, historial solo admin) y nunca devuelve número de colaborador,
+correo, fotos ni firmas. Los argumentos del modelo se validan (enumeraciones, fechas,
+límites). Las tarjetas que devuelve la respuesta (`mostrar`) solo pueden ser ids que las
+herramientas devolvieron en esa petición, y se releen comprobando visibilidad.
+Pruebas: `supabase/tests/assistant.test.mjs` (modelo con guion y base en memoria).
+
+La fecha de devolución es `found_items.returned_at` (migración 015, la fija un trigger al
+pasar a `RETURNED`; los ya devueltos se rellenaron con `updated_at`). Para perdidos
+`RESOLVED` no hay fecha propia: se usa `updated_at` como aproximación.
+
+> Lo que sigue describe el diseño original (Fase 1); el flujo de "Cómo funciona" se
+> sustituyó por las herramientas, pero el fallback, la seguridad y la configuración siguen
+> vigentes.
 
 Identidad: nombre **Olivia**, avatar SVG propio en `frontend/src/components/OliviaAvatar.tsx`
 (verde de marca OLO), personalidad definida en el *system prompt* de
@@ -45,8 +74,10 @@ pregunta; se devuelven los 10 mejores. "Hoy/ayer/esta semana" se calculan en
 - Solo texto. Las imágenes no se envían al proveedor.
 - **Inyección de prompt**: pregunta y descripciones (texto de usuarios) se envían como JSON
   de datos y el system prompt ordena no seguir instrucciones incrustadas. Aun así el modelo
-  no tiene herramientas: lo peor que puede hacer es redactar un texto erróneo (React lo escapa).
-- **Coste**: límite de 30 peticiones/min a `/ai/*` y 120 preguntas/hora al asistente por usuario.
+  sus herramientas solo leen lo que el propio usuario ya puede ver: lo peor que puede hacer
+  es redactar un texto erróneo (React lo escapa).
+- **Coste**: límite de 30 peticiones/min a `/ai/*` y 120 preguntas/hora al asistente por
+  usuario. Cada pregunta puede hacer hasta 5 llamadas al modelo (consultas encadenadas).
 
 ## Fallback automático
 
@@ -81,8 +112,11 @@ supabase functions deploy api
 - **Proyecto Supabase en plan Free**: se pausa por inactividad; mientras está pausado, las
   Edge Functions no responden (reactivar desde el panel con "Restore project").
 
-## Fase 2 (pendiente)
+## Acciones (pendiente)
 
-Dar al LLM capacidad de **acción** (function calling): p. ej. disparar avisos o registrar
-seguimientos. Requiere que cada herramienta valide permisos en el servidor (el LLM propone,
-el backend autoriza y ejecuta). No implementado todavía.
+Las herramientas actuales solo leen. Dar al LLM capacidad de **acción** (reclamar, marcar
+devuelto, etc.) requeriría que cada herramienta valide permisos en el servidor y pida
+confirmación al usuario. No implementado.
+
+En modo REST (Express) no hay LLM: el asistente usa solo el motor de palabras clave, que
+desde la v0.29.0 también entiende "devueltos/entregados/recuperados" y "reclamados".

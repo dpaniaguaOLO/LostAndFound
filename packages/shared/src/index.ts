@@ -82,6 +82,8 @@ export interface FoundItem {
   foundAt: string; // ISO 8601 — fecha en que se encontró
   imageUrl: string | null;
   status: FoundItemStatus;
+  /** Cuándo se marcó como devuelto (null si no lo está). Opcional: no lo envían APIs antiguas. */
+  returnedAt?: string | null;
   reporter: Pick<User, 'id' | 'name'>;
   createdAt: string;
   updatedAt: string;

@@ -16,7 +16,7 @@
     "build:backend": "npm run build --workspace backend",
     "build:frontend": "npm run build --workspace frontend",
     "test": "npm run test --workspace backend --if-present && npm run test --workspace frontend --if-present && npm run test:db",
-    "test:db": "node --test supabase/tests/db.test.mjs",
+    "test:db": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON supabase/tests/db.test.mjs supabase/tests/assistant.test.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "audit:prod": "npm audit --omit=dev",
     "lint": "npm run lint --workspace backend --if-present && npm run lint --workspace frontend --if-present"

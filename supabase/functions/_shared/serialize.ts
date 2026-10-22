@@ -82,6 +82,7 @@ export async function serializeFoundItem(sb: SupabaseClient, i: Row) {
     foundAt: iso(i.found_at),
     imageUrl: await signedUrl(sb, i.image_path),
     status: i.status as string,
+    returnedAt: i.returned_at ? iso(i.returned_at) : null,
     reporter: reporterOf(i),
     createdAt: iso(i.created_at),
     updatedAt: iso(i.updated_at),

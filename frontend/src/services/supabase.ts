@@ -150,6 +150,7 @@ async function toFoundItem(r: Record<string, unknown>): Promise<FoundItem> {
     foundAt: r.found_at as string,
     imageUrl: await signedUrl((r.image_path as string | null) ?? null),
     status: r.status as FoundItemStatus,
+    returnedAt: (r.returned_at as string | null) ?? null,
     reporter: { id: reporter?.id ?? (r.reporter_id as string), name: reporter?.name ?? '' },
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,

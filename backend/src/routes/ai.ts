@@ -130,12 +130,14 @@ aiRouter.post(
     let count = 0;
 
     if (intent.kind === 'found') {
-      const w = { ...where, status: { in: ['PUBLISHED', 'CLAIMED'] } };
-      if (intent.since) (w as Record<string, unknown>).foundAt = { gte: intent.since };
+      // "Devueltos esta semana": estado RETURNED y fecha de devolución (no la de hallazgo).
+      const dateField = intent.returned ? 'returnedAt' : 'foundAt';
+      const w = { ...where, status: { in: intent.statuses ?? ['PUBLISHED', 'CLAIMED'] } };
+      if (intent.since) (w as Record<string, unknown>)[dateField] = { gte: intent.since };
       const rows = await prisma.foundItem.findMany({
         where: w,
         include: { reporter: { select: { id: true, name: true } } },
-        orderBy: { foundAt: 'desc' },
+        orderBy: { [dateField]: 'desc' },
         take: 10,
       });
       count = rows.length;
@@ -143,12 +145,14 @@ aiRouter.post(
     } else {
       // Misma visibilidad que el muro: solo perdidos abiertos (antes listaba también
       // los CLOSED por moderación y los RESOLVED, INT-03).
-      const w = { ...where, status: { in: ['OPEN', 'MATCHED'] } };
-      if (intent.since) (w as Record<string, unknown>).lostAt = { gte: intent.since };
+      // Con "recuperados", RESOLVED por fecha de resolución (aprox.: última modificación).
+      const dateField = intent.returned ? 'updatedAt' : 'lostAt';
+      const w = { ...where, status: { in: intent.statuses ?? ['OPEN', 'MATCHED'] } };
+      if (intent.since) (w as Record<string, unknown>)[dateField] = { gte: intent.since };
       const rows = await prisma.lostReport.findMany({
         where: w,
         include: { reporter: { select: { id: true, name: true } } },
-        orderBy: { lostAt: 'desc' },
+        orderBy: { [dateField]: 'desc' },
         take: 10,
       });
       count = rows.length;

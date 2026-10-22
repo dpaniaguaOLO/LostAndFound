@@ -41,5 +41,42 @@ export function startOfTodayInAppTz(): Date {
 
 /** Fecha de hoy (YYYY-MM-DD) en la zona de la app. */
 export function todayInAppTz(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: appTz() }).format(new Date());
+  return dateInAppTz(new Date());
+}
+
+/** Fecha (YYYY-MM-DD) de un instante en la zona de la app. */
+export function dateInAppTz(d: Date | string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: appTz() }).format(typeof d === 'string' ? new Date(d) : d);
+}
+
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Inicio (00:00 en la zona de la app) del día `YYYY-MM-DD`, como instante UTC; null si no es válido. */
+export function startOfDayInAppTz(day: string): Date | null {
+  const m = DAY_RE.exec(day);
+  if (!m) return null;
+  const utcMidnight = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  if (Number.isNaN(utcMidnight)) return null;
+  return new Date(utcMidnight - tzOffsetMs(new Date(utcMidnight), appTz()));
+}
+
+/** Suma días a una fecha `YYYY-MM-DD` (calendario, sin zonas horarias). */
+export function addDays(day: string, n: number): string {
+  const m = DAY_RE.exec(day);
+  if (!m) return day;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + n)).toISOString().slice(0, 10);
+}
+
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+/** Hoy, su día de la semana y el inicio de la semana (lunes) y del mes, en la zona de la app. */
+export function calendarInAppTz(): { hoy: string; dia_semana: string; inicio_semana: string; inicio_mes: string } {
+  const hoy = todayInAppTz();
+  const dow = new Date(`${hoy}T00:00:00Z`).getUTCDay();
+  return {
+    hoy,
+    dia_semana: WEEKDAYS[dow],
+    inicio_semana: addDays(hoy, -((dow + 6) % 7)),
+    inicio_mes: `${hoy.slice(0, 8)}01`,
+  };
 }

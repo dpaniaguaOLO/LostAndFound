@@ -41,6 +41,7 @@ model FoundItem {
   imageUrl    String?
   imageSignature String? // firma visual (JSON) para búsqueda por imagen
   status      String   @default("PUBLISHED") // PUBLISHED | CLAIMED | RETURNED | ARCHIVED
+  returnedAt  DateTime? // cuándo se marcó RETURNED (null si no está devuelto)
   reporterId  String
   reporter    User     @relation(fields: [reporterId], references: [id])
   claims      Claim[]
