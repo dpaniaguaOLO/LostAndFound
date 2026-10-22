@@ -12,7 +12,7 @@ APK `LostAndFound-0.28.0.apk` (firmado con clave debug: aceptado para pruebas in
   recibe el aviso "fue eliminado por quien lo publicó"; queda en la auditoría. (Claude)
   - Express: `DELETE /found-items/:id` y `DELETE /lost-reports/:id` ya no son solo admin.
   - Supabase: migración 014 (políticas `*_delete_owner_or_admin` y texto del aviso).
-    **Pendiente de aplicar** en el proyecto alojado (`supabase db push`).
+    **Aplicada** en el proyecto alojado (2026-10-22).
   - Modo Supabase: si la RLS no deja borrar la fila, ahora se muestra un error en lugar de
     un falso "eliminado".
 

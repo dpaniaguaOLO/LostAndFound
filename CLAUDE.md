@@ -298,8 +298,8 @@ prefiere archivar.
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–014; 001–013 aplicadas en el proyecto alojado, 012 y 013 el
-2026-10-22; **014 pendiente de aplicar**).
+`supabase/migrations/` (001–014, todas aplicadas en el proyecto alojado; 012–014 el
+2026-10-22).
 
 ---
 
@@ -384,7 +384,7 @@ prefiere archivar.
 ## H. Estado actual
 
 - **Versión**: 0.28.0 (ver `VERSION`). 0.28.0: el autor puede eliminar sus publicaciones
-  (migración 014, pendiente de aplicar en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
+  (migración 014, aplicada en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
   2026-10-22 (migraciones 012/013 y Edge `api` desplegadas, accesibilidad, UX). 0.26.1: migración 011 (auditoría y avisos al
   eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
   acción móvil (`MobileActionBar`), hápticos (`lib/haptics.ts`), muro sin conexión
