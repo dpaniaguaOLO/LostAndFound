@@ -297,3 +297,31 @@ test('INT-03/04: lo archivado se oculta, no lo reabre el autor y cierra las pend
   assert.equal((await call('GET', `/api/found-items/${item.id}`, { token: tokens.ana })).status, 200, 'el autor sí');
   assert.equal((await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.ana })).status, 403, 'no lo reabre');
 });
+
+test('el autor elimina sus publicaciones, salvo con entrega en curso o moderadas', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Termo' }) })).data;
+  await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mío' } });
+  assert.equal((await call('DELETE', `/api/found-items/${item.id}`, { token: tokens.carla })).status, 403, 'tercero no');
+  assert.equal((await call('DELETE', `/api/found-items/${item.id}`, { token: tokens.ana })).status, 200);
+  const notices = (await call('GET', '/api/notifications', { token: tokens.beto })).data;
+  assert.ok(notices.some((n: any) => n.body.includes('"Termo"') && n.body.includes('quien lo publicó')), 'aviso al reclamante');
+
+  const claimed = (await call('POST', '/api/found-items', { token: tokens.ana, form: itemForm({ title: 'Gafas' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: claimed.id, message: 'Son mías' } })).data;
+  await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.ana, body: { status: 'APPROVED' } });
+  assert.equal((await call('DELETE', `/api/found-items/${claimed.id}`, { token: tokens.ana })).status, 403, 'entrega en curso');
+  assert.equal((await call('PATCH', `/api/found-items/${claimed.id}/return`, { token: tokens.ana })).status, 200);
+  assert.equal((await call('DELETE', `/api/found-items/${claimed.id}`, { token: tokens.ana })).status, 200, 'ya devuelto');
+
+  const lostForm = () => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ title: 'Cartera', description: 'negra', category: 'WALLET', lostAt: new Date().toISOString() })) f.set(k, v);
+    return f;
+  };
+  const lost = (await call('POST', '/api/lost-reports', { token: tokens.ana, form: lostForm() })).data;
+  assert.equal((await call('DELETE', `/api/lost-reports/${lost.id}`, { token: tokens.beto })).status, 403, 'tercero no');
+  assert.equal((await call('DELETE', `/api/lost-reports/${lost.id}`, { token: tokens.ana })).status, 200);
+  const closed = (await call('POST', '/api/lost-reports', { token: tokens.ana, form: lostForm() })).data;
+  await call('PATCH', `/api/lost-reports/${closed.id}/close`, { token: tokens.admin });
+  assert.equal((await call('DELETE', `/api/lost-reports/${closed.id}`, { token: tokens.ana })).status, 403, 'cerrado: solo admin');
+});

@@ -276,20 +276,32 @@ foundItemsRouter.patch(
   }),
 );
 
-// DELETE /api/found-items/:id â€” eliminar (solo admin). ModeraciÃ³n destructiva.
+// DELETE /api/found-items/:id â€” eliminar (admin, o el autor si estÃ¡ PUBLISHED/RETURNED).
 foundItemsRouter.delete(
   '/:id',
   authenticate,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const item = await prisma.foundItem.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Objeto no encontrado');
+    const isOwner = item.reporterId === req.auth!.sub;
+    const isAdmin = req.auth!.role === 'ADMIN';
+    if (!isOwner && !isAdmin) throw forbidden('No puedes eliminar este objeto');
+    // Como la RLS de Supabase (migración 014): con una entrega en curso (CLAIMED) o
+    // moderado (ARCHIVED), solo un admin.
+    if (!isAdmin && item.status !== 'PUBLISHED' && item.status !== 'RETURNED') {
+      throw forbidden(
+        item.status === 'CLAIMED'
+          ? 'Tiene una reclamación aprobada: márcalo como devuelto antes de eliminarlo'
+          : 'No puedes eliminar un objeto archivado',
+      );
+    }
+    const reason = isOwner ? 'fue eliminado por quien lo publicó' : 'fue eliminado por un administrador';
     // Avisa a los reclamantes en curso y borra las reclamaciones asociadas
     // (como el trigger found_items_on_delete de Supabase, INT-04).
     await prisma.$transaction(async (tx) => {
       const active = await tx.claim.findMany({ where: { foundItemId: item.id, status: { in: ['PENDING', 'APPROVED'] } } });
       for (const c of active) {
-        await tx.notification.create({ data: removedNotice(c.claimantId, item.title, 'fue eliminado por un administrador') });
+        await tx.notification.create({ data: removedNotice(c.claimantId, item.title, reason) });
       }
       await tx.claim.deleteMany({ where: { foundItemId: item.id } });
       await tx.foundItem.delete({ where: { id: item.id } });

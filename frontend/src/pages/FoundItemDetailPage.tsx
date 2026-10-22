@@ -95,6 +95,9 @@ export function FoundItemDetailPage() {
   // Solo PUBLISHED: si ya hay una reclamación aprobada (CLAIMED) no se puede aprobar otra.
   const canClaim = !isOwner && item.status === 'PUBLISHED' && !claimSent;
   const canMarkReturned = (isOwner || isAdmin) && item.status !== 'RETURNED' && item.status !== 'ARCHIVED';
+  // El autor borra lo suyo salvo con una entrega en curso (CLAIMED) o moderado (ARCHIVED).
+  // Un admin ya tiene "Eliminar" en el bloque de administración.
+  const canOwnerDelete = isOwner && !isAdmin && (item.status === 'PUBLISHED' || item.status === 'RETURNED');
   // Una sola acción principal por pantalla: reclamar, o entregar si ya hay una aprobada.
   const mobilePrimary: 'claim' | 'return' | null = canClaim
     ? 'claim'
@@ -153,7 +156,7 @@ export function FoundItemDetailPage() {
     try {
       await services.foundItems.remove(item.id);
       notify('Objeto eliminado', 'success');
-      navigate('/');
+      navigate(isOwner && !isAdmin ? '/mis-objetos' : '/');
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo eliminar'), 'error');
       setConfirmDelete(false);
@@ -245,6 +248,11 @@ export function FoundItemDetailPage() {
               <Link to={`/objetos/${item.id}/editar`} className="btn-secondary">
                 Editar
               </Link>
+            )}
+            {canOwnerDelete && (
+              <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                Eliminar publicación
+              </button>
             )}
           </div>
 
@@ -351,8 +359,12 @@ export function FoundItemDetailPage() {
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar objeto"
-        message="Esta acción es permanente y borra el objeto y sus reclamaciones. No se puede deshacer."
+        title={isOwner && !isAdmin ? 'Eliminar publicación' : 'Eliminar objeto'}
+        message={
+          isOwner && !isAdmin
+            ? 'Tu publicación se borrará junto con sus reclamaciones; avisaremos a quien tuviera una en curso. No se puede deshacer.'
+            : 'Esta acción es permanente y borra el objeto y sus reclamaciones. No se puede deshacer.'
+        }
         confirmLabel="Eliminar definitivamente"
         danger
         onConfirm={deleteItem}

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.28.0] - 2026-10-22
+
+### Añadido
+- **Eliminar mis publicaciones**: el autor puede borrar sus objetos encontrados (si están
+  publicados o ya devueltos; no con una entrega en curso ni si un admin los archivó) y sus
+  reportes de perdido (salvo si un admin los cerró). Botón "Eliminar publicación" /
+  "Eliminar reporte" en el detalle, con confirmación. Quien tuviera una reclamación en curso
+  recibe el aviso "fue eliminado por quien lo publicó"; queda en la auditoría. (Claude)
+  - Express: `DELETE /found-items/:id` y `DELETE /lost-reports/:id` ya no son solo admin.
+  - Supabase: migración 014 (políticas `*_delete_owner_or_admin` y texto del aviso).
+    **Pendiente de aplicar** en el proyecto alojado (`supabase db push`).
+  - Modo Supabase: si la RLS no deja borrar la fila, ahora se muestra un error en lugar de
+    un falso "eliminado".
+
 ## [0.27.1] - 2026-10-22 — APK de prueba (debug)
 
 ### Corregido

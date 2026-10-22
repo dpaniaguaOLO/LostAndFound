@@ -230,14 +230,17 @@ lostReportsRouter.patch(
   }),
 );
 
-// DELETE /api/lost-reports/:id â€” eliminar (solo admin).
+// DELETE /api/lost-reports/:id â€” eliminar (admin, o el autor salvo si estÃ¡ CLOSED).
 lostReportsRouter.delete(
   '/:id',
   authenticate,
-  requireAdmin,
   asyncHandler(async (req, res) => {
     const item = await prisma.lostReport.findUnique({ where: { id: req.params.id } });
     if (!item) throw notFound('Reporte no encontrado');
+    const isOwner = item.reporterId === req.auth!.sub;
+    const isAdmin = req.auth!.role === 'ADMIN';
+    if (!isOwner && !isAdmin) throw forbidden('No puedes eliminar este reporte');
+    if (item.status === 'CLOSED' && !isAdmin) throw forbidden('No puedes eliminar un reporte cerrado');
     await prisma.lostReport.delete({ where: { id: item.id } });
     await removeUploadedImage(item.imageUrl);
     await writeAudit(req.auth!.sub, 'LOST_REPORT_DELETED', 'LostReport', item.id, item.title);

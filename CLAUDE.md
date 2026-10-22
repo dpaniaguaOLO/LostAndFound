@@ -204,7 +204,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | PATCH | `/api/found-items/:id` | sí (autor o admin) | cuerpo como POST | `FoundItem` (editar) |
 | PATCH | `/api/found-items/:id/return` | sí (autor o admin) | — | `FoundItem` |
 | PATCH | `/api/found-items/:id/archive` | sí (admin) | — | `FoundItem` |
-| DELETE | `/api/found-items/:id` | sí (admin) | — | `{ ok }` (borra también sus claims) |
+| DELETE | `/api/found-items/:id` | sí (admin, o autor si `PUBLISHED`/`RETURNED`) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
 | GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status` oculta `CLOSED`) |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
@@ -230,7 +230,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | GET | `/api/claims/all` | admin | — | `Claim[]` (bandeja global) |
 | PATCH | `/api/lost-reports/:id` | sí (autor o admin) | cuerpo como POST | `LostReport` (editar) |
 | PATCH | `/api/lost-reports/:id/close` | admin | — | `LostReport` (→ `CLOSED`, archivar) |
-| DELETE | `/api/lost-reports/:id` | sí (admin) | — | `{ ok }` (borra también la imagen) |
+| DELETE | `/api/lost-reports/:id` | sí (admin, o autor salvo `CLOSED`) | — | `{ ok }` (borra también la imagen) |
 | POST | `/api/admin/users/reset-password` | admin | `{ employeeId, newPassword(≥8) }` | `{ ok }` |
 | GET | `/api/admin/archived` | admin | — | `ArchivedResponse` |
 | POST | `/api/admin/restore` | admin | `{ kind: found\|lost, id }` | `{ ok }` |
@@ -291,12 +291,15 @@ prefiere archivar.
   vuelve a `CLAIMED` (no a `PUBLISHED`).
 - Siempre queda al menos un **ADMIN activo** (trigger `prevent_role_escalation`, mig. 012).
 - Marcar devuelto: solo el autor del hallazgo o un admin.
+- Eliminar (v0.28.0, mig. 014): el admin siempre; el autor, su encontrado si está
+  `PUBLISHED`/`RETURNED` (no `CLAIMED`: entrega en curso; no `ARCHIVED`) y su reporte de
+  perdido salvo `CLOSED`. Se avisa a los reclamantes en curso y se audita.
 - Categorías válidas (`ItemCategory`): ELECTRONICS, CLOTHING, ACCESSORIES, DOCUMENTS,
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–013, todas aplicadas en el proyecto alojado; 012 y 013 el
-2026-10-22).
+`supabase/migrations/` (001–014; 001–013 aplicadas en el proyecto alojado, 012 y 013 el
+2026-10-22; **014 pendiente de aplicar**).
 
 ---
 
@@ -380,7 +383,8 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.27.1 (ver `VERSION`). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
+- **Versión**: 0.28.0 (ver `VERSION`). 0.28.0: el autor puede eliminar sus publicaciones
+  (migración 014, pendiente de aplicar en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
   2026-10-22 (migraciones 012/013 y Edge `api` desplegadas, accesibilidad, UX). 0.26.1: migración 011 (auditoría y avisos al
   eliminar/archivar, aplicada) y estado "No disponible" para elementos eliminados. 0.26.0: 0.26.0: introducción para nuevos usuarios, barra de
   acción móvil (`MobileActionBar`), hápticos (`lib/haptics.ts`), muro sin conexión

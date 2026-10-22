@@ -84,7 +84,7 @@ export function LostReportDetailPage() {
     try {
       await services.lostReports.remove(item.id);
       notify('Reporte eliminado', 'success');
-      navigate('/');
+      navigate(isOwner && !isAdmin ? '/mis-objetos' : '/');
     } catch (err) {
       notify(getErrorMessage(err, 'No se pudo eliminar'), 'error');
       setConfirmDelete(false);
@@ -98,6 +98,9 @@ export function LostReportDetailPage() {
 
   const isOwner = user?.id === item.reporter.id;
   const isActive = item.status === 'OPEN' || item.status === 'MATCHED';
+  // El autor borra su reporte salvo si un admin lo cerró (CLOSED). Un admin ya tiene
+  // "Eliminar reporte" en el bloque de administración.
+  const canOwnerDelete = isOwner && !isAdmin && item.status !== 'CLOSED';
 
   return (
     <div>
@@ -147,7 +150,7 @@ export function LostReportDetailPage() {
           )}
 
           {(isOwner || isAdmin) && isActive && (
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {isOwner && (
                 <>
                   <button className="btn-primary hidden md:inline-flex" onClick={() => setConfirmResolve(true)}>
@@ -163,6 +166,19 @@ export function LostReportDetailPage() {
               <Link to={`/perdidos/${item.id}/editar`} className="btn-secondary">
                 Editar
               </Link>
+              {canOwnerDelete && (
+                <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                  Eliminar reporte
+                </button>
+              )}
+            </div>
+          )}
+          {/* Ya resuelto: solo queda la opción de borrarlo. */}
+          {canOwnerDelete && !isActive && (
+            <div>
+              <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                Eliminar reporte
+              </button>
             </div>
           )}
 
@@ -228,7 +244,11 @@ export function LostReportDetailPage() {
       <ConfirmDialog
         open={confirmDelete}
         title="Eliminar reporte perdido"
-        message="Esta acción es permanente y borra el reporte. No se puede deshacer."
+        message={
+          isOwner && !isAdmin
+            ? 'Tu reporte se borrará y dejará de compararse con los objetos encontrados. No se puede deshacer.'
+            : 'Esta acción es permanente y borra el reporte. No se puede deshacer.'
+        }
         confirmLabel="Eliminar definitivamente"
         danger
         onConfirm={deleteReport}

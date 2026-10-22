@@ -248,14 +248,17 @@ async function updateItem(table: 'found_items' | 'lost_reports', id: string, for
 }
 
 /**
- * Borrado definitivo (solo admin, por RLS) que elimina también la foto de Storage:
- * antes quedaba huérfana y seguía siendo legible por cualquier colaborador.
+ * Borrado definitivo (admin, o el autor según el estado: RLS de la migración 014)
+ * que elimina también la foto de Storage: antes quedaba huérfana y seguía siendo
+ * legible por cualquier colaborador.
  */
 async function removeWithPhoto(table: 'found_items' | 'lost_reports', id: string) {
   const sb = requireSupabase();
   const { data } = await sb.from(table).select('image_path').eq('id', id).maybeSingle();
-  const { error } = await sb.from(table).delete().eq('id', id);
+  const { data: deleted, error } = await sb.from(table).delete().eq('id', id).select('id');
   if (error) throw error;
+  // Si la RLS no permite borrar la fila, PostgREST no da error: simplemente no borra nada.
+  if (!deleted?.length) throw new Error('No se pudo eliminar: ya no está disponible o no tienes permiso.');
   const path = (data?.image_path as string | null) ?? null;
   if (path) void sb.storage.from(PHOTO_BUCKET).remove([path]).catch(() => undefined);
 }

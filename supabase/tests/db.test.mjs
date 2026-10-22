@@ -337,8 +337,8 @@ test('eliminar un objeto: avisa a los reclamantes y queda en la auditoría', asy
 test('archivar un objeto: cierra pendientes, avisa y audita; un no-admin no puede eliminar', async () => {
   const item = await newItem(B);
   const claim = await newClaim(item, D);
-  await asUser(B, `delete from public.found_items where id = $1`, [item]);
-  assert.equal((await one(`select count(*)::int n from public.found_items where id = $1`, [item])).n, 1, 'RLS: solo admin elimina');
+  await asUser(D, `delete from public.found_items where id = $1`, [item]);
+  assert.equal((await one(`select count(*)::int n from public.found_items where id = $1`, [item])).n, 1, 'RLS: un tercero no elimina');
   await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
   assert.equal((await one(`select status from public.claims where id = $1`, [claim])).status, 'REJECTED');
   assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_ARCHIVED'`, [item])).n, 1);
@@ -407,4 +407,41 @@ test('SEC-04: solo se leen las fotos propias, de publicaciones visibles, o siend
 test('FUN-02: un admin puede subir a la carpeta del autor; un empleado no', async () => {
   await asUser(A, `insert into storage.objects (bucket_id, name) values ('item-photos', $1)`, [`${B}/por-admin.jpg`]);
   assert.ok(await error(() => asUser(D, `insert into storage.objects (bucket_id, name) values ('item-photos', $1)`, [`${B}/intruso.jpg`])));
+});
+
+
+// --- Migración 014: el autor elimina sus publicaciones -----------------------
+test('el autor elimina su objeto publicado o devuelto; no si está reclamado o archivado', async () => {
+  const count = async (id) => (await one(`select count(*)::int n from public.found_items where id = $1`, [id])).n;
+  const published = await newItem(B);
+  await newClaim(published, C);
+  await asUser(B, `delete from public.found_items where id = $1`, [published]);
+  assert.equal(await count(published), 0);
+  const notice = await one(`select body from public.notifications where user_id = $1 and title = 'Objeto retirado' order by created_at desc limit 1`, [C]);
+  assert.match(notice.body, /quien lo publicó/);
+  assert.equal((await one(`select count(*)::int n from public.audit_logs where entity_id = $1 and action = 'FOUND_ITEM_DELETED'`, [published])).n, 1);
+
+  const returned = await newItem(B, 'RETURNED');
+  await asUser(B, `delete from public.found_items where id = $1`, [returned]);
+  assert.equal(await count(returned), 0);
+
+  for (const status of ['CLAIMED', 'ARCHIVED']) {
+    const item = await newItem(B, status);
+    await asUser(B, `delete from public.found_items where id = $1`, [item]);
+    assert.equal(await count(item), 1, `${status}: el autor no lo elimina`);
+  }
+});
+
+test('el autor elimina su reporte de perdido salvo si está cerrado; un tercero nunca', async () => {
+  const count = async (id) => (await one(`select count(*)::int n from public.lost_reports where id = $1`, [id])).n;
+  const lost = await newLost(C);
+  await asUser(D, `delete from public.lost_reports where id = $1`, [lost]);
+  assert.equal(await count(lost), 1, 'un tercero no lo elimina');
+  await asUser(C, `delete from public.lost_reports where id = $1`, [lost]);
+  assert.equal(await count(lost), 0);
+
+  const closed = await newLost(C);
+  await asUser(A, `update public.lost_reports set status = 'CLOSED' where id = $1`, [closed]);
+  await asUser(C, `delete from public.lost_reports where id = $1`, [closed]);
+  assert.equal(await count(closed), 1, 'cerrado por moderación: solo admin');
 });
