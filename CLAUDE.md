@@ -303,7 +303,7 @@ prefiere archivar.
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–015; 001–014 aplicadas en el proyecto alojado, 012–014 el
+`supabase/migrations/` (001–015, todas aplicadas en el proyecto alojado; 012–015 el
 2026-10-22).
 
 ---

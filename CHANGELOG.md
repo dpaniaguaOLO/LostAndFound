@@ -1,6 +1,9 @@
 # Changelog
 
-## [0.29.0] - 2026-10-22
+## [0.29.0] - 2026-10-22 — APK de prueba (debug)
+
+**Desplegado**: migración 015 aplicada y Edge Function `api` redesplegada. APK
+`LostAndFound-0.29.0.apk` (firmado con clave debug: aceptado para pruebas internas).
 
 ### Añadido
 - **Olivia responde cualquier pregunta sobre la app**: en vez de una búsqueda fija sobre
