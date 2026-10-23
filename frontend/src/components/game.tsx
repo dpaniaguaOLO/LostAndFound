@@ -185,6 +185,20 @@ export function LegendEmblem({ className = 'h-5 w-5' }: { className?: string }) 
   );
 }
 
+/**
+ * Título "LEYENDA" bajo el nombre de quien tiene la insignia definitiva (como los
+ * títulos de Rocket League). No muestra nada para el resto.
+ */
+export function LegendTitle({ id, className = 'text-[10px]' }: { id: string | undefined; className?: string }) {
+  const legend = useIsLegend(id);
+  if (!legend) return null;
+  return (
+    <span className={`text-rainbow block font-black uppercase leading-tight tracking-[0.25em] ${className}`} title="Leyenda de OLO: todas las insignias al máximo">
+      Leyenda
+    </span>
+  );
+}
+
 /** Emblemas junto a un nombre: administrador, Leyenda de OLO y puesto del top 3 (pueden salir todos). */
 export function NameEmblems({ id, className = 'h-[1.1em] w-[1.1em]' }: { id: string | undefined; className?: string }) {
   const admin = useIsAdmin(id);

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
-import { Avatar, NameEmblems, RewardModal } from './game';
+import { Avatar, LegendTitle, NameEmblems, RewardModal } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -242,7 +242,10 @@ export function Layout() {
                 aria-expanded={userMenu}
               >
                 <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" />
-                <span className="max-w-[9rem] truncate">{user?.name}</span>
+                <span className="flex min-w-0 flex-col items-start text-left">
+                  <span className="max-w-[9rem] truncate">{user?.name}</span>
+                  <LegendTitle id={user?.id} className="text-[9px]" />
+                </span>
                 <NameEmblems id={user?.id} className="h-5 w-5" />
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -355,6 +358,7 @@ export function Layout() {
               <span className="truncate">{user?.name}</span>
               <NameEmblems id={user?.id} className="h-5 w-5" />
             </p>
+            <LegendTitle id={user?.id} />
             <p className="text-sm text-slate-500 dark:text-slate-400">
               N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
             </p>

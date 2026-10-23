@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BADGES, badgeCollection, showcaseBadges, type PlayerProfile } from '@laf/shared';
-import { Avatar, BadgeCollectionModal, BadgeShowcase, NameEmblems, PointsHelpModal } from '../components/game';
+import { Avatar, BadgeCollectionModal, BadgeShowcase, LegendTitle, NameEmblems, PointsHelpModal } from '../components/game';
 import { BackButton, ErrorState, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -130,6 +130,7 @@ export function ProfilePage() {
               {profile.name}
               <NameEmblems id={profile.id} className="h-7 w-7" />
             </h1>
+            <LegendTitle id={profile.id} className="text-sm" />
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
             </p>

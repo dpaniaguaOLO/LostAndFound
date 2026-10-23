@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { bestBadges, LEADERBOARD_MAX, LEADERBOARD_PAGE, type PlayerProfile, type PlayerSummary } from '@laf/shared';
-import { Avatar, BadgeEmblem, NameEmblems, PointsHelpModal } from '../components/game';
+import { Avatar, BadgeEmblem, LegendTitle, NameEmblems, PointsHelpModal } from '../components/game';
 import { EmptyState, ErrorState, ListSkeleton, PageHeader } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -81,6 +81,7 @@ export function RankingPage() {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-olo-700 dark:text-olo-300">Tu posición</p>
             <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{me.name}</p>
+            <LegendTitle id={me.id} />
           </div>
           <Points value={me.points} />
         </Link>
@@ -161,6 +162,7 @@ function RankingRow({ entry, isMe }: { entry: PlayerSummary; isMe: boolean }) {
           </span>
           {isMe &&<span className="ml-1.5 rounded-full bg-olo-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-olo-700 dark:bg-olo-500/20 dark:text-olo-300">Tú</span>}
         </p>
+        <LegendTitle id={entry.id} />
         {badges.length > 0 && (
           <div className="mt-1 flex gap-1">
             <span className="sr-only">Mejores insignias: {badges.map((p) => `${p.badge.name} nivel ${p.level}`).join(', ')}</span>
