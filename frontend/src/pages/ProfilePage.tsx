@@ -175,7 +175,7 @@ export function ProfilePage() {
             </div>
 
             {/* Puntos */}
-            <div className="flex shrink-0 flex-col items-center rounded-2xl bg-olo-50 px-5 py-3 dark:bg-olo-500/10 sm:items-end">
+            <div className="flex shrink-0 flex-col items-center rounded-2xl bg-olo-50 px-5 py-3 dark:bg-olo-500/10 sm:mt-5 sm:items-end">
               <p className="flex items-baseline gap-1.5">
                 <span className="text-3xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300">{profile.points.toLocaleString('es')}</span>
                 <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">puntos</span>
