@@ -37,6 +37,20 @@
   referencia para comparar) salía siempre vacía: la Edge Function `api` devolvía
   `imageUrl: null`. Ahora se firma como las demás. Edge Function `api` desplegada (2026-10-23).
 
+### Corregido (auditoría de diseño/UX 2026-10-24)
+- **Desbordamiento horizontal** de toda la página a 320 px y entre 768 y 1023 px (y en admin
+  a 1024): el menú de escritorio pasa a mostrarse desde `lg` (1024 px); en tabletas se usa la
+  barra inferior. El subtítulo del logo se oculta por debajo de 360 px y entre 1024 y 1279 px.
+- Contraste insuficiente (WCAG 1.4.3) en etiquetas sobre fondos tintados (perfil, publicar,
+  rangos, "¿Cómo ganar puntos?", etiqueta "Tú") y en el contador del formulario en oscuro.
+- Botones que abren una confirmación destructiva ("Eliminar publicación", "Desactivar") con el
+  nuevo estilo `btn-danger-soft`; el rojo sólido queda para el botón que confirma.
+- Ranking: los nombres largos ya no ocultan los emblemas ni la etiqueta "Tú".
+- Detalle de objeto/reporte: la insignia de estado ya no se estira como una barra.
+- Barras de progreso de la colección con nombre accesible; enlaces pequeños con área táctil
+  mínima (WCAG 2.5.8); avisos (toasts) por encima de la barra inferior en tabletas;
+  placeholder corto en la búsqueda (la etiqueta completa sigue para lectores de pantalla).
+
 ### Cambiado
 - Muro: los reportes de perdidos ya recuperados (RESOLVED) dejan de mostrarse; siguen en
   "Mis objetos" de su dueño.
