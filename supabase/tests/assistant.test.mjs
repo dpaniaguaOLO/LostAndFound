@@ -86,7 +86,9 @@ function from(table) {
   };
   return b;
 }
-const sb = { from };
+// game_stats() de la BD: puntos y estadísticas por colaborador activo.
+const rpc = async (fn) => (fn === 'game_stats' ? { data: db.game_stats ?? [], error: null } : { data: null, error: { message: `rpc ${fn}` } });
+const sb = { from, rpc };
 const ctxFor = (id, role = 'EMPLOYEE') => ({ sb, caller: { id, name: profile(id).name, role }, seen: new Map() });
 const tool = async (ctx, name, args) => runTool(ctx, name, JSON.stringify(args));
 
@@ -168,6 +170,62 @@ test('resumen: un colaborador no cuenta lo moderado ajeno; el admin ve métricas
   assert.equal(a.admin.usuarios, 3);
 });
 
+// --- Juego (puntos, rangos, ranking, insignias) ----------------------------------
+const stats = (points, s = {}) => ({ points, published: 0, published_photo: 0, returned: 0, fast_returned: 0, categories: 0, active_months: 0, ...s });
+
+test('juego: la copia de reglas de la Edge Function coincide con @laf/shared', async () => {
+  const edge = await import('../functions/_shared/game.ts');
+  const shared = await import('../../packages/shared/dist/index.js');
+  assert.deepEqual(edge.POINT_RULES, shared.POINT_RULES);
+  assert.deepEqual(edge.RANKS, shared.RANKS);
+  assert.deepEqual(edge.FRAME_NAMES, shared.FRAME_NAMES);
+  assert.deepEqual([...edge.BADGE_FRAMES], [...shared.BADGE_FRAMES]);
+  assert.equal(edge.TOP_PLAYERS, shared.TOP_PLAYERS);
+  assert.equal(edge.LEADERBOARD_MAX, shared.LEADERBOARD_MAX);
+  const shape = (bs) => bs.map((b) => ({ id: b.id, name: b.name, emoji: b.emoji, stat: b.stat, levels: [...b.levels], goals: b.levels.map((n) => b.goal(n)) }));
+  assert.deepEqual(shape(edge.BADGES), shape(shared.BADGES));
+});
+
+test('mi_juego: puntos, puesto, siguiente rango, quién va delante e insignias', async () => {
+  db.game_stats = [
+    { user_id: OTHER, ...stats(5600, { published: 40, returned: 30, fast_returned: 12 }) },
+    { user_id: ME, ...stats(2650, { published: 20, returned: 15, fast_returned: 3, categories: 4, active_months: 2 }) },
+    { user_id: ADMIN, ...stats(0) },
+  ];
+  const r = await tool(ctxFor(ME), 'mi_juego', {});
+  assert.equal(r.puntos, 2650);
+  assert.equal(r.puesto, 2);
+  assert.equal(r.rango, 'Detective');
+  assert.deepEqual([r.siguiente_rango.rango, r.siguiente_rango.te_faltan], ['Experto', 350]);
+  assert.deepEqual(r.justo_por_encima, { nombre: 'Beto', puntos: 5600, diferencia: 2950 });
+  assert.equal(r.en_top_3, true);
+  const samaritan = r.insignias.find((b) => b.insignia === 'Buen samaritano');
+  assert.deepEqual([samaritan.nivel, samaritan.progreso], [2, '15/25']);
+  assert.equal(r.leyenda_de_olo, false);
+});
+
+test('ranking_juego y jugador: top, puesto propio y perfil de otro sin datos sensibles', async () => {
+  db.game_stats = [
+    { user_id: OTHER, ...stats(5600, { published: 40, returned: 30 }) },
+    { user_id: ME, ...stats(50, { published: 1 }) },
+    { user_id: ADMIN, ...stats(0) },
+  ];
+  const rk = await tool(ctxFor(ME), 'ranking_juego', { limite: 5 });
+  assert.equal(rk.jugadores_con_puntos, 2);
+  assert.deepEqual(rk.top.map((p) => [p.puesto, p.nombre, p.rango]), [[1, 'Beto', 'Experto'], [2, 'Ana', 'Novato']]);
+  assert.equal(rk.tu_puesto, 2);
+
+  const j = await tool(ctxFor(ME), 'jugador', { nombre: 'bet' });
+  assert.equal(j.jugadores[0].puntos, 5600);
+  assert.ok(j.jugadores[0].insignias_conseguidas.some((b) => b.startsWith('Buen samaritano')));
+  assert.ok(!JSON.stringify(j).match(/employee|email|@/i), 'sin número de colaborador ni correo');
+  assert.equal((await tool(ctxFor(ME), 'jugador', { nombre: 'zzz' })).encontrados, 0);
+
+  const reglas = await tool(ctxFor(ME), 'reglas_juego', {});
+  assert.equal(reglas.rangos.length, 7);
+  assert.ok(reglas.puntos.some((p) => p.puntos === 100));
+});
+
 test('runTool: herramienta desconocida y JSON inválido no lanzan', async () => {
   assert.ok((await runTool(ctxFor(ME), 'borrar_todo', '{}')).error);
   assert.ok((await runTool(ctxFor(ME), 'buscar_objetos', '{nope')).error);
@@ -189,7 +247,7 @@ test('agente: consulta con herramientas y solo muestra tarjetas consultadas y vi
   const userMsg = JSON.parse(requests[0].messages.at(-1).content);
   assert.equal(userMsg.usuario.nombre, 'Ana');
   assert.ok(userMsg.calendario.inicio_semana);
-  assert.equal(requests[0].tools.length, 6);
+  assert.equal(requests[0].tools.length, 10);
   // El resultado de la herramienta vuelve al modelo como mensaje "tool".
   const toolMsg = requests[1].messages.find((m) => m.role === 'tool');
   assert.ok(JSON.parse(toolMsg.content).objetos.some((o) => o.id === 'f-ret'));

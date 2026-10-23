@@ -9,6 +9,8 @@
  *   - Reclamaciones: las hechas por el usuario y las recibidas sobre sus objetos
  *     (la bandeja global, solo admin).
  *   - Notificaciones: solo las propias. Historial de auditoría: solo admin.
+ *   - Juego (puntos, ranking, perfiles de otros): lo mismo que la app muestra a
+ *     cualquier colaborador activo en el ranking y los perfiles.
  *   - Nunca se devuelven número de colaborador, correo, fotos ni firmas visuales.
  * Ninguna herramienta escribe nada.
  */
@@ -18,6 +20,20 @@ import { matchItems, type MatchableItem } from './matching.ts';
 import { tokenize } from './nlp.ts';
 import { parseSignature } from './visual.ts';
 import { addDays, dateInAppTz, startOfDayInAppTz } from './time.ts';
+import {
+  BADGE_FRAMES,
+  BADGES,
+  badgeProgress,
+  LEADERBOARD_MAX,
+  nextRank,
+  type PlayerStats,
+  POINT_RULES,
+  rankFor,
+  RANKS,
+  rankUnlocks,
+  TOP_PLAYERS,
+  ULTIMATE_BADGE,
+} from './game.ts';
 
 type Row = Record<string, unknown>;
 export type ItemKind = 'found' | 'lost';
@@ -144,6 +160,51 @@ export const TOOL_DEFINITIONS = [
         required: ['reporte_id'],
         additionalProperties: false,
       },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'mi_juego',
+      description:
+        'Puntos, rango y progreso del USUARIO que pregunta: puntos, puesto en el ranking, rango actual, siguiente rango y cuántos puntos le faltan, ' +
+        'quién está justo por encima y la diferencia, si está en el top 3, si es Leyenda de OLO, estadísticas e insignias (nivel y lo que falta para el siguiente).',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'ranking_juego',
+      description: 'Ranking global por puntos: los primeros puestos (nombre, puntos, rango) y la posición del usuario que pregunta.',
+      parameters: {
+        type: 'object',
+        properties: { limite: { type: 'integer', minimum: 1, maximum: 30, description: 'Cuántos puestos (por defecto 10).' } },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'jugador',
+      description: 'Puntos, puesto, rango e insignias de otro colaborador, buscándolo por su nombre (es lo mismo que muestra su perfil en la app).',
+      parameters: {
+        type: 'object',
+        properties: { nombre: { type: 'string', description: 'Nombre o parte del nombre.' } },
+        required: ['nombre'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'reglas_juego',
+      description:
+        'Reglas del sistema de puntos: cómo se ganan puntos, todos los rangos (puntos necesarios y qué desbloquean), el catálogo de insignias con sus niveles, ' +
+        'la insignia Leyenda de OLO, las ventajas del top 3 y los emblemas junto al nombre.',
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
     },
   },
   {
@@ -456,6 +517,174 @@ async function historial(ctx: ToolContext, args: Row) {
   };
 }
 
+// --- Juego: puntos, rangos, ranking e insignias --------------------------------
+// Lo mismo que cualquier colaborador ve en el ranking y los perfiles (top 100,
+// perfiles de activos); game_stats() ya excluye cuentas desactivadas.
+
+interface Player {
+  id: string;
+  name: string;
+  role: string;
+  points: number;
+  stats: PlayerStats;
+}
+
+/** Todos los colaboradores activos con sus puntos, ordenados como el ranking. */
+async function players(ctx: ToolContext): Promise<Player[]> {
+  const { data, error } = await ctx.sb.rpc('game_stats');
+  if (error) throw error;
+  const rows = (data ?? []) as Row[];
+  const ids = rows.map((r) => r.user_id as string);
+  const names = new Map<string, Row>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: ps, error: e } = await ctx.sb.from('profiles').select('id, name, role').in('id', ids.slice(i, i + 200));
+    if (e) throw e;
+    for (const p of (ps ?? []) as Row[]) names.set(p.id as string, p);
+  }
+  return rows
+    .map((r) => ({
+      id: r.user_id as string,
+      name: String(names.get(r.user_id as string)?.name ?? ''),
+      role: String(names.get(r.user_id as string)?.role ?? 'EMPLOYEE'),
+      points: Number(r.points ?? 0),
+      stats: {
+        published: Number(r.published ?? 0),
+        publishedWithPhoto: Number(r.published_photo ?? 0),
+        returned: Number(r.returned ?? 0),
+        fastReturned: Number(r.fast_returned ?? 0),
+        categories: Number(r.categories ?? 0),
+        activeMonths: Number(r.active_months ?? 0),
+      },
+    }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}
+
+/** Puesto con empates (como el ranking de la app); null sin puntos. */
+const positionOf = (all: Player[], points: number) => (points > 0 ? all.filter((p) => p.points > points).length + 1 : null);
+
+function badgesOf(stats: PlayerStats) {
+  return BADGES.map((b) => {
+    const p = badgeProgress(b, stats);
+    return {
+      insignia: b.name,
+      nivel: p.level,
+      nivel_maximo: b.levels.length,
+      conseguida: p.level > 0,
+      al_maximo: p.maxed,
+      siguiente_objetivo: p.next === null ? null : b.goal(p.next),
+      progreso: p.next === null ? null : `${p.value}/${p.next}`,
+    };
+  });
+}
+
+function playerCard(all: Player[], p: Player) {
+  const top = all.filter((x) => x.points > 0).slice(0, TOP_PLAYERS).map((x) => x.id);
+  const rank = rankFor(p.points);
+  return {
+    nombre: p.name,
+    administrador: p.role === 'ADMIN',
+    puntos: p.points,
+    puesto: positionOf(all, p.points),
+    rango: rank.name,
+    en_top_3: top.includes(p.id),
+    leyenda_de_olo: badgeProgress(ULTIMATE_BADGE, p.stats).level > 0,
+    estadisticas: {
+      objetos_publicados: p.stats.published,
+      publicados_con_foto: p.stats.publishedWithPhoto,
+      devueltos: p.stats.returned,
+      devueltos_en_menos_de_24h: p.stats.fastReturned,
+      categorias_distintas_devueltas: p.stats.categories,
+      meses_con_devoluciones: p.stats.activeMonths,
+    },
+  };
+}
+
+async function miJuego(ctx: ToolContext) {
+  const all = await players(ctx);
+  const me = all.find((p) => p.id === ctx.caller.id);
+  if (!me) return { error: 'No encontré tu perfil de juego.' };
+  const next = nextRank(me.points);
+  const pos = positionOf(all, me.points);
+  const above = pos && pos > 1 ? [...all].reverse().find((p) => p.points > me.points) : null;
+  return {
+    ...playerCard(all, me),
+    jugadores_con_puntos: all.filter((p) => p.points > 0).length,
+    siguiente_rango: next
+      ? { rango: next.name, puntos_necesarios: next.min, te_faltan: next.min - me.points, desbloquea: rankUnlocks(next) }
+      : null,
+    justo_por_encima: above ? { nombre: above.name, puntos: above.points, diferencia: above.points - me.points } : null,
+    insignias: badgesOf(me.stats),
+  };
+}
+
+async function rankingJuego(ctx: ToolContext, args: Row) {
+  const all = await players(ctx);
+  const ranked = all.filter((p) => p.points > 0).slice(0, LEADERBOARD_MAX);
+  const me = all.find((p) => p.id === ctx.caller.id);
+  return {
+    jugadores_con_puntos: all.filter((p) => p.points > 0).length,
+    top: ranked.slice(0, int(args.limite, 10, 1, 30)).map((p) => ({
+      puesto: positionOf(all, p.points),
+      nombre: p.name,
+      puntos: p.points,
+      rango: rankFor(p.points).name,
+      administrador: p.role === 'ADMIN',
+    })),
+    tu_puesto: me ? positionOf(all, me.points) : null,
+    tus_puntos: me?.points ?? 0,
+    nota: 'El ranking de la app muestra hasta el puesto 100. Los 3 primeros tienen ventajas.',
+  };
+}
+
+async function jugador(ctx: ToolContext, args: Row) {
+  const name = str(args.nombre, 60);
+  if (!name || name.length < 2) return { error: 'Indica el nombre (al menos 2 letras).' };
+  const all = await players(ctx);
+  const needle = name.toLocaleLowerCase('es');
+  const found = all.filter((p) => p.name.toLocaleLowerCase('es').includes(needle)).slice(0, 5);
+  if (!found.length) return { encontrados: 0, nota: 'Ningún colaborador activo con ese nombre.' };
+  return {
+    encontrados: found.length,
+    jugadores: found.map((p) => ({
+      ...playerCard(all, p),
+      insignias_conseguidas: badgesOf(p.stats)
+        .filter((b) => b.conseguida)
+        .map((b) => `${b.insignia}${b.nivel_maximo > 1 ? ` (nivel ${b.nivel}/${b.nivel_maximo})` : ''}`),
+    })),
+  };
+}
+
+async function reglasJuego() {
+  return {
+    puntos: POINT_RULES.map((r) => ({ regla: r.title, puntos: r.points, detalle: r.description })),
+    notas_puntos: [
+      'Quien pierde un objeto no gana puntos: solo quien lo encuentra y lo devuelve.',
+      'Devolver sin una reclamación aprobada de otra persona no suma los 100 puntos.',
+      'Archivar (un admin) o eliminar una publicación descuenta sus puntos.',
+    ],
+    rangos: RANKS.map((r) => ({ rango: r.name, desde_puntos: r.min, desbloquea: rankUnlocks(r) })),
+    marcos:
+      'El marco de la foto se elige en "Mi perfil" > "Personalizar marco" entre los desbloqueados por rango (o automático / sin marco).',
+    insignias: BADGES.map((b) => ({
+      insignia: b.name,
+      como: b === ULTIMATE_BADGE
+        ? b.goal(b.levels[0])
+        : b.levels.length === 1
+          ? `${b.goal(b.levels[0])} (insignia de una sola vez)`
+          : `Sube de nivel: ${b.levels.map((n, i) => `nivel ${i + 1}: ${b.goal(n).toLowerCase()}`).join('; ')}`,
+    })),
+    marcos_de_insignia: `Cada nivel mejora el marco de la insignia: ${BADGE_FRAMES.join(', ')}.`,
+    leyenda_de_olo:
+      'Insignia definitiva: todas las demás al nivel máximo. Quien la tiene lleva el título LEYENDA en arcoíris bajo su nombre y un emblema de corona.',
+    ventajas_top_3: [
+      'Sus objetos perdidos aún en búsqueda salen primero en el muro (en orden de ranking).',
+      'Un emblema con su puesto (oro, plata o bronce) junto a su nombre.',
+    ],
+    emblemas_junto_al_nombre: 'Administrador (sello verde con estrella), Leyenda de OLO (corona) y puesto del top 3. Pueden salir juntos.',
+    donde_verlo: 'Mi perfil (puntos, rango, insignias, "¿Cómo ganar puntos?") y la sección Ranking.',
+  };
+}
+
 const TOOLS: Record<string, (ctx: ToolContext, args: Row) => Promise<unknown>> = {
   buscar_objetos: buscarObjetos,
   resumen,
@@ -463,6 +692,10 @@ const TOOLS: Record<string, (ctx: ToolContext, args: Row) => Promise<unknown>> =
   notificaciones,
   coincidencias,
   historial,
+  mi_juego: miJuego,
+  ranking_juego: rankingJuego,
+  jugador,
+  reglas_juego: reglasJuego,
 };
 
 /** Ejecuta una herramienta pedida por el modelo. Nunca lanza: los errores vuelven como datos. */

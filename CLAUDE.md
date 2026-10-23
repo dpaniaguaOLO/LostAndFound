@@ -249,7 +249,9 @@ Juego (rama `features/game`): los puntos se calculan en el servidor a partir de 
 (`game_stats()` en Supabase, `backend/src/lib/game.ts` en Express) con las reglas de
 `POINT_RULES` de `@laf/shared`; las insignias se derivan de las estadísticas con
 `badgeProgress()/showcaseBadges()` (`BADGES`, insignias con niveles). Si cambian las reglas
-o las estadísticas, actualizar los tres sitios. El top 3 (`TOP_PLAYERS`) tiene sus perdidos
+o las estadísticas, actualizar los tres sitios, y también la copia para Olivia en
+`supabase/functions/_shared/game.ts` (sus herramientas `mi_juego`, `ranking_juego`, `jugador`,
+`reglas_juego`; `assistant.test.mjs` falla si la copia difiere de `@laf/shared`). El top 3 (`TOP_PLAYERS`) tiene sus perdidos
 OPEN/MATCHED destacados al principio del listado (`pinned: true`; Express en
 `GET /lost-reports`, Supabase en `services/supabase.ts`) y un emblema junto al nombre
 (`PlayerName`/`RankEmblem` en `components/game.tsx`).

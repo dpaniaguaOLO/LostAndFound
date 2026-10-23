@@ -18,6 +18,13 @@
   tira horizontal con los objetos devueltos en los últimos 7 días (máx. 12), quién los
   encontró (con sus emblemas) y cuándo. Express: `GET /api/found-items/returned/recent`.
 
+- **Olivia responde sobre el juego**: nuevas herramientas `mi_juego` (puntos, puesto, rango,
+  siguiente rango y cuánto falta, quién va delante, insignias y su progreso), `ranking_juego`,
+  `jugador` (perfil de otro por nombre) y `reglas_juego` (puntos, rangos, insignias, Leyenda,
+  ventajas del top 3). Alcance ampliado: responde todo lo relacionado con la app y solo
+  rechaza lo ajeno. Reglas copiadas en `supabase/functions/_shared/game.ts` (una prueba
+  comprueba que coinciden con `@laf/shared`). Requiere `supabase functions deploy api`.
+
 ### Corregido
 - Coincidencias (modo Supabase): la foto del propio objeto perdido ("Tu objeto", la
   referencia para comparar) salía siempre vacía: la Edge Function `api` devolvía
