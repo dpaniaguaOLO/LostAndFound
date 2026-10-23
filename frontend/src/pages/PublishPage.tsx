@@ -87,7 +87,7 @@ export function PublishPage() {
                 <span className={'block text-sm font-bold sm:text-base ' + (active ? 'text-olo-800 dark:text-olo-200' : 'text-slate-800 dark:text-slate-100')}>
                   {o.title}
                 </span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400 sm:text-sm">{o.hint}</span>
+                <span className="mt-0.5 block text-xs text-slate-600 dark:text-slate-400 sm:text-sm">{o.hint}</span>
               </span>
             </button>
           );

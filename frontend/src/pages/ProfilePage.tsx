@@ -202,11 +202,11 @@ export function ProfilePage() {
           {/* Fila 3: cifras principales */}
           <div className="mt-6 grid grid-cols-3 gap-2.5 sm:gap-4">
             <div className="flex flex-col-reverse rounded-2xl bg-olo-50 px-3 py-3.5 text-center dark:bg-olo-500/10 sm:py-4">
-              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Puntos</span>
+              <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">Puntos</span>
               <span className="text-2xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300 sm:text-3xl">{profile.points.toLocaleString('es')}</span>
             </div>
             <Link to="/ranking" className="flex flex-col-reverse rounded-2xl bg-amber-50 px-3 py-3.5 text-center transition hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/15 sm:py-4">
-              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">En el ranking</span>
+              <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">En el ranking</span>
               <span className="text-2xl font-extrabold tabular-nums text-amber-700 dark:text-amber-300 sm:text-3xl">{profile.rank ? `#${profile.rank}` : '—'}</span>
             </Link>
             <button
@@ -214,7 +214,7 @@ export function ProfilePage() {
               onClick={() => setRanksOpen(true)}
               className="flex flex-col-reverse items-center rounded-2xl bg-slate-50 px-3 py-3.5 text-center transition hover:bg-slate-100 dark:bg-olo-dark-850 dark:hover:bg-olo-dark-800 sm:py-4"
             >
-              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Rango</span>
+              <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">Rango</span>
               <span className={`text-lg font-extrabold leading-8 sm:text-xl sm:leading-9 ${rankNameClass(profile.points)}`}>{rank.name}</span>
             </button>
           </div>

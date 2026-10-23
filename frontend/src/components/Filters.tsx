@@ -25,14 +25,15 @@ export function Filters({
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <label className="sr-only" htmlFor="search">
-            Buscar
+            Buscar por título o descripción
           </label>
           <SearchIcon />
           <input
             id="search"
             type="search"
             className="input pl-11"
-            placeholder="Buscar por título o descripción…"
+            // Corto para que no se corte en móviles estrechos; la etiqueta lo explica entero.
+            placeholder="Buscar objetos…"
             value={value.search}
             onChange={(e) => onChange({ ...value, search: e.target.value })}
             enterKeyHint="search"

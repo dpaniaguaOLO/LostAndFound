@@ -155,12 +155,11 @@ function RankingRow({ entry, isMe }: { entry: PlayerSummary; isMe: boolean }) {
       </span>
       <Avatar name={entry.name} url={entry.avatarUrl} size="md" frame={displayedFrame(entry)} />
       <div className="min-w-0 flex-1">
-        <p className={`truncate font-semibold ${rankNameClass(entry.points)}`}>
-          {entry.name}
-          <span className="ml-1 inline-flex align-middle">
-            <NameEmblems id={entry.id} className="h-4 w-4" />
-          </span>
-          {isMe &&<span className="ml-1.5 rounded-full bg-olo-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-olo-700 dark:bg-olo-500/20 dark:text-olo-300">Tú</span>}
+        {/* Solo se recorta el nombre: emblemas y "Tú" siempre visibles. */}
+        <p className={`flex min-w-0 items-center gap-1 font-semibold ${rankNameClass(entry.points)}`}>
+          <span className="truncate">{entry.name}</span>
+          <NameEmblems id={entry.id} className="h-4 w-4" />
+          {isMe && <span className="ml-0.5 shrink-0 rounded-full bg-olo-100 px-1.5 py-0.5 text-[10px] font-bold text-olo-800 dark:bg-olo-500/20 dark:text-olo-300">Tú</span>}
         </p>
         <LegendTitle id={entry.id} />
         {badges.length > 0 && (

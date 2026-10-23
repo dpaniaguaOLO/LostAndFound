@@ -180,7 +180,7 @@ export function AdminPage() {
         {/* No permitir que un admin se desactive a sí mismo */}
         {currentUser?.id !== u.id &&
           (u.active ? (
-            <button className="btn-danger" onClick={() => setConfirmDeactivate(u)}>
+            <button className="btn-danger-soft" onClick={() => setConfirmDeactivate(u)}>
               Desactivar
             </button>
           ) : (
