@@ -320,8 +320,9 @@ prefiere archivar.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
-2026-10-22; 016 `game_profiles`, de la rama `features/game`, el 2026-10-23; 017
-`game_rules` pendiente).
+2026-10-22; 016 `game_profiles` y 017 `game_rules`, de la rama `features/game`, el
+2026-10-23). Datos demo del juego cargados en el proyecto alojado con
+`supabase/demo/seed_game_demo.sql` (se quitan con `cleanup_game_demo.sql`).
 
 ---
 
@@ -430,7 +431,7 @@ prefiere archivar.
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
 - **En desarrollo**: rama `features/game`: perfil con foto, puntos, insignias y ranking
-  (insignias por niveles, ventajas del top 3; migración 016 aplicada, 017 pendiente).
+  (insignias por niveles, ventajas del top 3; migraciones 016-017 aplicadas, datos demo cargados).
 - **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).
