@@ -110,7 +110,7 @@ function RecentlyReturned({ reload }: { reload: number }) {
     <section className="mb-6 animate-fade-up" aria-labelledby="recent-returned-title">
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <h2 id="recent-returned-title" className="text-base font-bold text-slate-900 dark:text-slate-50">
-          🎉 Devueltos recientemente
+          Devueltos recientemente
         </h2>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
           {/* El servicio devuelve como mucho 12: con 12 puede haber más. */}
