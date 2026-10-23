@@ -14,9 +14,10 @@
   publicación descuenta sus puntos.
 - **Insignias por niveles** al estilo del perfil de Clash Royale: escaparate de hasta 8
   insignias y "Ver colección" con progreso; cada nivel mejora el marco (Bronce → Plata →
-  Oro → Esmeralda → Zafiro → Rubí → Leyenda). Buen samaritano (1-5-15-25-50-75-100
-  devueltos), Rayo (devueltos en < 24 h), Ojo de halcón (publicados), Fotógrafo (con foto),
-  Todoterreno (categorías distintas) y Constante (meses con devoluciones).
+  Oro → Esmeralda → Zafiro → Rubí → Leyenda). Hitos de un solo nivel (marco de oro y ★):
+  Primera devolución y Primer hallazgo. Con niveles: Buen samaritano (5-15-25-50-75-100
+  devueltos), Rayo (devueltos en < 24 h), Ojo de halcón (5-15-30-50-100 publicados),
+  Fotógrafo (con foto), Todoterreno (categorías distintas) y Constante (meses con devoluciones).
 - **Ventajas del top 3**: sus perdidos en búsqueda salen primero en el muro (en orden de
   ranking, "Destacado") y llevan un emblema con su puesto junto al nombre.
 - Los nombres (detalle de objetos, reclamaciones, panel admin, ranking) enlazan al perfil.

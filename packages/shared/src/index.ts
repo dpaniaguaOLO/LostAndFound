@@ -360,7 +360,7 @@ export interface BadgeDef {
   emoji: string;
   /** Estadística que hace subir de nivel la insignia. */
   stat: keyof PlayerStats;
-  /** Umbral de cada nivel (nivel 1 = levels[0]). Máximo BADGE_FRAMES.length niveles. */
+  /** Umbral de cada nivel (nivel 1 = levels[0]). Máximo BADGE_FRAMES.length niveles; uno solo = hito. */
   levels: readonly number[];
   /** Objetivo legible para alcanzar `n`. */
   goal: (n: number) => string;
@@ -370,17 +370,20 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /** Catálogo de insignias. Orden = orden de la colección. */
 export const BADGES: readonly BadgeDef[] = [
+  // Hitos de un solo nivel (insignias aparte de las que suben de nivel).
+  { id: 'first_return', name: 'Primera devolución', emoji: '🎉', stat: 'returned', levels: [1], goal: () => 'Devuelve tu primer objeto a su dueño' },
+  { id: 'first_find', name: 'Primer hallazgo', emoji: '🌟', stat: 'published', levels: [1], goal: () => 'Publica tu primer objeto encontrado' },
   {
-    id: 'samaritan', name: 'Buen samaritano', emoji: '🤝', stat: 'returned', levels: [1, 5, 15, 25, 50, 75, 100],
-    goal: (n) => (n === 1 ? 'Devuelve tu primer objeto a su dueño' : `Devuelve ${n} objetos a sus dueños`),
+    id: 'samaritan', name: 'Buen samaritano', emoji: '🤝', stat: 'returned', levels: [5, 15, 25, 50, 75, 100],
+    goal: (n) => `Devuelve ${n} objetos a sus dueños`,
   },
   {
     id: 'lightning', name: 'Rayo', emoji: '⚡', stat: 'fastReturned', levels: [1, 3, 10, 25, 50],
     goal: (n) => `Devuelve ${n} ${plural(n, 'objeto', 'objetos')} en menos de 24 horas`,
   },
   {
-    id: 'hawk_eye', name: 'Ojo de halcón', emoji: '🔍', stat: 'published', levels: [1, 5, 15, 30, 50, 100],
-    goal: (n) => (n === 1 ? 'Publica tu primer objeto encontrado' : `Publica ${n} objetos encontrados`),
+    id: 'hawk_eye', name: 'Ojo de halcón', emoji: '🔍', stat: 'published', levels: [5, 15, 30, 50, 100],
+    goal: (n) => `Publica ${n} objetos encontrados`,
   },
   {
     id: 'photographer', name: 'Fotógrafo', emoji: '📸', stat: 'publishedWithPhoto', levels: [1, 10, 25, 50],

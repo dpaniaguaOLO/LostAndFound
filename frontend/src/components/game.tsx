@@ -154,8 +154,11 @@ const EMBLEM_SIZES = {
 export function BadgeEmblem({ badge, level, size = 'md' }: { badge: BadgeDef; level: number; size?: keyof typeof EMBLEM_SIZES }) {
   const s = EMBLEM_SIZES[size];
   const locked = level <= 0;
-  const frame = FRAME_STYLES[Math.min(level, FRAME_STYLES.length) - 1];
-  const maxed = level >= badge.levels.length;
+  const milestone = isMilestone(badge);
+  // Los hitos (un solo nivel) llevan siempre marco de oro y una estrella en vez del nivel.
+  const frameIdx = milestone ? 2 : Math.min(level, FRAME_STYLES.length) - 1;
+  const frame = FRAME_STYLES[frameIdx];
+  const maxed = !milestone && level >= badge.levels.length;
   return (
     <span className={`relative inline-flex shrink-0 ${s.box}`} aria-hidden>
       {maxed && !locked && size !== 'sm' && (
@@ -173,9 +176,9 @@ export function BadgeEmblem({ badge, level, size = 'md' }: { badge: BadgeDef; le
       </span>
       {size !== 'sm' && !locked && (
         <span
-          className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-br font-extrabold shadow ring-1 ring-black/10 ${frame} ${FRAME_TEXT[level - 1] ?? ''} ${s.pill}`}
+          className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-br font-extrabold shadow ring-1 ring-black/10 ${frame} ${FRAME_TEXT[frameIdx] ?? ''} ${s.pill}`}
         >
-          {level}
+          {milestone ? '★' : level}
         </span>
       )}
     </span>
@@ -193,8 +196,12 @@ function ProgressBar({ p }: { p: BadgeProgress }) {
   );
 }
 
+/** Insignia de un solo nivel (hito): se consigue una vez y no sube de nivel. */
+const isMilestone = (b: BadgeDef) => b.levels.length === 1;
+
 function levelLabel(p: BadgeProgress): string {
   if (p.level === 0) return 'Bloqueada';
+  if (isMilestone(p.badge)) return 'Hito conseguido';
   return `Nivel ${p.level} · ${BADGE_FRAMES[p.level - 1]}${p.maxed ? ' · Máximo' : ''}`;
 }
 
@@ -262,12 +269,14 @@ export function BadgeCollectionModal({
                     <span className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{p.badge.name}</span>
                       <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {p.level}/{p.badge.levels.length}
+                        {isMilestone(p.badge) ? 'Hito' : `${p.level}/${p.badge.levels.length}`}
                       </span>
                     </span>
                     <ProgressBar p={p} />
                     <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                      {p.maxed ? '¡Nivel máximo!' : `${p.value}/${p.next} · ${p.badge.goal(p.next!)}`}
+                      {isMilestone(p.badge)
+                        ? p.level ? '¡Conseguida!' : p.badge.goal(1)
+                        : p.maxed ? '¡Nivel máximo!' : `${p.value}/${p.next} · ${p.badge.goal(p.next!)}`}
                     </span>
                   </span>
                 </button>
@@ -295,13 +304,15 @@ function BadgeDetail({ p, ownerName, onBack }: { p: BadgeProgress; ownerName: st
         <div className="mt-3 w-full max-w-xs">
           <ProgressBar p={p} />
           <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
-            {p.maxed
-              ? ownerName ? `${ownerName} alcanzó el nivel máximo` : 'Has alcanzado el nivel máximo'
-              : `${p.value}/${p.next} para el nivel ${p.level + 1}: ${p.badge.goal(p.next!).toLowerCase()}`}
+            {isMilestone(p.badge)
+              ? p.level ? `Hito: ${p.badge.goal(1).toLowerCase()}. ¡Conseguida!` : `Hito: ${p.badge.goal(1).toLowerCase()}.`
+              : p.maxed
+                ? ownerName ? `${ownerName} alcanzó el nivel máximo` : 'Has alcanzado el nivel máximo'
+                : `${p.value}/${p.next} para el nivel ${p.level + 1}: ${p.badge.goal(p.next!).toLowerCase()}`}
           </p>
         </div>
       </div>
-      <ol className="mt-5 flex flex-col gap-1.5">
+      <ol className={'mt-5 flex flex-col gap-1.5 ' + (isMilestone(p.badge) ? 'hidden' : '')}>
         {p.badge.levels.map((t, i) => {
           const done = p.level > i;
           return (
