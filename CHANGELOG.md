@@ -23,7 +23,7 @@
   `jugador` (perfil de otro por nombre) y `reglas_juego` (puntos, rangos, insignias, Leyenda,
   ventajas del top 3). Alcance ampliado: responde todo lo relacionado con la app y solo
   rechaza lo ajeno. Reglas copiadas en `supabase/functions/_shared/game.ts` (una prueba
-  comprueba que coinciden con `@laf/shared`). Requiere `supabase functions deploy api`.
+  comprueba que coinciden con `@laf/shared`). Edge Function `api` desplegada (2026-10-23).
 
 ### Corregido
 - Coincidencias (modo Supabase): la foto del propio objeto perdido ("Tu objeto", la
