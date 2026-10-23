@@ -76,7 +76,7 @@ export function MyThingsPage() {
           {tab === 'found'
             ? found.map((i, idx) => (
                 <div key={i.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}>
-                  <FoundItemCard item={i} />
+                  <FoundItemCard item={i} showReporter={false} />
                 </div>
               ))
             : lost.map((i, idx) => (

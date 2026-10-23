@@ -34,8 +34,8 @@ export function serializeFoundItem(i: AnyRecord) {
     status: i.status as string,
     returnedAt: i.returnedAt ? iso(i.returnedAt) : null,
     reporter: reporter
-      ? { id: reporter.id as string, name: reporter.name as string }
-      : { id: i.reporterId as string, name: '' },
+      ? { id: reporter.id as string, name: reporter.name as string, avatarUrl: signUploadUrl(reporter.avatarUrl as string | null) }
+      : { id: i.reporterId as string, name: '', avatarUrl: null },
     createdAt: iso(i.createdAt),
     updatedAt: iso(i.updatedAt),
   };
@@ -53,8 +53,8 @@ export function serializeLostReport(i: AnyRecord) {
     imageUrl: signUploadUrl(i.imageUrl as string | null),
     status: i.status as string,
     reporter: reporter
-      ? { id: reporter.id as string, name: reporter.name as string }
-      : { id: i.reporterId as string, name: '' },
+      ? { id: reporter.id as string, name: reporter.name as string, avatarUrl: signUploadUrl(reporter.avatarUrl as string | null) }
+      : { id: i.reporterId as string, name: '', avatarUrl: null },
     createdAt: iso(i.createdAt),
     updatedAt: iso(i.updatedAt),
   };

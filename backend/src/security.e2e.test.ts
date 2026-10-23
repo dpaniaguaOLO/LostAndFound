@@ -165,7 +165,8 @@ test('contraseñas: >72 bytes rechazadas, nunca se devuelven hashes', async () =
     assert.ok(!/passwordHash|sessionVersion|imageSignature|\$2[aby]\$/.test(text), p);
   }
   const wall = (await call('GET', '/api/found-items', { token: tokens.ana })).data.data[0];
-  assert.deepEqual(Object.keys(wall.reporter).sort(), ['id', 'name'], 'el muro solo expone id y nombre del autor');
+  // Id, nombre y foto (la misma que ya muestra su perfil, con URL firmada); nada más.
+  assert.deepEqual(Object.keys(wall.reporter).sort(), ['avatarUrl', 'id', 'name'], 'el muro solo expone id, nombre y foto del autor');
 });
 
 test('login: mensaje idéntico exista o no el usuario', async () => {
@@ -403,10 +404,27 @@ test('juego: los perdidos activos del top 3 salen primero en el muro, en orden d
   assert.equal(wall.data.filter((r: any) => r.id === mine.id).length, 1, 'sin duplicados');
   const page2 = (await call('GET', '/api/lost-reports?page=2', { token: tokens.ana })).data;
   assert.ok(!page2.data.some((r: any) => r.pinned));
-  // Resuelto: deja de estar destacado.
+  // Recuperado: sale del muro (ni destacado ni en el listado), pero su dueño lo sigue viendo.
   await prisma.lostReport.update({ where: { id: mine.id }, data: { status: 'RESOLVED' } });
   const after = (await call('GET', '/api/lost-reports', { token: tokens.ana })).data.data;
-  assert.ok(!after.some((r: any) => r.id === mine.id && r.pinned));
+  assert.ok(!after.some((r: any) => r.id === mine.id));
+  assert.ok((await call('GET', '/api/lost-reports?status=RESOLVED', { token: tokens.ana })).data.data.some((r: any) => r.id === mine.id));
+});
+
+test('entregas atascadas: recordatorio a ambos tras 3 días reclamado, sin repetir', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Termo verde' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mío' } })).data;
+  await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.carla, body: { status: 'APPROVED' } });
+  const reminders = async (who: string) =>
+    (await call('GET', '/api/notifications', { token: tokens[who] })).data.filter((n: any) => n.title === 'Entrega pendiente' && n.relatedItemId === item.id);
+  assert.equal((await reminders('carla')).length, 0, 'recién aprobada');
+  // Aprobada hace 4 días (un valor explícito de @updatedAt se respeta).
+  await prisma.claim.update({ where: { id: claim.id }, data: { updatedAt: new Date(Date.now() - 4 * 86_400_000) } });
+  assert.equal((await reminders('carla')).length, 1);
+  assert.match((await reminders('carla'))[0].body, /márcalo como devuelto/);
+  assert.equal((await reminders('carla')).length, 1, 'no se repite');
+  assert.match((await reminders('beto'))[0].body, /¿Ya recibiste/);
+  assert.equal((await reminders('ana')).length, 0, 'un tercero no');
 });
 
 test('juego: marco equipado (valor validado, visible en el perfil)', async () => {

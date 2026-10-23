@@ -25,7 +25,8 @@ import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const foundItemsRouter = Router();
 
-const reporterSelect = { reporter: { select: { id: true, name: true } } };
+// avatarUrl: foto del autor en las tarjetas del muro.
+const reporterSelect = { reporter: { select: { id: true, name: true, avatarUrl: true } } };
 const FOUND_STATUSES = new Set(['PUBLISHED', 'CLAIMED', 'RETURNED', 'ARCHIVED']);
 
 // GET /api/found-items â€” muro con bÃºsqueda, filtros y paginaciÃ³n.

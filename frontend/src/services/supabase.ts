@@ -22,7 +22,7 @@ import type {
   User,
   UserRole,
 } from '@laf/shared';
-import { signAvatar } from '../lib/avatars';
+import { signAvatar, signAvatars } from '../lib/avatars';
 import { syntheticEmail } from '../lib/config';
 import { NotAvailableError } from '../lib/errors';
 import { requireSupabase, setRememberDevice } from '../lib/supabase';
@@ -135,10 +135,22 @@ async function signedUrl(path: string | null): Promise<string | null> {
 
 type Row = Record<string, unknown>;
 
-/** Mapea una lista de filas precargando antes todas sus URLs de imagen. */
+/** Mapea una lista de filas precargando antes todas sus URLs de imagen (y las fotos de sus autores). */
 async function mapWithImages<T>(rows: Row[], pathOf: (r: Row) => unknown, map: (r: Row) => Promise<T>): Promise<T[]> {
-  await primeSignedUrls(rows.map(pathOf));
+  await Promise.all([
+    primeSignedUrls(rows.map(pathOf)),
+    signAvatars(rows.map((r) => (r.reporter as Row | null)?.avatar_path as string | null | undefined)).catch(() => undefined),
+  ]);
   return Promise.all(rows.map(map));
+}
+
+/** Autor de un objeto/reporte con su foto de perfil (si la tiene). */
+async function toReporter(r: Row, reporter: (ProfileRow & { avatar_path?: string | null }) | null) {
+  return {
+    id: reporter?.id ?? (r.reporter_id as string),
+    name: reporter?.name ?? '',
+    avatarUrl: await signAvatar(reporter?.avatar_path).catch(() => null),
+  };
 }
 
 async function toFoundItem(r: Record<string, unknown>): Promise<FoundItem> {
@@ -153,7 +165,7 @@ async function toFoundItem(r: Record<string, unknown>): Promise<FoundItem> {
     imageUrl: await signedUrl((r.image_path as string | null) ?? null),
     status: r.status as FoundItemStatus,
     returnedAt: (r.returned_at as string | null) ?? null,
-    reporter: { id: reporter?.id ?? (r.reporter_id as string), name: reporter?.name ?? '' },
+    reporter: await toReporter(r, reporter),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -170,7 +182,7 @@ async function toLostReport(r: Record<string, unknown>): Promise<LostReport> {
     lostAt: r.lost_at as string,
     imageUrl: await signedUrl((r.image_path as string | null) ?? null),
     status: r.status as LostReport['status'],
-    reporter: { id: reporter?.id ?? (r.reporter_id as string), name: reporter?.name ?? '' },
+    reporter: await toReporter(r, reporter),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -344,7 +356,8 @@ const auth: AuthService = {
 
 // --- Found items -------------------------------------------------------------
 
-const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
+// avatar_path: foto del autor en las tarjetas del muro (columna legible, mig. 016).
+const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name, avatar_path)';
 
 /** Patrón ILIKE "contiene" con los comodines del usuario (% _ \) tratados como literales. */
 function containsPattern(text: string): string {
@@ -513,8 +526,9 @@ const lostReports: LostReportsService = {
     let q = sb
       .from('lost_reports')
       .select(REPORTER_SELECT, { count: 'exact' })
-      // Oculta los archivados/cerrados del muro (equivale a excluir ARCHIVED en encontrados).
-      .in('status', ['OPEN', 'MATCHED', 'RESOLVED'])
+      // Solo lo que aún se busca: los recuperados (RESOLVED) y cerrados no ocupan el muro;
+      // su dueño los sigue viendo en "Mis objetos".
+      .in('status', ['OPEN', 'MATCHED'])
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (pinnedRows.length) q = q.not('id', 'in', `(${pinnedRows.map((r) => r.id as string).join(',')})`);
@@ -684,8 +698,20 @@ const claims: ClaimsService = {
   },
 };
 
+// Recordatorios de entregas atascadas (migración 019): los crea el servidor para el
+// usuario que llama. Como mucho una vez cada 10 min (la campana se consulta al navegar).
+const REMIND_EVERY_MS = 10 * 60_000;
+let lastRemind = 0;
+async function remindPendingHandovers(): Promise<void> {
+  if (Date.now() - lastRemind < REMIND_EVERY_MS) return;
+  lastRemind = Date.now();
+  const { error } = await requireSupabase().rpc('remind_my_pending_handovers');
+  if (error) lastRemind = 0; // reintentar la próxima vez (p. ej. sin red)
+}
+
 const notifications: NotificationsService = {
   async list() {
+    await remindPendingHandovers().catch(() => undefined);
     const sb = requireSupabase();
     const { data, error } = await sb
       .from('notifications')
@@ -704,6 +730,7 @@ const notifications: NotificationsService = {
     }));
   },
   async unreadCount() {
+    await remindPendingHandovers().catch(() => undefined);
     // HEAD + count: solo el número (la RLS limita a las propias). Antes se
     // descargaban hasta 100 filas completas en cada navegación (PERF-01).
     const { count, error } = await requireSupabase()

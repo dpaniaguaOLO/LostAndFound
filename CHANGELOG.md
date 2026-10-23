@@ -3,6 +3,13 @@
 ## [Sin publicar]
 
 ### Añadido
+- **Quién lo publicó, en las tarjetas del muro**: foto con su marco, nombre y emblemas,
+  enlazados al perfil (la tarjeta usa un enlace extendido para no anidar enlaces). Los
+  objetos traen `reporter.avatarUrl` (Supabase: `avatar_path` del autor; Express: `avatarUrl`).
+- **Recordatorio de entregas atascadas**: un objeto "Reclamado" desde hace más de 3 días
+  avisa a quien lo encontró ("márcalo como devuelto") y a quien lo reclamó ("¿ya lo
+  recibiste?"), como mucho cada 3 días. Migración 019 `remind_my_pending_handovers()` (la
+  app la llama al cargar notificaciones); Express en `GET /api/notifications`.
 - **Rangos por puntos**: Novato (0), Explorador (250), Rastreador (750), Detective (1.500),
   Experto (3.000), Maestro (6.000) y Gran Maestro (10.000). Cada uno desbloquea un marco para
   la foto (bronce, plata, oro, esmeralda animado, rubí, diamante animado) y, desde Maestro, un
@@ -31,6 +38,8 @@
   `imageUrl: null`. Ahora se firma como las demás. Edge Function `api` desplegada (2026-10-23).
 
 ### Cambiado
+- Muro: los reportes de perdidos ya recuperados (RESOLVED) dejan de mostrarse; siguen en
+  "Mis objetos" de su dueño.
 - Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
   10) y "Mostrar menos"; la búsqueda sigue abarcando a todos. Así el alta de colaboradores
   y el cambio de contraseña no quedan al final de una lista de cientos.

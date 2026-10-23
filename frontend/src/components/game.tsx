@@ -25,7 +25,7 @@ import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../lib/errors';
 import { haptics } from '../lib/haptics';
 import { onReward, type Reward } from '../lib/rewards';
-import { adminIds, currentMyPlayer, gameService, legendIds, onMyPlayer, refreshMyPlayer, topPlayerIds } from '../services/game';
+import { adminIds, currentMyPlayer, gameService, legendIds, onMyPlayer, playerFrame, refreshMyPlayer, topPlayerIds } from '../services/game';
 import { Modal } from './ui';
 
 // --- Avatar --------------------------------------------------------------------
@@ -359,6 +359,19 @@ export function RankEmblem({ rank, className = 'h-5 w-5' }: { rank: number | nul
       </text>
     </svg>
   );
+}
+
+/** Marco que lleva un jugador (del ranking cacheado; null fuera del top 100). */
+export function usePlayerFrame(userId: string | undefined): FrameId | null {
+  const [frame, setFrame] = useState<FrameId | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (userId) void playerFrame(userId).then((f) => active && setFrame(f));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  return frame;
 }
 
 /** ¿Es administrador? (para el emblema junto al nombre). */

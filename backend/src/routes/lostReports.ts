@@ -15,7 +15,8 @@ import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const lostReportsRouter = Router();
 
-const reporterSelect = { reporter: { select: { id: true, name: true } } };
+// avatarUrl: foto del autor en las tarjetas del muro.
+const reporterSelect = { reporter: { select: { id: true, name: true, avatarUrl: true } } };
 const LOST_STATUSES = new Set(['OPEN', 'MATCHED', 'RESOLVED', 'CLOSED']);
 
 // GET /api/lost-reports â€” listado con bÃºsqueda y filtros.
@@ -35,7 +36,8 @@ lostReportsRouter.get(
     if (status && LOST_STATUSES.has(status) && (status !== 'CLOSED' || req.auth!.role === 'ADMIN')) {
       where.status = status;
     } else {
-      where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
+      // Por defecto, solo lo que aún se busca (como Supabase): sin recuperados ni cerrados.
+      where.status = { in: ['OPEN', 'MATCHED'] };
     }
     if (location) {
       const term = likeSafe(location);

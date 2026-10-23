@@ -86,7 +86,8 @@ export interface FoundItem {
   status: FoundItemStatus;
   /** Cuándo se marcó como devuelto (null si no lo está). Opcional: no lo envían APIs antiguas. */
   returnedAt?: string | null;
-  reporter: Pick<User, 'id' | 'name'>;
+  /** Autor. `avatarUrl`: su foto (opcional: no la envían APIs antiguas). */
+  reporter: Pick<User, 'id' | 'name' | 'avatarUrl'>;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,7 +101,8 @@ export interface LostReport {
   lostAt: string; // ISO 8601
   imageUrl: string | null;
   status: LostReportStatus;
-  reporter: Pick<User, 'id' | 'name'>;
+  /** Autor. `avatarUrl`: su foto (opcional: no la envían APIs antiguas). */
+  reporter: Pick<User, 'id' | 'name' | 'avatarUrl'>;
   /** Destacado arriba del muro porque su autor está en el top 3 del ranking (solo en listados). */
   pinned?: boolean;
   createdAt: string;

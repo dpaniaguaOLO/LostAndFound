@@ -210,7 +210,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | DELETE | `/api/found-items/:id` | sí (admin, o autor si `PUBLISHED`/`RETURNED`) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
 | GET | `/api/found-items/returned/recent` | sí | — | `FoundItem[]` devueltos en 7 días (máx. 12; Supabase: consulta directa) |
-| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status` oculta `CLOSED`) |
+| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status`: solo `OPEN`/`MATCHED`, los del top 3 primero con `pinned`) |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
 | POST | `/api/lost-reports` | sí | `multipart/form-data`: `title, description, category, location, lostAt(ISO)`, `image?` | `201 LostReport` |
 | PATCH | `/api/lost-reports/:id/resolve` | sí (autor o admin) | — | `LostReport` |
@@ -220,7 +220,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | GET | `/api/claims/incoming` | sí | — | `Claim[]` (sobre objetos que publiqué) |
 | PATCH | `/api/claims/:id/review` | sí (autor del hallazgo o admin) | `{ status: APPROVED\|REJECTED, reviewNote? }` | `Claim` |
 | PATCH | `/api/claims/:id/cancel` | sí (reclamante) | — | `Claim` |
-| GET | `/api/notifications` | sí | — | `Notification[]` (máx 100) |
+| GET | `/api/notifications` | sí | — | `Notification[]` (máx 100; antes crea los recordatorios de entregas atascadas del usuario, como `remind_my_pending_handovers()` en Supabase) |
 | PATCH | `/api/notifications/:id/read` | sí | — | `Notification` |
 | PATCH | `/api/notifications/read-all` | sí | — | `{ ok: true }` |
 | POST | `/api/ai/search` | sí | `{ query, limit? }` | `SemanticSearchResponse` (encontrados rankeados 0–100) |
@@ -325,7 +325,8 @@ prefiere archivar.
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
 2026-10-22; 016 `game_profiles` y 017 `game_rules`, de la rama `features/game`, el
-2026-10-23; 018 `cosmetics` (marco equipado) el 2026-10-23). Datos demo del juego cargados en el proyecto alojado con
+2026-10-23; 018 `cosmetics` (marco equipado) el 2026-10-23; 019 `handover_reminders`
+pendiente). Datos demo del juego cargados en el proyecto alojado con
 `supabase/demo/seed_game_demo.sql` (se quitan con `cleanup_game_demo.sql`).
 
 ---
@@ -379,9 +380,9 @@ prefiere archivar.
   En producción: almacenamiento privado + URLs firmadas.
 - Rate limiting solo en login y en memoria (si se escala a varias instancias, moverlo a
   Redis o al proxy). Sin rate limiting general de la API.
-- Supabase: `enable_signup = true` y la anon key es pública → cualquiera con la URL puede
-  registrarse. Para una app interna conviene desactivar el registro abierto y dar de alta
-  usuarios desde el panel/Admin API.
+- Supabase: registro abierto **desactivado** (`enable_signup = false` en `config.toml`; en el
+  proyecto alojado, según el usuario, 2026-10-24). Las altas se hacen desde el panel admin.
+  La anon key sigue siendo pública (es por diseño); pendiente rotarla antes de distribuir.
 - Token en `localStorage` (considerar cookies httpOnly si se endurece el modelo).
 - Sin rotación/refresh de tokens.
 - `JWT_SECRET` por defecto solo para desarrollo; en producción es obligatorio definirlo.

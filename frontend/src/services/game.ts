@@ -10,6 +10,8 @@
 import {
   badgeCollection,
   badgeProgress,
+  displayedFrame,
+  type FrameId,
   LEADERBOARD_MAX,
   TOP_PLAYERS,
   ULTIMATE_BADGE,
@@ -222,7 +224,8 @@ export async function trackPoints<T>(kind: RewardKind, action: () => Promise<T>)
 // --- Top del ranking (emblemas junto al nombre y perdidos destacados) ---------
 
 const TOP_TTL_MS = 60_000;
-type Snapshot = { top: string[]; legends: string[] };
+/** frames: marco que se muestra de cada jugador del top 100 (tarjetas del muro). */
+type Snapshot = { top: string[]; legends: string[]; frames: Record<string, FrameId | null> };
 let topCache: (Snapshot & { at: number }) | null = null;
 let topInFlight: Promise<Snapshot> | null = null;
 
@@ -262,8 +265,9 @@ function rankingSnapshot(): Promise<Snapshot> {
     .then((p) => ({
       top: p.entries.slice(0, TOP_PLAYERS).map((e) => e.id),
       legends: p.entries.filter((e) => badgeProgress(ULTIMATE_BADGE, e.stats).level > 0).map((e) => e.id),
+      frames: Object.fromEntries(p.entries.map((e) => [e.id, displayedFrame(e)])),
     }))
-    .catch(() => ({ top: [], legends: [] }))
+    .catch(() => ({ top: [], legends: [], frames: {} }))
     .then((snap) => {
       topCache = { ...snap, at: Date.now() };
       topInFlight = null;
@@ -274,6 +278,9 @@ function rankingSnapshot(): Promise<Snapshot> {
 
 /** Ids de los primeros TOP_PLAYERS del ranking, en orden. Vacío si falla. */
 export const topPlayerIds = () => rankingSnapshot().then((s) => s.top);
+
+/** Marco de la foto de un jugador (null si no tiene o está fuera del top 100). */
+export const playerFrame = (id: string) => rankingSnapshot().then((s) => s.frames[id] ?? null);
 
 /** Ids de quienes tienen la insignia definitiva (Leyenda de OLO). */
 export const legendIds = () => rankingSnapshot().then((s) => s.legends);

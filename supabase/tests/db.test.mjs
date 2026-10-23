@@ -527,6 +527,33 @@ test('juego: marco equipado solo por su dueño y con valor válido', async () =>
   assert.equal((await profileOf(E, F)).equipped_frame, null);
 });
 
+// --- Migración 019: recordatorio de entregas atascadas -------------------------------
+test('entregas atascadas: aviso a quien lo encontró y a quien lo reclamó, como mucho cada 3 días', async () => {
+  const reminders = async (uid) =>
+    (await one(`select count(*)::int n from public.notifications where user_id = $1 and title = 'Entrega pendiente'`, [uid])).n;
+  const item = await newItem(E);
+  const claim = await newClaim(item, F);
+  await review(claim, E, 'APPROVED');
+  // Recién aprobada: nada todavía.
+  assert.equal((await asUser(E, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 0);
+  // Aprobada hace 4 días: un aviso para cada uno, y no se repite enseguida.
+  // (sin el trigger que fija updated_at = now(), para simular que se aprobó hace días)
+  await asServer(`alter table public.claims disable trigger claims_set_updated_at`);
+  await asServer(`update public.claims set updated_at = now() - interval '4 days' where id = $1`, [claim]);
+  await asServer(`alter table public.claims enable trigger claims_set_updated_at`);
+  const before = await reminders(E);
+  assert.equal((await asUser(E, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 1);
+  assert.equal(await reminders(E), before + 1);
+  assert.equal((await asUser(E, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 0, 'sin repetir');
+  assert.equal((await asUser(F, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 1, 'el reclamante también');
+  // Un tercero no recibe nada; tras devolverlo, ya no se avisa.
+  assert.equal((await asUser(D, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 0);
+  await asUser(E, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
+  await asServer(`delete from public.notifications where title = 'Entrega pendiente' and related_item_id = $1`, [item]);
+  assert.equal((await asUser(E, `select public.remind_my_pending_handovers() as n`)).rows[0].n, 0);
+  assert.match((await error(() => asRole('anon', `select public.remind_my_pending_handovers()`))).message, /permission denied/);
+});
+
 test('juego: foto de perfil solo en la carpeta propia y mediante set_my_avatar()', async () => {
   const mine = `${E}/11111111-1111-1111-1111-111111111111.jpg`;
   const foreign = `${F}/22222222-2222-2222-2222-222222222222.jpg`;
