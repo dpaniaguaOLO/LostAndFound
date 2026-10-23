@@ -1,4 +1,5 @@
 -- Borra los datos demo de seed_game_demo.sql (todo lo que tiene id 'dddddddd-…').
+--   node supabase/demo/demo_photos.mjs --cleanup     # primero: las fotos de Storage
 --   supabase db query --linked -f supabase/demo/cleanup_game_demo.sql
 -- No toca nada creado por usuarios reales. El colaborador 777 se conserva (solo
 -- se borran sus objetos demo).
