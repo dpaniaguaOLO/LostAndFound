@@ -87,6 +87,8 @@ function ForYouCard({ to, tone, title, text }: { to: string; tone: 'amber' | 'ol
   );
 }
 
+const RECENT_HIDDEN_KEY = 'laf.wall.recentHidden';
+
 /**
  * "Devueltos recientemente": objetos que volvieron a su dueño en los últimos 7
  * días, en una tira horizontal. Muestra que la app funciona (y a quién se debe).
@@ -105,19 +107,53 @@ function RecentlyReturned({ reload }: { reload: number }) {
     };
   }, [reload]);
 
+  // Mostrar u ocultar la tira (se recuerda en este dispositivo).
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(RECENT_HIDDEN_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  function toggle() {
+    setOpen((v) => {
+      try {
+        localStorage.setItem(RECENT_HIDDEN_KEY, v ? '1' : '0');
+      } catch {
+        /* sin almacenamiento: solo dura esta sesión */
+      }
+      return !v;
+    });
+  }
+
   if (items.length === 0) return null;
   return (
     <section className="mb-6 animate-fade-up" aria-labelledby="recent-returned-title">
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <h2 id="recent-returned-title" className="text-base font-bold text-slate-900 dark:text-slate-50">
-          Devueltos recientemente
-        </h2>
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-          {/* El servicio devuelve como mucho 12: con 12 puede haber más. */}
-          {items.length === 1 ? '1 objeto volvió' : `${items.length}${items.length >= 12 ? '+' : ''} objetos volvieron`} a su dueño en los últimos 7 días
-        </p>
+      <div className={'flex items-center justify-between gap-3 ' + (open ? 'mb-2.5' : '')}>
+        <div className="min-w-0">
+          <h2 id="recent-returned-title" className="text-base font-bold text-slate-900 dark:text-slate-50">
+            Devueltos recientemente
+          </h2>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            {/* El servicio devuelve como mucho 12: con 12 puede haber más. */}
+            {items.length === 1 ? '1 objeto volvió' : `${items.length}${items.length >= 12 ? '+' : ''} objetos volvieron`} a su dueño en los últimos 7 días
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls="recent-returned-list"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-850"
+        >
+          {open ? 'Ocultar' : 'Mostrar'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (open ? 'rotate-180' : '')}>
+            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
       </div>
-      <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:px-0">
+      {open && (
+      <ul id="recent-returned-list" className="-mx-4 flex animate-fade-in snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:px-0">
         {items.map((item) => (
           <li key={item.id} className="w-40 shrink-0 snap-start sm:w-44">
             <Link to={`/objetos/${item.id}`} className="card-interactive group flex h-full flex-col overflow-hidden">
@@ -141,6 +177,7 @@ function RecentlyReturned({ reload }: { reload: number }) {
           </li>
         ))}
       </ul>
+      )}
     </section>
   );
 }
