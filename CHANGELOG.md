@@ -14,7 +14,7 @@
   `@laf/shared` (`BADGES`).
 - Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,
   `leaderboard()`, `player_profile()`; los puntos los calcula `game_stats()`, nunca el
-  cliente). **Pendiente de aplicar** en el proyecto alojado.
+  cliente). Aplicada en el proyecto alojado (2026-10-23).
 - Express: `/api/game/*` y migración Prisma `avatar`.
 
 ## [0.29.0] - 2026-10-22 — APK de prueba (debug)

@@ -316,7 +316,7 @@ prefiere archivar.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
-2026-10-22; 016 `game_profiles` en la rama `features/game`, **sin aplicar**).
+2026-10-22; 016 `game_profiles`, de la rama `features/game`, el 2026-10-23).
 
 ---
 
@@ -425,7 +425,7 @@ prefiere archivar.
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
 - **En desarrollo**: rama `features/game`: perfil con foto, puntos, insignias y ranking
-  (reglas de puntos e insignias provisionales; migración 016 sin aplicar).
+  (reglas de puntos e insignias provisionales; migración 016 aplicada en Supabase).
 - **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).
