@@ -177,7 +177,7 @@ export function Layout() {
   }
 
   const desktopLink = ({ isActive }: { isActive: boolean }) =>
-    'relative flex items-center whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-200 ' +
+    'relative flex items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition duration-200 lg:px-3.5 ' +
     (isActive
       ? 'bg-olo-50 text-olo-700 dark:bg-olo-500/15 dark:text-olo-300'
       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-olo-dark-850 dark:hover:text-white');
@@ -199,12 +199,12 @@ export function Layout() {
             : 'border-transparent bg-slate-50/60 dark:bg-olo-dark-950/60')
         }
       >
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:h-[4.25rem] sm:px-6 lg:gap-8">
           <Link to="/" className="flex shrink-0 items-center rounded-lg" aria-label="Lost and Found — OLO, ir al muro">
             <Logo markClassName="h-6 w-auto sm:h-7" />
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
+          <nav className="hidden flex-1 items-center gap-0.5 md:flex lg:gap-1.5" aria-label="Principal">
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} end={'end' in item ? item.end : undefined} className={desktopLink}>
                 {item.label}
@@ -220,7 +220,7 @@ export function Layout() {
             )}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <ThemeToggle />
             <Link
               to="/notificaciones"
@@ -237,32 +237,46 @@ export function Layout() {
 
             {/* Menú de usuario (escritorio): patrón "disclosure" (botón + panel con
                 enlaces), no role="menu", que exigiría navegación con flechas. */}
+            {/* Separador entre los iconos y el usuario (escritorio) */}
+            <span className="mx-1 hidden h-7 w-px bg-slate-200 dark:bg-olo-dark-800 md:block" aria-hidden />
+
             <div ref={userMenuRef} className="relative hidden md:block">
               <button
                 ref={userMenuButtonRef}
                 onClick={() => setUserMenu((v) => !v)}
-                className="ml-1 flex items-center gap-2 rounded-xl py-1 pl-1 pr-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
+                className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
                 aria-controls="user-menu"
                 aria-expanded={userMenu}
+                aria-label={`Menú de ${user?.name ?? 'usuario'}`}
               >
-                <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" frame={myFrame} />
-                <span className="flex min-w-0 flex-col items-start text-left">
-                  <span className="max-w-[9rem] truncate">{user?.name}</span>
+                <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-9 w-9 text-xs" className="shadow-glow" frame={myFrame} />
+                {/* Nombre, título y emblemas solo en pantallas anchas; si no, van en el menú. */}
+                <span className="hidden min-w-0 flex-col items-start text-left xl:flex">
+                  <span className="flex max-w-[11rem] items-center gap-1">
+                    <span className="truncate">{user?.name}</span>
+                    <NameEmblems id={user?.id} className="h-4 w-4" />
+                  </span>
                   <LegendTitle id={user?.id} className="text-[9px]" />
                 </span>
-                <NameEmblems id={user?.id} className="h-5 w-5" />
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'text-slate-400 transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
 
               {userMenu && (
-                <div id="user-menu" className="card absolute right-0 mt-2 w-60 origin-top-right animate-slide-down overflow-hidden p-1.5 shadow-elevated">
-                  <div className="px-3 py-2.5">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{user?.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
-                    </p>
+                <div id="user-menu" className="card absolute right-0 mt-3 w-72 origin-top-right animate-slide-down overflow-hidden p-1.5 shadow-elevated">
+                  <div className="flex items-center gap-3 px-3 py-3">
+                    <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-11 w-11 text-sm" frame={myFrame} />
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        <span className="truncate">{user?.name}</span>
+                        <NameEmblems id={user?.id} className="h-4 w-4" />
+                      </p>
+                      <LegendTitle id={user?.id} className="text-[9px]" />
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
+                      </p>
+                    </div>
                   </div>
                   <div className="my-1 h-px bg-slate-100 dark:bg-olo-dark-800" />
                   <Link
@@ -304,7 +318,7 @@ export function Layout() {
       </header>
 
       {!online && (
-        <div className="sticky top-14 z-20 animate-slide-down bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200 sm:top-16" role="status">
+        <div className="sticky top-14 z-20 animate-slide-down bg-amber-100 px-4 py-2 text-center text-sm font-semibold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200 sm:top-[4.25rem]" role="status">
           Sin conexión a internet. Los cambios no se guardarán hasta que vuelva la red.
         </div>
       )}
