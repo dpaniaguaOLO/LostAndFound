@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { ClaimReviewDialog } from '../components/ClaimReviewDialog';
 import { CreateUserCard } from '../components/CreateUserCard';
+import { PlayerName } from '../components/game';
 import { PasswordResetCard } from '../components/PasswordResetCard';
 import { ConfirmDialog, ErrorState, ItemImage, PageHeader, Spinner, StatusBadge, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -271,7 +272,9 @@ export function AdminPage() {
               <li key={u.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{u.name}</p>
+                    <p className="truncate">
+                      <PlayerName id={u.id} name={u.name} />
+                    </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       N° {u.employeeId} · desde {formatDate(u.createdAt)}
                     </p>
@@ -301,7 +304,9 @@ export function AdminPage() {
               <tbody>
                 {visibleUsers.map((u) => (
                   <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-olo-dark-800">
-                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
+                    <td className="px-4 py-3">
+                      <PlayerName id={u.id} name={u.name} />
+                    </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.employeeId}</td>
                     <td className="px-4 py-3">
                       <RoleBadge role={u.role} />
@@ -356,7 +361,7 @@ export function AdminPage() {
                     </div>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{c.message}</p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Reclama: {c.claimant.name} · {formatDateTime(c.createdAt)}
+                      Reclama: <PlayerName id={c.claimant.id} name={c.claimant.name} /> · {formatDateTime(c.createdAt)}
                     </p>
                     {c.reviewNote && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nota: {c.reviewNote}</p>}
                   </div>
@@ -450,7 +455,7 @@ export function AdminPage() {
                   <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-olo-500" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-slate-800 dark:text-slate-100">
-                      <span className="font-medium">{e.actor.name}</span>{' '}
+                      <PlayerName id={e.actor.id} name={e.actor.name} />{' '}
                       — {ACTION_LABELS[e.action] ?? e.action}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">{e.summary}</p>

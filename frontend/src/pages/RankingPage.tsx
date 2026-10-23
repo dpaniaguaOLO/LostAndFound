@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { bestBadges, LEADERBOARD_MAX, LEADERBOARD_PAGE, type PlayerProfile, type PlayerSummary } from '@laf/shared';
-import { Avatar, BadgeMedal, PointsHelpModal } from '../components/game';
+import { Avatar, BadgeEmblem, PointsHelpModal } from '../components/game';
 import { EmptyState, ErrorState, ListSkeleton, PageHeader } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -160,9 +160,9 @@ function RankingRow({ entry, isMe }: { entry: PlayerSummary; isMe: boolean }) {
         </p>
         {badges.length > 0 && (
           <div className="mt-1 flex gap-1">
-            <span className="sr-only">Mejores insignias: {badges.map((b) => b.name).join(', ')}</span>
-            {badges.map((b) => (
-              <BadgeMedal key={b.id} badge={b} size="sm" />
+            <span className="sr-only">Mejores insignias: {badges.map((p) => `${p.badge.name} nivel ${p.level}`).join(', ')}</span>
+            {badges.map((p) => (
+              <BadgeEmblem key={p.badge.id} badge={p.badge} level={p.level} size="sm" />
             ))}
           </div>
         )}

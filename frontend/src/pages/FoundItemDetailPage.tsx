@@ -15,6 +15,7 @@ import {
   UnavailableState,
   ZoomableImage,
 } from '../components/ui';
+import { PlayerName } from '../components/game';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage, isNotAvailable } from '../lib/errors';
@@ -186,7 +187,7 @@ export function FoundItemDetailPage() {
               ...(item.status === 'RETURNED' && item.returnedAt
                 ? ([['Devuelto el', formatDate(item.returnedAt)]] as [string, string][])
                 : []),
-              ['Publicado por', item.reporter.name],
+              ['Publicado por', <PlayerName id={item.reporter.id} name={item.reporter.name} />],
             ]}
           />
 

@@ -472,30 +472,31 @@ async function returnedItem(hoursAgo = 0) {
   return item;
 }
 
-test('juego: puntos solo por devoluciones con reclamación aprobada de otra persona', async () => {
+test('juego: 50 por publicar, +100 por devolver con reclamación de otra persona, +50 si es rápida', async () => {
   for (const [id, emp] of [[E, 'game-1'], [F, 'game-2'], [G, 'game-3']]) {
     await asServer(`insert into auth.users values ($1, $2, $3)`, [id, `${emp}@x`, { name: `User ${emp}`, employee_id: emp }]);
   }
   assert.equal((await profileOf(F, E)).points, 0);
   assert.equal((await profileOf(F, E)).rank, null, 'sin puntos no tiene puesto');
 
-  // Publicar no da puntos; devolver sin reclamación tampoco.
+  // Publicar da 50; "devolver" sin reclamación no suma más.
   const solo = await newItem(E);
   await asUser(E, `update public.found_items set status = 'RETURNED' where id = $1`, [solo]);
   let p = await profileOf(F, E);
-  assert.deepEqual([p.points, p.published, p.returned], [0, 1, 0]);
+  assert.deepEqual([p.points, p.published, p.returned], [50, 1, 0]);
 
-  await returnedItem(0); // rápida: 100 + 50
-  await returnedItem(48); // lenta: 100
+  await returnedItem(0); // 50 + 100 + 50 (rápida)
+  await returnedItem(48); // 50 + 100
   p = await profileOf(F, E);
-  assert.deepEqual([p.points, p.returned, p.fast_returned], [250, 2, 1]);
+  assert.deepEqual([p.points, p.returned, p.fast_returned], [400, 2, 1]);
+  assert.deepEqual([p.published_photo, p.categories, p.active_months], [0, 1, 1]);
   assert.ok(p.rank >= 1);
 
-  // Moderación: archivar quita los puntos de ese objeto.
+  // Moderación: archivar quita todos los puntos de ese objeto.
   const archived = await returnedItem(0);
-  assert.equal((await profileOf(F, E)).points, 400);
+  assert.equal((await profileOf(F, E)).points, 600);
   await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [archived]);
-  assert.equal((await profileOf(F, E)).points, 250);
+  assert.equal((await profileOf(F, E)).points, 400);
 });
 
 test('juego: ranking ordenado, top 100 y solo para colaboradores activos', async () => {
@@ -503,7 +504,7 @@ test('juego: ranking ordenado, top 100 y solo para colaboradores activos', async
   assert.ok(board.length >= 1 && board.every((r) => r.points > 0), 'solo quien tiene puntos');
   for (let i = 1; i < board.length; i++) assert.ok(board[i - 1].points >= board[i].points, 'orden descendente');
   assert.equal(board.find((r) => r.id === E)?.rank, (await profileOf(F, E)).rank, 'mismo puesto en ranking y perfil');
-  assert.deepEqual(Object.keys(board[0]).sort(), ['avatar_path', 'fast_returned', 'id', 'name', 'points', 'published', 'rank', 'returned']);
+  assert.deepEqual(Object.keys(board[0]).sort(), ['active_months', 'avatar_path', 'categories', 'fast_returned', 'id', 'name', 'points', 'published', 'published_photo', 'rank', 'returned']);
   assert.equal((await asUser(F, `select * from public.leaderboard(100, 30)`)).rows.length, 0, 'nada más allá del puesto 100');
   assert.equal((await asUser(F, `select * from public.leaderboard(0, 500)`)).rows.length, board.length, 'el límite se acota');
 

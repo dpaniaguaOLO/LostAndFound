@@ -245,8 +245,11 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 Juego (rama `features/game`): los puntos se calculan en el servidor a partir de los datos
 (`game_stats()` en Supabase, `backend/src/lib/game.ts` en Express) con las reglas de
 `POINT_RULES` de `@laf/shared`; las insignias se derivan de las estadísticas con
-`earnedBadges()/bestBadges()` (`BADGES`). Reglas e insignias son provisionales: si cambian,
-actualizar los tres sitios.
+`badgeProgress()/showcaseBadges()` (`BADGES`, insignias con niveles). Si cambian las reglas
+o las estadísticas, actualizar los tres sitios. El top 3 (`TOP_PLAYERS`) tiene sus perdidos
+OPEN/MATCHED destacados al principio del listado (`pinned: true`; Express en
+`GET /lost-reports`, Supabase en `services/supabase.ts`) y un emblema junto al nombre
+(`PlayerName`/`RankEmblem` en `components/game.tsx`).
 
 Reglas añadidas en v0.15.x: `PATCH /admin/users/:id/role` no permite dejar el sistema sin
 administradores (400). `PATCH /claims/:id/review` con `APPROVED` exige que el objeto siga
@@ -316,7 +319,8 @@ prefiere archivar.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
-2026-10-22; 016 `game_profiles`, de la rama `features/game`, el 2026-10-23).
+2026-10-22; 016 `game_profiles`, de la rama `features/game`, el 2026-10-23; 017
+`game_rules` pendiente).
 
 ---
 
@@ -425,7 +429,7 @@ prefiere archivar.
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
 - **En desarrollo**: rama `features/game`: perfil con foto, puntos, insignias y ranking
-  (reglas de puntos e insignias provisionales; migración 016 aplicada en Supabase).
+  (insignias por niveles, ventajas del top 3; migración 016 aplicada, 017 pendiente).
 - **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).

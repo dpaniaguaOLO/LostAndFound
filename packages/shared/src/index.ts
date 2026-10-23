@@ -101,6 +101,8 @@ export interface LostReport {
   imageUrl: string | null;
   status: LostReportStatus;
   reporter: Pick<User, 'id' | 'name'>;
+  /** Destacado arriba del muro porque su autor está en el top 3 del ranking (solo en listados). */
+  pinned?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -109,7 +111,7 @@ export interface Claim {
   id: string;
   foundItemId: string;
   /** `reporterName`: quien encontró el objeto (para coordinar la entrega). */
-  foundItem?: Pick<FoundItem, 'id' | 'title' | 'imageUrl' | 'status'> & { reporterName?: string };
+  foundItem?: Pick<FoundItem, 'id' | 'title' | 'imageUrl' | 'status'> & { reporterId?: string; reporterName?: string };
   /** Reporte de perdido del reclamante al que corresponde (Supabase; se resuelve al entregar). */
   lostReportId?: string | null;
   claimant: Pick<User, 'id' | 'name'>;
@@ -320,60 +322,115 @@ export interface AuditEntry {
 //
 // Los puntos y las estadísticas los calcula SIEMPRE el servidor a partir de los
 // datos reales (nadie puede escribirlos): función SQL game_stats() en Supabase
-// (migración 016) y backend/src/lib/game.ts en Express. Si cambian las reglas de
-// POINT_RULES hay que cambiar también esos dos sitios.
+// (migración 017) y backend/src/lib/game.ts en Express. Si cambian las reglas de
+// POINT_RULES o las estadísticas hay que cambiar también esos dos sitios.
 // Las insignias se derivan de las estadísticas aquí, en un único lugar.
 
-/** Una devolución cuenta si el objeto quedó RETURNED con una reclamación aprobada de otra persona. */
+/**
+ * Estadísticas de un colaborador. Solo cuentan objetos encontrados no archivados.
+ * Una devolución es válida si el objeto quedó RETURNED con una reclamación
+ * aprobada de otra persona.
+ */
 export interface PlayerStats {
-  published: number; // objetos encontrados publicados (sin contar los archivados)
+  published: number; // objetos encontrados publicados
+  publishedWithPhoto: number; // ...de ellos, con foto
   returned: number; // devoluciones válidas
   fastReturned: number; // devoluciones válidas en ≤ FAST_RETURN_HOURS desde que se publicó
+  categories: number; // categorías distintas entre las devoluciones válidas
+  activeMonths: number; // meses distintos con alguna devolución válida
 }
 
-/** Reglas de puntos (provisionales). `key` identifica la regla en el servidor. */
+/** Reglas de puntos. `key` identifica la regla en el servidor. */
 export const POINT_RULES = [
-  { key: 'returned', points: 100, title: 'Devuelves un objeto', description: 'Un objeto que encontraste llega a su dueño: se aprobó su reclamación y lo marcaste como devuelto.' },
-  { key: 'fast', points: 50, title: 'Entrega rápida', description: 'Extra si la devolución ocurre en menos de 24 horas desde que lo publicaste.' },
+  { key: 'published', points: 50, title: 'Publicas un objeto encontrado', description: 'Por cada objeto encontrado que publicas en el muro. Si lo eliminas o un administrador lo archiva, se descuentan.' },
+  { key: 'returned', points: 100, title: 'Lo devuelves a su dueño', description: 'Alguien lo reclama, apruebas la reclamación y lo marcas como devuelto.' },
+  { key: 'fast', points: 50, title: 'Entrega rápida', description: 'Extra si lo devuelves en menos de 24 horas desde que lo publicaste.' },
 ] as const;
 export const FAST_RETURN_HOURS = 24;
 
-export type BadgeTier = 'common' | 'rare' | 'epic' | 'legendary';
-export const BADGE_TIER_ORDER: Record<BadgeTier, number> = { common: 1, rare: 2, epic: 3, legendary: 4 };
-export const BADGE_TIER_LABEL: Record<BadgeTier, string> = { common: 'Común', rare: 'Rara', epic: 'Épica', legendary: 'Legendaria' };
+/**
+ * Marcos de las insignias por nivel (como la maestría de cartas de Clash Royale):
+ * cada nivel mejora el marco. Índice = nivel - 1.
+ */
+export const BADGE_FRAMES = ['Bronce', 'Plata', 'Oro', 'Esmeralda', 'Zafiro', 'Rubí', 'Leyenda'] as const;
 
-export interface Badge {
+export interface BadgeDef {
   id: string;
   name: string;
   emoji: string;
-  description: string; // cómo se consigue
-  tier: BadgeTier;
+  /** Estadística que hace subir de nivel la insignia. */
+  stat: keyof PlayerStats;
+  /** Umbral de cada nivel (nivel 1 = levels[0]). Máximo BADGE_FRAMES.length niveles. */
+  levels: readonly number[];
+  /** Objetivo legible para alcanzar `n`. */
+  goal: (n: number) => string;
 }
 
-/** Catálogo de insignias (provisional). Orden = orden de visualización. */
-export const BADGES: readonly (Badge & { earned: (s: PlayerStats) => boolean })[] = [
-  { id: 'first_find', name: 'Primer hallazgo', emoji: '🔍', tier: 'common', description: 'Publica tu primer objeto encontrado.', earned: (s) => s.published >= 1 },
-  { id: 'good_samaritan', name: 'Buen samaritano', emoji: '🤝', tier: 'common', description: 'Devuelve tu primer objeto a su dueño.', earned: (s) => s.returned >= 1 },
-  { id: 'lightning', name: 'Rayo', emoji: '⚡', tier: 'rare', description: 'Devuelve un objeto en menos de 24 horas.', earned: (s) => s.fastReturned >= 1 },
-  { id: 'hero', name: 'Héroe de OLO', emoji: '🦸', tier: 'rare', description: 'Devuelve 5 objetos.', earned: (s) => s.returned >= 5 },
-  { id: 'supersonic', name: 'Supersónico', emoji: '🚀', tier: 'epic', description: 'Devuelve 5 objetos en menos de 24 horas cada uno.', earned: (s) => s.fastReturned >= 5 },
-  { id: 'legend', name: 'Leyenda', emoji: '🏆', tier: 'epic', description: 'Devuelve 10 objetos.', earned: (s) => s.returned >= 10 },
-  { id: 'guardian', name: 'Guardián de OLO', emoji: '👑', tier: 'legendary', description: 'Devuelve 25 objetos.', earned: (s) => s.returned >= 25 },
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/** Catálogo de insignias. Orden = orden de la colección. */
+export const BADGES: readonly BadgeDef[] = [
+  {
+    id: 'samaritan', name: 'Buen samaritano', emoji: '🤝', stat: 'returned', levels: [1, 5, 15, 25, 50, 75, 100],
+    goal: (n) => (n === 1 ? 'Devuelve tu primer objeto a su dueño' : `Devuelve ${n} objetos a sus dueños`),
+  },
+  {
+    id: 'lightning', name: 'Rayo', emoji: '⚡', stat: 'fastReturned', levels: [1, 3, 10, 25, 50],
+    goal: (n) => `Devuelve ${n} ${plural(n, 'objeto', 'objetos')} en menos de 24 horas`,
+  },
+  {
+    id: 'hawk_eye', name: 'Ojo de halcón', emoji: '🔍', stat: 'published', levels: [1, 5, 15, 30, 50, 100],
+    goal: (n) => (n === 1 ? 'Publica tu primer objeto encontrado' : `Publica ${n} objetos encontrados`),
+  },
+  {
+    id: 'photographer', name: 'Fotógrafo', emoji: '📸', stat: 'publishedWithPhoto', levels: [1, 10, 25, 50],
+    goal: (n) => `Publica ${n} ${plural(n, 'objeto encontrado', 'objetos encontrados')} con foto`,
+  },
+  {
+    id: 'all_terrain', name: 'Todoterreno', emoji: '🧭', stat: 'categories', levels: [2, 4, 6, 9],
+    goal: (n) => (n >= 9 ? 'Devuelve objetos de todas las categorías' : `Devuelve objetos de ${n} categorías distintas`),
+  },
+  {
+    id: 'constant', name: 'Constante', emoji: '📅', stat: 'activeMonths', levels: [2, 3, 6, 12],
+    goal: (n) => `Devuelve objetos en ${n} meses distintos`,
+  },
 ];
 
-/** Insignias conseguidas, en el orden del catálogo. */
-export function earnedBadges(stats: PlayerStats): Badge[] {
-  return BADGES.filter((b) => b.earned(stats)).map(({ earned: _e, ...b }) => b);
+export interface BadgeProgress {
+  badge: BadgeDef;
+  level: number; // 0 = aún bloqueada
+  value: number; // valor actual de la estadística
+  next: number | null; // umbral del siguiente nivel (null = nivel máximo)
+  maxed: boolean;
 }
 
-/** Las `n` mejores insignias (mayor rareza primero; a igual rareza, la más avanzada del catálogo). */
-export function bestBadges(stats: PlayerStats, n = 3): Badge[] {
-  return earnedBadges(stats)
-    .map((b, i) => ({ b, i }))
-    .sort((x, y) => BADGE_TIER_ORDER[y.b.tier] - BADGE_TIER_ORDER[x.b.tier] || y.i - x.i)
-    .slice(0, n)
-    .map((x) => x.b);
+export function badgeProgress(badge: BadgeDef, stats: PlayerStats): BadgeProgress {
+  const value = stats[badge.stat] ?? 0;
+  const level = badge.levels.filter((t) => value >= t).length;
+  const next = badge.levels[level] ?? null;
+  return { badge, level, value, next, maxed: next === null };
 }
+
+/** Progreso de toda la colección, en el orden del catálogo. */
+export function badgeCollection(stats: PlayerStats): BadgeProgress[] {
+  return BADGES.map((b) => badgeProgress(b, stats));
+}
+
+/** Insignias para exhibir (como el escaparate del perfil de Clash Royale): las de mayor nivel primero. */
+export function showcaseBadges(stats: PlayerStats, n = 8): BadgeProgress[] {
+  return badgeCollection(stats)
+    .map((p, i) => ({ p, i }))
+    .filter((x) => x.p.level > 0)
+    .sort((a, b) => b.p.level - a.p.level || a.i - b.i)
+    .slice(0, n)
+    .map((x) => x.p);
+}
+
+/** Las `n` mejores insignias (para el ranking). */
+export const bestBadges = (stats: PlayerStats, n = 3) => showcaseBadges(stats, n);
+
+/** Los primeros puestos del ranking tienen ventajas (emblema y perdidos destacados). */
+export const TOP_PLAYERS = 3;
 
 /** Colaborador en el ranking o en un perfil. `rank` null = aún sin puntos. */
 export interface PlayerSummary {

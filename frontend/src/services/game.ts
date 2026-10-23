@@ -9,6 +9,7 @@
  */
 import {
   LEADERBOARD_MAX,
+  TOP_PLAYERS,
   type LeaderboardPage,
   type PlayerProfile,
   type PlayerStats,
@@ -40,12 +41,22 @@ type StatsRow = {
   points: number;
   rank: number | null;
   published: number;
+  published_photo: number;
   returned: number;
   fast_returned: number;
+  categories: number;
+  active_months: number;
 };
 
 function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
-  const stats: PlayerStats = { published: r.published, returned: r.returned, fastReturned: r.fast_returned };
+  const stats: PlayerStats = {
+    published: r.published,
+    publishedWithPhoto: r.published_photo,
+    returned: r.returned,
+    fastReturned: r.fast_returned,
+    categories: r.categories,
+    activeMonths: r.active_months,
+  };
   return {
     id: r.id,
     name: r.name,
@@ -130,3 +141,24 @@ const restGame: GameService = {
 };
 
 export const gameService: GameService = useSupabase ? supabaseGame : restGame;
+
+// --- Top del ranking (emblemas junto al nombre y perdidos destacados) ---------
+
+const TOP_TTL_MS = 60_000;
+let topCache: { ids: string[]; at: number } | null = null;
+let topInFlight: Promise<string[]> | null = null;
+
+/** Ids de los primeros TOP_PLAYERS del ranking, en orden (cacheado 1 min). Vacío si falla. */
+export function topPlayerIds(): Promise<string[]> {
+  if (topCache && Date.now() - topCache.at < TOP_TTL_MS) return Promise.resolve(topCache.ids);
+  topInFlight ??= gameService
+    .leaderboard(0, TOP_PLAYERS)
+    .then((p) => p.entries.map((e) => e.id))
+    .catch(() => [] as string[])
+    .then((ids) => {
+      topCache = { ids, at: Date.now() };
+      topInFlight = null;
+      return ids;
+    });
+  return topInFlight;
+}

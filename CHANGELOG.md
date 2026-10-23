@@ -9,9 +9,17 @@
 - **Ranking** (`/ranking`): top 100 por puntos, de 30 en 30 ("Cargar más"), con podio,
   mejores insignias de cada colaborador, tu posición y acceso a cada perfil.
 - La foto de perfil se ve en la cabecera, la barra inferior y la hoja de perfil.
-- Puntos e insignias **provisionales** (por definir): 100 por objeto devuelto con
-  reclamación aprobada de otra persona, +50 si fue en < 24 h. Catálogo de insignias en
-  `@laf/shared` (`BADGES`).
+- **Puntos**: +50 por publicar un objeto encontrado, +100 si se devuelve con reclamación
+  aprobada de otra persona, +50 si fue en < 24 h (migración 017). Archivar o eliminar la
+  publicación descuenta sus puntos.
+- **Insignias por niveles** al estilo del perfil de Clash Royale: escaparate de hasta 8
+  insignias y "Ver colección" con progreso; cada nivel mejora el marco (Bronce → Plata →
+  Oro → Esmeralda → Zafiro → Rubí → Leyenda). Buen samaritano (1-5-15-25-50-75-100
+  devueltos), Rayo (devueltos en < 24 h), Ojo de halcón (publicados), Fotógrafo (con foto),
+  Todoterreno (categorías distintas) y Constante (meses con devoluciones).
+- **Ventajas del top 3**: sus perdidos en búsqueda salen primero en el muro (en orden de
+  ranking, "Destacado") y llevan un emblema con su puesto junto al nombre.
+- Los nombres (detalle de objetos, reclamaciones, panel admin, ranking) enlazan al perfil.
 - Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,
   `leaderboard()`, `player_profile()`; los puntos los calcula `game_stats()`, nunca el
   cliente). Aplicada en el proyecto alojado (2026-10-23).

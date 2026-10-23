@@ -26,6 +26,7 @@ import { signAvatar } from '../lib/avatars';
 import { syntheticEmail } from '../lib/config';
 import { NotAvailableError } from '../lib/errors';
 import { requireSupabase, setRememberDevice } from '../lib/supabase';
+import { topPlayerIds } from './game';
 import type {
   AuthService,
   ClaimsService,
@@ -474,6 +475,27 @@ const lostReports: LostReportsService = {
     const sb = requireSupabase();
     const page = Math.max(1, params.page ?? 1);
     const from = (page - 1) * PAGE_SIZE;
+
+    // Ventaja del top 3 del ranking (como GET /lost-reports en Express): sus
+    // perdidos aún en búsqueda van arriba (en orden de ranking) y salen del listado normal.
+    const top = await topPlayerIds();
+    let pinnedRows: Row[] = [];
+    if (top.length) {
+      let pq = sb
+        .from('lost_reports')
+        .select(REPORTER_SELECT)
+        .in('reporter_id', top)
+        .in('status', ['OPEN', 'MATCHED'])
+        .order('created_at', { ascending: false });
+      if (params.category) pq = pq.eq('category', params.category);
+      pq = applyTextFilters(pq, params);
+      const { data, error } = await pq;
+      if (error) throw error;
+      pinnedRows = [...(data ?? [])].sort(
+        (a, b) => top.indexOf(a.reporter_id as string) - top.indexOf(b.reporter_id as string),
+      );
+    }
+
     let q = sb
       .from('lost_reports')
       .select(REPORTER_SELECT, { count: 'exact' })
@@ -481,13 +503,17 @@ const lostReports: LostReportsService = {
       .in('status', ['OPEN', 'MATCHED', 'RESOLVED'])
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+    if (pinnedRows.length) q = q.not('id', 'in', `(${pinnedRows.map((r) => r.id as string).join(',')})`);
     if (params.category) q = q.eq('category', params.category);
     q = applyTextFilters(q, params);
     const { data, count, error } = await q;
     if (error) throw error;
-    const items = await mapWithImages(data ?? [], (r) => r.image_path, toLostReport);
-    const total = count ?? items.length;
-    return { data: items, page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil(total / PAGE_SIZE) || 1 };
+    const pinned = page === 1 ? pinnedRows : [];
+    const rows = [...pinned, ...(data ?? [])];
+    const items = await mapWithImages(rows, (r) => r.image_path, toLostReport);
+    pinned.forEach((_, i) => (items[i].pinned = true));
+    const total = (count ?? items.length) + pinnedRows.length;
+    return { data: items, page, pageSize: PAGE_SIZE, total, totalPages: Math.ceil((count ?? 0) / PAGE_SIZE) || 1 };
   },
 
   async get(id) {
@@ -585,6 +611,7 @@ async function toClaim(c: Row): Promise<Claim> {
           title: fi.title as string,
           imageUrl: await signedUrl((fi.image_path as string | null) ?? null),
           status: fi.status as FoundItemStatus,
+          reporterId: (fi.reporter_id as string | undefined) ?? undefined,
           reporterName: ((fi.reporter as Row | null)?.name as string | undefined) ?? undefined,
         }
       : undefined,

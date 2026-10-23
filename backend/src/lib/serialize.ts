@@ -72,6 +72,8 @@ export function serializeClaim(c: AnyRecord) {
           title: foundItem.title as string,
           imageUrl: signUploadUrl(foundItem.imageUrl as string | null),
           status: foundItem.status as string,
+          reporterId: (foundItem.reporterId as string | undefined) ?? undefined,
+          reporterName: ((foundItem.reporter as AnyRecord | undefined)?.name as string | undefined) ?? undefined,
         }
       : undefined,
     claimant: claimant

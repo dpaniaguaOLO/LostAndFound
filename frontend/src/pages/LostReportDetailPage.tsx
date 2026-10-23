@@ -14,6 +14,7 @@ import {
   UnavailableState,
   ZoomableImage,
 } from '../components/ui';
+import { PlayerName } from '../components/game';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage, isNotAvailable } from '../lib/errors';
@@ -122,7 +123,7 @@ export function LostReportDetailPage() {
               ['Categoría', CATEGORY_LABELS[item.category]],
               ['Ubicación', item.location || 'No indicada'],
               ['Perdido el', formatDate(item.lostAt)],
-              ['Reportado por', item.reporter.name],
+              ['Reportado por', <PlayerName id={item.reporter.id} name={item.reporter.name} />],
             ]}
           />
 

@@ -13,7 +13,9 @@ export const claimsRouter = Router();
 
 const claimInclude = {
   claimant: { select: { id: true, name: true } },
-  foundItem: { select: { id: true, title: true, imageUrl: true, status: true } },
+  foundItem: {
+    select: { id: true, title: true, imageUrl: true, status: true, reporterId: true, reporter: { select: { name: true } } },
+  },
 };
 
 // POST /api/claims — solicitar reclamación de un objeto encontrado.

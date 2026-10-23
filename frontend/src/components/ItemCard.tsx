@@ -7,6 +7,7 @@ import {
   formatDate,
   formatRelativeDay,
 } from '../lib/format';
+import { RankEmblem, useTopRank } from './game';
 import { ItemImage, StatusBadge } from './ui';
 
 /** Metadatos de la tarjeta: categoría, ubicación y fecha, con iconos. */
@@ -68,9 +69,23 @@ export function LostReportCard({ item, embedded = false }: { item: LostReport; e
   const body = <LostReportCardBody item={item} />;
   if (embedded) return <div className="group flex flex-col overflow-hidden">{body}</div>;
   return (
-    <Link to={`/perdidos/${item.id}`} className="card-interactive group flex flex-col overflow-hidden">
+    <Link
+      to={`/perdidos/${item.id}`}
+      className={'card-interactive group flex flex-col overflow-hidden ' + (item.pinned ? 'ring-2 ring-amber-400/80 dark:ring-amber-300/60' : '')}
+    >
       {body}
     </Link>
+  );
+}
+
+/** Distintivo de un perdido destacado (su autor está en el top 3 del ranking). */
+function PinnedTag({ reporterId }: { reporterId: string }) {
+  const rank = useTopRank(reporterId);
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100/95 px-2 py-0.5 text-[11px] font-bold text-amber-900 shadow-card backdrop-blur dark:bg-amber-500/25 dark:text-amber-100">
+      <RankEmblem rank={rank} className="h-4 w-4" />
+      Destacado
+    </span>
   );
 }
 
@@ -84,6 +99,11 @@ function LostReportCardBody({ item }: { item: LostReport }) {
             <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
           </span>
         </div>
+        {item.pinned && (
+          <div className="absolute right-3 top-3">
+            <PinnedTag reporterId={item.reporter.id} />
+          </div>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h2 className="text-base line-clamp-1 font-semibold text-slate-900 transition-colors group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BADGES, earnedBadges, type PlayerProfile } from '@laf/shared';
-import { Avatar, BadgeCard, PointsHelpModal } from '../components/game';
+import { BADGES, badgeCollection, showcaseBadges, type PlayerProfile } from '@laf/shared';
+import { Avatar, BadgeCollectionModal, BadgeShowcase, PointsHelpModal, RankEmblem, useTopRank } from '../components/game';
 import { BackButton, ErrorState, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -22,8 +22,11 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [help, setHelp] = useState(false);
+  // Colección de insignias: null = cerrada; '' = lista completa; id = detalle de una.
+  const [badgeView, setBadgeView] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const topRank = useTopRank(userId);
 
   function load() {
     setLoading(true);
@@ -78,9 +81,9 @@ export function ProfilePage() {
   }
   if (!profile) return null;
 
-  const earned = earnedBadges(profile.stats);
-  const earnedIds = new Set(earned.map((b) => b.id));
-  const locked = BADGES.filter((b) => !earnedIds.has(b.id));
+  const showcase = showcaseBadges(profile.stats);
+  const totalLevels = BADGES.reduce((n, b) => n + b.levels.length, 0);
+  const levels = badgeCollection(profile.stats).reduce((n, p) => n + p.level, 0);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -124,7 +127,10 @@ export function ProfilePage() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <h1 className="page-title break-words">{profile.name}</h1>
+            <h1 className="page-title inline-flex items-center gap-2 break-words">
+              {profile.name}
+              <RankEmblem rank={topRank} className="h-7 w-7" />
+            </h1>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
             </p>
@@ -166,26 +172,33 @@ export function ProfilePage() {
 
       {/* Insignias */}
       <section className="mt-6" aria-labelledby="badges-title">
-        <h2 id="badges-title" className="mb-3 flex items-baseline gap-2 text-lg font-bold text-slate-900 dark:text-slate-50">
-          Insignias
-          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            {earned.length}/{BADGES.length}
-          </span>
-        </h2>
-        {earned.length === 0 && !isMe ? (
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2 id="badges-title" className="flex items-baseline gap-2 text-lg font-bold text-slate-900 dark:text-slate-50">
+            Insignias
+            <span className="text-sm font-semibold text-slate-500 dark:text-slate-400" title="Niveles conseguidos">
+              {levels}/{totalLevels}
+            </span>
+          </h2>
+          <button type="button" className="btn-secondary min-h-9 px-3 text-sm" onClick={() => setBadgeView('')}>
+            Ver colección
+          </button>
+        </div>
+        {showcase.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500 dark:border-olo-dark-800 dark:text-slate-400">
-            Todavía no tiene insignias.
+            {isMe ? 'Aún no tienes insignias. Publica o devuelve un objeto encontrado para conseguir la primera.' : 'Todavía no tiene insignias.'}
           </p>
         ) : (
-          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {earned.map((b) => (
-              <BadgeCard key={b.id} badge={b} />
-            ))}
-            {/* En el perfil propio también se ven las que faltan, como objetivo. */}
-            {isMe && locked.map((b) => <BadgeCard key={b.id} badge={b} locked />)}
-          </ul>
+          <BadgeShowcase items={showcase} onSelect={setBadgeView} />
         )}
       </section>
+
+      <BadgeCollectionModal
+        open={badgeView !== null}
+        onClose={() => setBadgeView(null)}
+        stats={profile.stats}
+        focus={badgeView || null}
+        ownerName={isMe ? null : profile.name}
+      />
 
       <div className="mt-6 flex justify-center">
         <Link to="/ranking" className="btn-secondary">

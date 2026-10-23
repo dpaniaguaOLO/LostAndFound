@@ -344,23 +344,24 @@ test('asistente: "¿qué se devolvió esta semana?" usa la fecha de devolución'
 });
 
 // --- Juego: puntos, ranking y foto de perfil (paridad con la migración 016) --------
-test('juego: puntos solo por devoluciones con reclamación aprobada; ranking top 100', async () => {
+test('juego: 50 por publicar, +100 por devolver con reclamación, +50 si es rápida; ranking top 100', async () => {
   const points = async () => (await call('GET', `/api/game/players/${ids.carla}`, { token: tokens.ana })).data;
   const start = await points();
-  // Publicar y "devolver" sin reclamación no da puntos.
+  // Publicar da 50; "devolver" sin reclamación no suma más.
   const solo = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Llavero' }) })).data;
   await call('PATCH', `/api/found-items/${solo.id}/return`, { token: tokens.carla });
   let p = await points();
-  assert.equal(p.points, start.points);
+  assert.equal(p.points, start.points + 50);
   assert.equal(p.stats.published, start.stats.published + 1);
 
-  // Con reclamación aprobada de otra persona, el mismo día: 100 + 50.
+  // Con reclamación aprobada de otra persona, el mismo día: 50 + 100 + 50.
   const item = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Cargador' }) })).data;
   const claim = (await call('POST', '/api/claims', { token: tokens.ana, body: { foundItemId: item.id, message: 'Es mío' } })).data;
   await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.carla, body: { status: 'APPROVED' } });
   await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.carla });
   p = await points();
-  assert.equal(p.points, start.points + 150);
+  assert.equal(p.points, start.points + 250);
+  assert.ok(p.stats.categories >= 1 && p.stats.activeMonths >= 1);
   assert.deepEqual([p.stats.returned, p.stats.fastReturned], [start.stats.returned + 1, start.stats.fastReturned + 1]);
   assert.ok(p.rank >= 1);
   assert.equal(p.role, 'EMPLOYEE');
@@ -373,9 +374,33 @@ test('juego: puntos solo por devoluciones con reclamación aprobada; ranking top
   assert.equal((await call('GET', '/api/game/leaderboard')).status, 401);
   assert.equal((await call('GET', '/api/game/players/no-existe', { token: tokens.beto })).status, 404);
 
-  // Archivar (moderación) quita los puntos.
+  // Archivar (moderación) quita todos los puntos de ese objeto.
   await call('PATCH', `/api/found-items/${item.id}/archive`, { token: tokens.admin });
-  assert.equal((await points()).points, start.points);
+  assert.equal((await points()).points, start.points + 50);
+});
+
+test('juego: los perdidos activos del top 3 salen primero en el muro, en orden de ranking', async () => {
+  const board = (await call('GET', '/api/game/leaderboard?limit=3', { token: tokens.ana })).data.entries;
+  const leader = board[0].id as string;
+  const outsider = Object.values(ids).find((id) => !board.some((e: any) => e.id === id));
+  const lost = (reporterId: string, title: string, createdAt: Date) =>
+    prisma.lostReport.create({ data: { title, description: 'x', category: 'OTHER', location: '', lostAt: createdAt, createdAt, reporterId } });
+  const mine = await lost(leader, 'Del líder', new Date(Date.now() - 86_400_000));
+  if (outsider) await lost(outsider, 'Más reciente', new Date());
+  const wall = (await call('GET', '/api/lost-reports', { token: tokens.ana })).data;
+  assert.equal(wall.data[0].reporter.id, leader, 'los del nº 1 van primero aunque haya otros más recientes');
+  assert.equal(wall.data[0].pinned, true);
+  const ranks = wall.data.filter((r: any) => r.pinned).map((r: any) => board.findIndex((e: any) => e.id === r.reporter.id));
+  assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), 'destacados en orden de ranking');
+  assert.equal(wall.data.find((r: any) => r.id === mine.id)?.pinned, true);
+  assert.ok(wall.data.findIndex((r: any) => !r.pinned) > wall.data.findIndex((r: any) => r.id === mine.id));
+  assert.equal(wall.data.filter((r: any) => r.id === mine.id).length, 1, 'sin duplicados');
+  const page2 = (await call('GET', '/api/lost-reports?page=2', { token: tokens.ana })).data;
+  assert.ok(!page2.data.some((r: any) => r.pinned));
+  // Resuelto: deja de estar destacado.
+  await prisma.lostReport.update({ where: { id: mine.id }, data: { status: 'RESOLVED' } });
+  const after = (await call('GET', '/api/lost-reports', { token: tokens.ana })).data.data;
+  assert.ok(!after.some((r: any) => r.id === mine.id && r.pinned));
 });
 
 test('juego: foto de perfil cuadrada, sin EXIF, con URL firmada y reemplazable', async () => {
