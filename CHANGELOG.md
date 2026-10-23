@@ -7,6 +7,11 @@
   tira horizontal con los objetos devueltos en los últimos 7 días (máx. 12), quién los
   encontró (con sus emblemas) y cuándo. Express: `GET /api/found-items/returned/recent`.
 
+### Corregido
+- Coincidencias (modo Supabase): la foto del propio objeto perdido ("Tu objeto", la
+  referencia para comparar) salía siempre vacía: la Edge Function `api` devolvía
+  `imageUrl: null`. Ahora se firma como las demás. Requiere `supabase functions deploy api`.
+
 ### Cambiado
 - Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
   10) y "Mostrar menos"; la búsqueda sigue abarcando a todos. Así el alta de colaboradores
