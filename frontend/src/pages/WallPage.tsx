@@ -114,7 +114,7 @@ function RecentlyReturned({ reload }: { reload: number }) {
         </h2>
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
           {/* El servicio devuelve como mucho 12: con 12 puede haber más. */}
-          {items.length === 1 ? '1 objeto volvió' : `${items.length}${items.length >= 12 ? '+' : ''} objetos volvieron`} a su dueño en 7 días
+          {items.length === 1 ? '1 objeto volvió' : `${items.length}${items.length >= 12 ? '+' : ''} objetos volvieron`} a su dueño en los últimos 7 días
         </p>
       </div>
       <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:px-0">
