@@ -406,7 +406,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.29.0 (ver `VERSION`). 0.29.0: Olivia consulta con herramientas (devueltos,
+- **Versión**: 0.30.0 (ver `VERSION`). 0.30.0 (rama `features/game`, APK debug): perfil con
+  foto, puntos, insignias por niveles, ranking, ventajas del top 3, emblemas de admin y
+  Leyenda, ventana de recompensa (migraciones 016-017). 0.29.0: Olivia consulta con herramientas (devueltos,
   estados, reclamaciones, notificaciones, resumen, coincidencias, historial admin) y fecha de
   devolución `returned_at` (migración 015). 0.28.0: el autor puede eliminar sus publicaciones
   (migración 014, aplicada en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral

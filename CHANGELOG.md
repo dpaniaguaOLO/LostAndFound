@@ -1,6 +1,10 @@
 # Changelog
 
-## [Sin publicar] — rama `features/game`
+## [0.30.0] - 2026-10-23 — APK de prueba (debug) · rama `features/game`
+
+**Desplegado**: migraciones 016 y 017 aplicadas y datos demo del juego cargados en
+Supabase. APK `LostAndFound-0.30.0.apk` (firmado con clave debug: aceptado para pruebas
+internas; para distribución formal siguen pendientes firma de release y rotación de la anon key).
 
 ### Añadido
 - **Perfil** (`/perfil`, `/perfil/:id`): foto de perfil personalizable (recorte cuadrado
