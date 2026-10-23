@@ -64,7 +64,7 @@ export function RankingPage() {
         title="Ranking"
         subtitle={`Los ${LEADERBOARD_MAX} colaboradores que más objetos han devuelto a su dueño.`}
         action={
-          <button type="button" onClick={() => setHelp(true)} className="text-sm font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
+          <button type="button" onClick={() => setHelp(true)} className="inline-flex min-h-9 items-center text-sm font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
             ¿Cómo ganar puntos?
           </button>
         }

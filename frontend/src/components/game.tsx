@@ -166,7 +166,7 @@ export function RankProgress({ points, onShowRanks }: { points: number; onShowRa
         <p className="text-sm text-slate-600 dark:text-slate-400">
           Rango <strong className={`text-base font-extrabold ${rankNameClass(points)}`}>{rank.name}</strong>
         </p>
-        <button type="button" onClick={onShowRanks} className="text-xs font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
+        <button type="button" onClick={onShowRanks} className="-my-2 inline-flex min-h-9 items-center text-xs font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
           Ver rangos
         </button>
       </div>
@@ -197,15 +197,18 @@ export function RanksModal({ open, onClose, points }: { open: boolean; onClose: 
               key={r.id}
               className={
                 'flex items-center gap-3 rounded-2xl p-2.5 ' +
-                (r.id === current.id ? 'bg-olo-50 ring-2 ring-olo-400/60 dark:bg-olo-500/10' : reached ? '' : 'opacity-60')
+                (r.id === current.id ? 'bg-olo-50 ring-2 ring-olo-400/60 dark:bg-olo-500/10' : '')
               }
             >
-              <Avatar name={r.name} size="h-10 w-10 text-sm" frame={r.frame} />
+              {/* Atenuado solo el dibujo (no el texto, que perdería contraste). */}
+              <span className={reached ? '' : 'opacity-50 grayscale'}>
+                <Avatar name={r.name} size="h-10 w-10 text-sm" frame={r.frame} />
+              </span>
               <div className="min-w-0 flex-1">
                 <p className={`font-bold ${reached ? rankNameClass(r.min) : 'text-slate-500 dark:text-slate-400'}`}>
-                  {r.name} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">· {r.min.toLocaleString('es')} pts</span>
+                  {r.name} <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">· {r.min.toLocaleString('es')} pts</span>
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{rankUnlocks(r).join(' · ') || 'Punto de partida'}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">{rankUnlocks(r).join(' · ') || 'Punto de partida'}</p>
               </div>
               {reached && (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 text-olo-600 dark:text-olo-400" role="img" aria-label="alcanzado">
@@ -593,7 +596,7 @@ function ProgressBar({ p }: { p: BadgeProgress }) {
   const prev = p.level > 0 ? p.badge.levels[p.level - 1] : 0;
   const pct = p.maxed ? 100 : Math.round(((p.value - prev) / ((p.next ?? 1) - prev)) * 100);
   return (
-    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-olo-dark-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-olo-dark-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`Progreso de ${p.badge.name}`}>
       <div className={`h-full rounded-full ${p.maxed ? 'bg-gradient-to-r from-amber-400 to-fuchsia-500' : 'bg-olo-500'}`} style={{ width: `${Math.max(pct, 3)}%` }} />
     </div>
   );
@@ -880,7 +883,7 @@ export function PointsHelpModal({ open, onClose }: { open: boolean; onClose: () 
       <ul className="mt-4 flex flex-col gap-2.5">
         {POINT_RULES.map((r) => (
           <li key={r.key} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3.5 dark:bg-olo-dark-850">
-            <span className="shrink-0 rounded-xl bg-olo-100 px-2.5 py-1 text-sm font-extrabold text-olo-700 dark:bg-olo-500/15 dark:text-olo-300">
+            <span className="shrink-0 rounded-xl bg-olo-100 px-2.5 py-1 text-sm font-extrabold text-olo-800 dark:bg-olo-500/15 dark:text-olo-300">
               +{r.points}
             </span>
             <div>

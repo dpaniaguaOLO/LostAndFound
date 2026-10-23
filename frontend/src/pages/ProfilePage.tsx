@@ -222,7 +222,7 @@ export function ProfilePage() {
           {/* Fila 4: acciones (móvil) y ayuda */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-end">
             {isMe && <div className="flex flex-wrap justify-center gap-2 sm:hidden">{actions}</div>}
-            <button type="button" onClick={() => setHelp(true)} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300">
+            <button type="button" onClick={() => setHelp(true)} className="inline-flex min-h-9 items-center px-1 text-xs font-semibold text-slate-600 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300">
               ¿Cómo ganar puntos?
             </button>
           </div>
