@@ -24,14 +24,13 @@ type PlayerStats = {
   categories: number;
   activeMonths: number;
 };
-type Equipped = { frame: string | null; title: string | null };
-type PlayerSummary = { id: string; name: string; avatarUrl: string | null; points: number; rank: number | null; stats: PlayerStats; equipped: Equipped };
-type Scored = { id: string; name: string; avatarUrl: string | null; equippedFrame: string | null; equippedTitle: string | null; points: number; stats: PlayerStats };
+type PlayerSummary = { id: string; name: string; avatarUrl: string | null; points: number; rank: number | null; stats: PlayerStats; equippedFrame: string | null };
+type Scored = { id: string; name: string; avatarUrl: string | null; equippedFrame: string | null; points: number; stats: PlayerStats };
 
 /** Estadísticas y puntos de todos los usuarios, ordenados como el ranking. */
 async function scoreAll(): Promise<Scored[]> {
   const [users, items] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, name: true, avatarUrl: true, equippedFrame: true, equippedTitle: true } }),
+    prisma.user.findMany({ select: { id: true, name: true, avatarUrl: true, equippedFrame: true } }),
     prisma.foundItem.findMany({
       where: { status: { not: 'ARCHIVED' } },
       select: {
@@ -86,7 +85,7 @@ function toSummary(all: Scored[], s: Scored): PlayerSummary {
     points: s.points,
     rank: rankOf(all, s.points),
     stats: s.stats,
-    equipped: { frame: s.equippedFrame, title: s.equippedTitle },
+    equippedFrame: s.equippedFrame,
   };
 }
 

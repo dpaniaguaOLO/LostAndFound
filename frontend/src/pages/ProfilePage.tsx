@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BADGES, badgeCollection, displayedCosmetics, rankFor, showcaseBadges, type PlayerProfile } from '@laf/shared';
+import { BADGES, badgeCollection, displayedFrame, rankFor, showcaseBadges, type PlayerProfile } from '@laf/shared';
 import {
   Avatar,
   BadgeCollectionModal,
   BadgeShowcase,
-  CustomizeModal,
+  FrameModal,
+  LegendTitle,
   NameEmblems,
-  PlayerTitle,
   PointsHelpModal,
   RankProgress,
   RanksModal,
+  rankNameClass,
 } from '../components/game';
 import { BackButton, ErrorState, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,17 @@ import { getErrorMessage, isNotAvailable } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { haptics } from '../lib/haptics';
 import { gameService, refreshMyPlayer } from '../services/game';
+
+/** Fondo de la cabecera del perfil según el rango (Maestro y Gran Maestro, especiales). */
+const BANNERS: Record<string, string> = {
+  default: 'from-olo-500 via-olo-600 to-emerald-800',
+  gran_maestro: 'from-cyan-400 via-violet-500 to-fuchsia-500',
+  maestro: 'from-rose-500 via-red-600 to-amber-500',
+};
+
+/** Botones secundarios pequeños de la cabecera (personalizar marco, quitar foto). */
+const PILL =
+  'inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-95 disabled:opacity-50 dark:border-olo-dark-700 dark:bg-olo-dark-850 dark:text-slate-200 dark:hover:bg-olo-dark-800';
 
 /** Perfil de un colaborador: foto, puntos, puesto en el ranking e insignias. `/perfil` = el propio. */
 export function ProfilePage() {
@@ -36,7 +48,7 @@ export function ProfilePage() {
   const [badgeView, setBadgeView] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [ranksOpen, setRanksOpen] = useState(false);
-  const [customize, setCustomize] = useState(false);
+  const [framePicker, setFramePicker] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function load() {
@@ -93,7 +105,7 @@ export function ProfilePage() {
   if (!profile) return null;
 
   const showcase = showcaseBadges(profile.stats);
-  const cosmetics = displayedCosmetics(profile);
+  const frame = displayedFrame(profile);
   const rank = rankFor(profile.points);
   const totalLevels = BADGES.reduce((n, b) => n + b.levels.length, 0);
   const levels = badgeCollection(profile.stats).reduce((n, p) => n + p.level, 0);
@@ -102,86 +114,107 @@ export function ProfilePage() {
     <div className="mx-auto max-w-3xl">
       {!isMe && <BackButton />}
 
-      {/* Cabecera: foto, nombre y puntos */}
-      <section className="card relative overflow-hidden p-5 sm:p-7">
-        {/* Fondo de cabecera: el de Maestro / Gran Maestro es especial (se desbloquea). */}
-        <div
-          className={
-            'pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-br ' +
-            (rank.id === 'gran_maestro'
-              ? 'h-32 from-cyan-400/40 via-violet-400/30 to-fuchsia-400/20'
-              : rank.banner
-                ? 'h-32 from-rose-500/35 via-amber-400/25 to-transparent'
-                : 'h-24 from-olo-500/20 via-olo-400/10 to-transparent dark:from-olo-500/25')
-          }
-          aria-hidden
-        />
-        <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
-          <div className="relative">
-            <Avatar name={profile.name} url={profile.avatarUrl} size="lg" frame={cosmetics.frame} className="shadow-elevated" />
-            {isMe && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-full bg-olo-600 text-white shadow-glow ring-4 ring-white transition hover:bg-olo-700 active:scale-90 disabled:opacity-60 dark:bg-olo-500 dark:text-slate-950 dark:ring-olo-dark-900"
-                  aria-label={profile.avatarUrl ? 'Cambiar foto de perfil' : 'Añadir foto de perfil'}
-                >
-                  {uploading ? (
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                      <circle cx="12" cy="13" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-                    </svg>
-                  )}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden
-                  onChange={(e) => void changePhoto(e.target.files?.[0])}
-                />
-              </>
-            )}
+      {/* Cabecera: fondo (especial desde Maestro), foto con marco, nombre y puntos */}
+      <section className="card overflow-hidden">
+        <div className={`relative h-28 bg-gradient-to-br sm:h-32 ${BANNERS[rank.id] ?? BANNERS.default}`} aria-hidden>
+          {/* Textura sutil de puntos sobre el degradado */}
+          <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:14px_14px]" />
+          <span className="absolute right-3 top-3 rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur">
+            Rango {rank.name}
+          </span>
+        </div>
+
+        <div className="px-5 pb-5 sm:px-7 sm:pb-6">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-end sm:gap-5 sm:text-left">
+            {/* Foto (sube sobre el fondo) */}
+            <div className="relative -mt-14 shrink-0 sm:-mt-16">
+              <span className="block rounded-full bg-white p-1 shadow-elevated dark:bg-olo-dark-900">
+                <Avatar name={profile.name} url={profile.avatarUrl} size="lg" frame={frame} />
+              </span>
+              {isMe && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-olo-600 text-white shadow-glow ring-4 ring-white transition hover:bg-olo-700 active:scale-90 disabled:opacity-60 dark:bg-olo-500 dark:text-slate-950 dark:ring-olo-dark-900"
+                    aria-label={profile.avatarUrl ? 'Cambiar foto de perfil' : 'Añadir foto de perfil'}
+                  >
+                    {uploading ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+                    ) : (
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                        <circle cx="12" cy="13" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+                      </svg>
+                    )}
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden
+                    onChange={(e) => void changePhoto(e.target.files?.[0])}
+                  />
+                </>
+              )}
+            </div>
+
+            {/* Nombre */}
+            <div className="min-w-0 flex-1 sm:pb-1">
+              <h1 className={`inline-flex max-w-full items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl ${rankNameClass(profile.points)}`}>
+                <span className="break-words">{profile.name}</span>
+                <NameEmblems id={profile.id} className="h-7 w-7" />
+              </h1>
+              <LegendTitle id={profile.id} className="text-sm" />
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
+              </p>
+            </div>
+
+            {/* Puntos */}
+            <div className="flex shrink-0 flex-col items-center rounded-2xl bg-olo-50 px-5 py-3 dark:bg-olo-500/10 sm:items-end">
+              <p className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300">{profile.points.toLocaleString('es')}</span>
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">puntos</span>
+              </p>
+              <Link to="/ranking" className="mt-0.5 text-xs font-bold text-amber-700 hover:underline dark:text-amber-300">
+                {profile.rank ? `#${profile.rank} en el ranking` : 'Aún sin puesto en el ranking'}
+              </Link>
+            </div>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <h1 className="page-title inline-flex items-center gap-2 break-words">
-              {profile.name}
-              <NameEmblems id={profile.id} className="h-7 w-7" />
-            </h1>
-            <PlayerTitle player={profile} className="text-sm" />
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
-            </p>
-            {isMe && (
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
-                <button type="button" onClick={() => setCustomize(true)} className="btn-secondary min-h-8 px-3 text-xs">
-                  Personalizar marco y título
+          {/* Acciones (perfil propio) y ayuda */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 pt-4 dark:border-olo-dark-800 sm:justify-between">
+            {isMe ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => setFramePicker(true)} className={PILL}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
+                    <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2 2" />
+                  </svg>
+                  Personalizar marco
                 </button>
                 {profile.avatarUrl && (
-                  <button type="button" onClick={() => void removePhoto()} disabled={uploading} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-red-600 hover:underline dark:text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => void removePhoto()}
+                    disabled={uploading}
+                    className={`${PILL} hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                     Quitar foto
                   </button>
                 )}
               </div>
+            ) : (
+              <span />
             )}
-          </div>
-
-          <div className="flex flex-col items-center sm:items-end">
-            <p className="flex items-baseline gap-1.5">
-              <span className="text-4xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300">{profile.points.toLocaleString('es')}</span>
-              <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">puntos</span>
-            </p>
-            <Link to="/ranking" className="mt-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 transition hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300">
-              {profile.rank ? `#${profile.rank} en el ranking` : 'Aún sin puesto en el ranking'}
-            </Link>
-            <button type="button" onClick={() => setHelp(true)} className="mt-2 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-olo-700 dark:text-slate-400 dark:hover:text-olo-300">
+            <button type="button" onClick={() => setHelp(true)} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300">
               ¿Cómo ganar puntos?
             </button>
           </div>
@@ -243,13 +276,13 @@ export function ProfilePage() {
       <PointsHelpModal open={help} onClose={() => setHelp(false)} />
       <RanksModal open={ranksOpen} onClose={() => setRanksOpen(false)} points={profile.points} />
       {isMe && (
-        <CustomizeModal
-          open={customize}
-          onClose={() => setCustomize(false)}
+        <FrameModal
+          open={framePicker}
+          onClose={() => setFramePicker(false)}
           player={profile}
-          onSaved={(equipped) => {
-            setProfile((p) => (p ? { ...p, equipped } : p));
-            notify('Perfil personalizado', 'success');
+          onSaved={(equippedFrame) => {
+            setProfile((p) => (p ? { ...p, equippedFrame } : p));
+            notify('Marco actualizado', 'success');
             void refreshMyPlayer(); // la cabecera usa el perfil propio
           }}
         />

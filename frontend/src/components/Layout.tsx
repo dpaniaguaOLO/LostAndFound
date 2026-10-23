@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
-import { displayedCosmetics } from '@laf/shared';
-import { Avatar, NameEmblems, PlayerTitle, RewardModal, useMyPlayer } from './game';
+import { displayedFrame } from '@laf/shared';
+import { Avatar, LegendTitle, NameEmblems, RewardModal, useMyPlayer } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -70,9 +70,9 @@ export function Layout() {
   const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
-  // Perfil de juego propio: marco y título en la cabecera (se refresca al ganar puntos o personalizar).
+  // Perfil de juego propio: marco de la foto en la cabecera (se refresca al ganar puntos o personalizar).
   const myPlayer = useMyPlayer();
-  const myFrame = myPlayer ? displayedCosmetics(myPlayer).frame : null;
+  const myFrame = myPlayer ? displayedFrame(myPlayer) : null;
 
   // Contador de no leídas: se refresca al navegar, al marcarlas como leídas y al
   // volver a la app (en el móvil la app queda abierta en segundo plano).
@@ -248,7 +248,7 @@ export function Layout() {
                 <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" frame={myFrame} />
                 <span className="flex min-w-0 flex-col items-start text-left">
                   <span className="max-w-[9rem] truncate">{user?.name}</span>
-                  <PlayerTitle player={myPlayer} className="text-[9px]" />
+                  <LegendTitle id={user?.id} className="text-[9px]" />
                 </span>
                 <NameEmblems id={user?.id} className="h-5 w-5" />
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
@@ -362,7 +362,7 @@ export function Layout() {
               <span className="truncate">{user?.name}</span>
               <NameEmblems id={user?.id} className="h-5 w-5" />
             </p>
-            <PlayerTitle player={myPlayer} />
+            <LegendTitle id={user?.id} />
             <p className="text-sm text-slate-500 dark:text-slate-400">
               N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
             </p>

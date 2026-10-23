@@ -19,8 +19,7 @@ model User {
   passwordHash String
   role         String   @default("EMPLOYEE") // EMPLOYEE | ADMIN
   avatarUrl    String?  // foto de perfil (/uploads/<archivo>), como imageUrl de los objetos
-  equippedFrame String? // cosmético elegido: null (automático) | 'none' | bronze|silver|gold|emerald|ruby|diamond
-  equippedTitle String? // null (automático) | 'none' | 'legend' | 'rank:<id>' | 'badge:<id>'
+  equippedFrame String? // marco elegido: null (automático) | 'none' | bronze|silver|gold|emerald|ruby|diamond
   // Se incrementa al restablecer la contraseña: invalida todos los JWT emitidos antes.
   sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())

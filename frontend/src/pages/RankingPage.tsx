@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { bestBadges, displayedCosmetics, LEADERBOARD_MAX, LEADERBOARD_PAGE, type PlayerProfile, type PlayerSummary } from '@laf/shared';
-import { Avatar, BadgeEmblem, NameEmblems, PlayerTitle, PointsHelpModal, rankNameClass } from '../components/game';
+import { bestBadges, displayedFrame, LEADERBOARD_MAX, LEADERBOARD_PAGE, type PlayerProfile, type PlayerSummary } from '@laf/shared';
+import { Avatar, BadgeEmblem, LegendTitle, NameEmblems, PointsHelpModal, rankNameClass } from '../components/game';
 import { EmptyState, ErrorState, ListSkeleton, PageHeader } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -77,11 +77,11 @@ export function RankingPage() {
           aria-label={`Tu posición: ${me.rank ? `puesto ${me.rank}` : 'sin puesto'}, ${me.points} puntos. Ver tu perfil`}
         >
           <span className="w-10 text-center text-sm font-extrabold text-olo-700 dark:text-olo-300">{me.rank ? `#${me.rank}` : '—'}</span>
-          <Avatar name={me.name} url={me.avatarUrl} size="md" frame={displayedCosmetics(me).frame} />
+          <Avatar name={me.name} url={me.avatarUrl} size="md" frame={displayedFrame(me)} />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-olo-700 dark:text-olo-300">Tu posición</p>
             <p className={`truncate font-semibold ${rankNameClass(me.points)}`}>{me.name}</p>
-            <PlayerTitle player={me} />
+            <LegendTitle id={me.id} />
           </div>
           <Points value={me.points} />
         </Link>
@@ -153,7 +153,7 @@ function RankingRow({ entry, isMe }: { entry: PlayerSummary; isMe: boolean }) {
       <span className="w-10 shrink-0 text-center font-extrabold tabular-nums text-slate-500 dark:text-slate-400">
         {podium ? <span className="text-2xl" role="img" aria-label={`Puesto ${entry.rank}`}>{podium.medal}</span> : `#${entry.rank}`}
       </span>
-      <Avatar name={entry.name} url={entry.avatarUrl} size="md" frame={displayedCosmetics(entry).frame} />
+      <Avatar name={entry.name} url={entry.avatarUrl} size="md" frame={displayedFrame(entry)} />
       <div className="min-w-0 flex-1">
         <p className={`truncate font-semibold ${rankNameClass(entry.points)}`}>
           {entry.name}
@@ -162,7 +162,7 @@ function RankingRow({ entry, isMe }: { entry: PlayerSummary; isMe: boolean }) {
           </span>
           {isMe &&<span className="ml-1.5 rounded-full bg-olo-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-olo-700 dark:bg-olo-500/20 dark:text-olo-300">Tú</span>}
         </p>
-        <PlayerTitle player={entry} />
+        <LegendTitle id={entry.id} />
         {badges.length > 0 && (
           <div className="mt-1 flex gap-1">
             <span className="sr-only">Mejores insignias: {badges.map((p) => `${p.badge.name} nivel ${p.level}`).join(', ')}</span>

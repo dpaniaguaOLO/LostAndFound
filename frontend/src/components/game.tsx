@@ -5,26 +5,24 @@ import {
   badgeCollection,
   badgeProgress,
   BADGES,
-  displayedCosmetics,
+  displayedFrame,
   FRAME_NAMES,
   frameUnlocked,
   nextRank,
   POINT_RULES,
   rankFor,
   RANKS,
-  TITLES,
-  titleUnlocked,
   ULTIMATE_BADGE,
   type BadgeDef,
   type BadgeProgress,
-  type Equipped,
+  type EquippedFrame,
   type FrameId,
   type PlayerProfile,
   type PlayerStats,
   type RankDef,
-  type TitleDef,
 } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../lib/errors';
 import { haptics } from '../lib/haptics';
 import { onReward, type Reward } from '../lib/rewards';
 import { adminIds, currentMyPlayer, gameService, legendIds, onMyPlayer, refreshMyPlayer, topPlayerIds } from '../services/game';
@@ -108,21 +106,7 @@ export function Avatar({
   );
 }
 
-// --- Rangos y títulos ------------------------------------------------------------
-
-/** Estilo de cada título (los de rango con el color de su marco). */
-function titleClass(t: TitleDef): string {
-  if (t.id === 'legend') return 'text-rainbow';
-  if (t.id === 'rank:gran_maestro') return 'text-diamond';
-  const gradient: Record<string, string> = {
-    'rank:maestro': 'from-red-600 via-rose-400 to-red-700',
-    'rank:experto': 'from-emerald-600 via-green-400 to-emerald-700',
-    'rank:detective': 'from-yellow-600 via-amber-400 to-yellow-700',
-    'rank:rastreador': 'from-slate-500 via-slate-400 to-slate-600 dark:from-slate-300 dark:via-white dark:to-slate-400',
-  };
-  const g = gradient[t.id];
-  return g ? `bg-gradient-to-r ${g} bg-clip-text text-transparent` : 'text-olo-600 dark:text-olo-300';
-}
+// --- Rangos y marcos ---------------------------------------------------------------
 
 /** Color del nombre en el ranking desde Detective (como el color de nombre de los juegos). */
 export function rankNameClass(points: number): string {
@@ -135,21 +119,21 @@ export function rankNameClass(points: number): string {
   return byRank[rankFor(points).id] ?? 'text-slate-900 dark:text-slate-100';
 }
 
-type Cosmetic = { points: number; stats: PlayerStats; equipped?: Equipped | null };
-
-/** Título bajo el nombre (el elegido si está desbloqueado; si no, el automático). */
-export function PlayerTitle({ player, className = 'text-[10px]' }: { player: Cosmetic | null | undefined; className?: string }) {
-  if (!player) return null;
-  const { title } = displayedCosmetics(player);
-  if (!title) return null;
+/**
+ * Título "LEYENDA" bajo el nombre de quien tiene la insignia definitiva (como los
+ * títulos de Rocket League). No muestra nada para el resto.
+ */
+export function LegendTitle({ id, className = 'text-[10px]' }: { id: string | undefined; className?: string }) {
+  const legend = useIsLegend(id);
+  if (!legend) return null;
   return (
-    <span className={`block font-black uppercase leading-tight tracking-[0.25em] ${titleClass(title)} ${className}`} title={title.unlock}>
-      {title.text}
+    <span className={`text-rainbow block font-black uppercase leading-tight tracking-[0.25em] ${className}`} title="Leyenda de OLO: todas las insignias al máximo">
+      Leyenda
     </span>
   );
 }
 
-/** Perfil de juego propio compartido (cabecera, personalizar). */
+/** Perfil de juego propio compartido (marco en la cabecera). */
 export function useMyPlayer(): PlayerProfile | null {
   const { user } = useAuth();
   const [me, setMe] = useState<PlayerProfile | null>(() => currentMyPlayer());
@@ -166,8 +150,8 @@ export function useMyPlayer(): PlayerProfile | null {
 function rankUnlocks(r: RankDef): string[] {
   return [
     r.frame && `Marco ${FRAME_NAMES[r.frame]}`,
-    r.title && `Título ${r.title.toUpperCase()}`,
     r.banner && 'Fondo especial en el perfil',
+    r.min >= 1500 && 'Nombre con color en el ranking',
   ].filter(Boolean) as string[];
 }
 
@@ -204,7 +188,7 @@ export function RanksModal({ open, onClose, points }: { open: boolean; onClose: 
   return (
     <Modal open={open} label="Rangos" onClose={onClose}>
       <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Rangos</h2>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Sube de rango sumando puntos. Cada rango desbloquea cosméticos que puedes equipar.</p>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Sube de rango sumando puntos. Cada rango desbloquea un marco para tu foto.</p>
       <ol className="mt-4 flex flex-col gap-2">
         {RANKS.map((r) => {
           const reached = points >= r.min;
@@ -239,8 +223,8 @@ export function RanksModal({ open, onClose, points }: { open: boolean; onClose: 
   );
 }
 
-/** Elegir marco y título entre los desbloqueados (con vista previa). */
-export function CustomizeModal({
+/** Elegir el marco de la foto entre los desbloqueados (con vista previa). */
+export function FrameModal({
   open,
   onClose,
   player,
@@ -249,112 +233,71 @@ export function CustomizeModal({
   open: boolean;
   onClose: () => void;
   player: PlayerProfile;
-  onSaved: (eq: Equipped) => void;
+  onSaved: (frame: EquippedFrame) => void;
 }) {
-  const [frame, setFrame] = useState<Equipped['frame']>(player.equipped?.frame ?? null);
-  const [title, setTitle] = useState<string | null>(player.equipped?.title ?? null);
+  const [frame, setFrame] = useState<EquippedFrame>(player.equippedFrame ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
-    setFrame(player.equipped?.frame ?? null);
-    setTitle(player.equipped?.title ?? null);
+    setFrame(player.equippedFrame ?? null);
     setError(null);
   }, [open, player]);
-
-  const preview = displayedCosmetics({ points: player.points, stats: player.stats, equipped: { frame, title } });
-  const frames = RANKS.filter((r) => r.frame);
 
   async function save() {
     setSaving(true);
     setError(null);
     try {
-      await gameService.setCosmetics({ frame, title });
+      await gameService.setFrame(frame);
       haptics.success();
-      onSaved({ frame, title });
+      onSaved(frame);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar');
+      setError(getErrorMessage(e, 'No se pudo guardar el marco'));
     } finally {
       setSaving(false);
     }
   }
 
   const option = (active: boolean, disabled = false) =>
-    'flex items-center gap-3 rounded-2xl border p-2.5 text-left transition ' +
+    'flex flex-col items-center gap-2 rounded-2xl border p-3 text-center transition ' +
     (active
       ? 'border-olo-500 bg-olo-50 ring-2 ring-olo-400/50 dark:bg-olo-500/10'
       : 'border-slate-200 hover:bg-slate-50 dark:border-olo-dark-800 dark:hover:bg-olo-dark-850') +
-    (disabled ? ' cursor-not-allowed opacity-50 hover:bg-transparent' : '');
+    (disabled ? ' cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent' : '');
+
+  const choices: { value: EquippedFrame; label: string; preview: FrameId | null; rank?: RankDef }[] = [
+    { value: null, label: 'Automático', preview: displayedFrame({ points: player.points }) },
+    { value: 'none', label: 'Sin marco', preview: null },
+    ...RANKS.filter((r) => r.frame).map((r) => ({ value: r.frame, label: FRAME_NAMES[r.frame!], preview: r.frame, rank: r })),
+  ];
 
   return (
-    <Modal open={open} label="Personalizar perfil" onClose={saving ? () => undefined : onClose}>
-      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Personalizar</h2>
+    <Modal open={open} label="Marco de la foto" onClose={saving ? () => undefined : onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Marco de la foto</h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Elige entre los marcos que has desbloqueado con tu rango.</p>
 
-      {/* Vista previa */}
-      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-olo-dark-850">
-        <Avatar name={player.name} url={player.avatarUrl} size="md" frame={preview.frame} />
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{player.name}</p>
-          <PlayerTitle player={{ points: player.points, stats: player.stats, equipped: { frame, title } }} />
-        </div>
-      </div>
-
-      <h3 className="mb-2 mt-5 text-sm font-bold text-slate-800 dark:text-slate-200">Marco</h3>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" className={option(frame === null)} onClick={() => setFrame(null)} aria-pressed={frame === null}>
-          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automático</span>
-        </button>
-        <button type="button" className={option(frame === 'none')} onClick={() => setFrame('none')} aria-pressed={frame === 'none'}>
-          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Sin marco</span>
-        </button>
-        {frames.map((r) => {
-          const unlocked = frameUnlocked(r.frame!, player.points);
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {choices.map((c) => {
+          const unlocked = !c.rank || frameUnlocked(c.rank.frame!, player.points);
           return (
             <button
-              key={r.id}
+              key={c.label}
               type="button"
               disabled={!unlocked}
-              className={option(frame === r.frame, !unlocked)}
-              onClick={() => setFrame(r.frame)}
-              aria-pressed={frame === r.frame}
-              title={unlocked ? undefined : `Llega a ${r.name} (${r.min.toLocaleString('es')} pts)`}
+              className={option(frame === c.value, !unlocked)}
+              onClick={() => setFrame(c.value)}
+              aria-pressed={frame === c.value}
             >
-              <Avatar name={player.name} url={player.avatarUrl} size="h-8 w-8 text-xs" frame={r.frame} />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{FRAME_NAMES[r.frame!]}</span>
-                {!unlocked && <span className="block text-[11px] text-slate-500 dark:text-slate-400">🔒 {r.name}</span>}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <h3 className="mb-2 mt-5 text-sm font-bold text-slate-800 dark:text-slate-200">Título</h3>
-      <div className="flex flex-col gap-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={option(title === null)} onClick={() => setTitle(null)} aria-pressed={title === null}>
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automático</span>
-          </button>
-          <button type="button" className={option(title === 'none')} onClick={() => setTitle('none')} aria-pressed={title === 'none'}>
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Sin título</span>
-          </button>
-        </div>
-        {TITLES.map((t) => {
-          const unlocked = titleUnlocked(t, player.points, player.stats);
-          return (
-            <button
-              key={t.id}
-              type="button"
-              disabled={!unlocked}
-              className={option(title === t.id, !unlocked)}
-              onClick={() => setTitle(t.id)}
-              aria-pressed={title === t.id}
-            >
-              <span className="min-w-0 flex-1">
-                <span className={`block text-xs font-black uppercase tracking-[0.25em] ${unlocked ? titleClass(t) : 'text-slate-400'}`}>{t.text}</span>
-                {!unlocked && <span className="block text-[11px] text-slate-500 dark:text-slate-400">🔒 {t.unlock}</span>}
-              </span>
+              <Avatar name={player.name} url={player.avatarUrl} size="h-12 w-12 text-base" frame={c.preview} />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{c.label}</span>
+              {!unlocked && c.rank && (
+                <span className="-mt-1 text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+                  🔒 {c.rank.name}
+                  <br />
+                  {c.rank.min.toLocaleString('es')} pts
+                </span>
+              )}
             </button>
           );
         })}
@@ -936,7 +879,7 @@ export function PointsHelpModal({ open, onClose }: { open: boolean; onClose: () 
       </ul>
       <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
         Con tus puntos subes de <strong className="text-slate-800 dark:text-slate-200">rango</strong> ({RANKS.slice(1).map((r) => r.name).join(', ')}) y
-        desbloqueas marcos para tu foto y títulos para tu nombre.
+        desbloqueas marcos para tu foto.
       </p>
       <div className="mt-4 rounded-2xl bg-amber-50 p-3.5 dark:bg-amber-500/10">
         <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">

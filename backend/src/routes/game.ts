@@ -56,23 +56,19 @@ gameRouter.get(
   }),
 );
 
-// PUT /api/game/cosmetics — { frame, title }: marco y título que lleva el usuario
-// (como set_my_cosmetics en Supabase). Solo se valida el formato: si están
-// desbloqueados lo decide la app al mostrarlos (displayedCosmetics de @laf/shared).
-const cosmeticsSchema = z.object({
+// PUT /api/game/frame — { frame }: marco que lleva el usuario (como set_my_frame en
+// Supabase). Solo se valida el valor: si está desbloqueado lo decide la app al
+// mostrarlo (displayedFrame de @laf/shared).
+const frameSchema = z.object({
   frame: z.enum(['none', 'bronze', 'silver', 'gold', 'emerald', 'ruby', 'diamond']).nullable(),
-  title: z.string().regex(/^(none|legend|(rank|badge):[a-z_]{1,40})$/).nullable(),
 });
 gameRouter.put(
-  '/cosmetics',
+  '/frame',
   authenticate,
   asyncHandler(async (req, res) => {
-    const body = parseOrThrow(cosmeticsSchema, req.body);
-    const user = await prisma.user.update({
-      where: { id: req.auth!.sub },
-      data: { equippedFrame: body.frame, equippedTitle: body.title },
-    });
-    res.json({ frame: user.equippedFrame, title: user.equippedTitle });
+    const { frame } = parseOrThrow(frameSchema, req.body);
+    const user = await prisma.user.update({ where: { id: req.auth!.sub }, data: { equippedFrame: frame } });
+    res.json({ frame: user.equippedFrame });
   }),
 );
 

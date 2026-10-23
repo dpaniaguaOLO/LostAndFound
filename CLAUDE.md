@@ -241,7 +241,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | GET | `/api/game/leaderboard` | sí | query: `offset, limit` (máx. puesto 100) | `LeaderboardPage` (Supabase: RPC `leaderboard`) |
 | GET | `/api/game/players/:id` | sí | — | `PlayerProfile` (Supabase: RPC `player_profile`) |
 | GET | `/api/game/admins` | sí | — | `string[]` ids de admins, para su emblema (Supabase: `profiles.role`) |
-| PUT | `/api/game/cosmetics` | sí | `{ frame, title }` (null = auto, 'none') | `{ frame, title }` (Supabase: RPC `set_my_cosmetics`) |
+| PUT | `/api/game/frame` | sí | `{ frame }` (null = auto, 'none') | `{ frame }` (Supabase: RPC `set_my_frame`) |
 | PUT | `/api/game/avatar` | sí | `multipart/form-data`: `image` | `User` con `avatarUrl` (Supabase: bucket `avatars` + RPC `set_my_avatar`) |
 | DELETE | `/api/game/avatar` | sí | — | `User` |
 

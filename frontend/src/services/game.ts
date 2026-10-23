@@ -13,7 +13,7 @@ import {
   LEADERBOARD_MAX,
   TOP_PLAYERS,
   ULTIMATE_BADGE,
-  type Equipped,
+  type EquippedFrame,
   type LeaderboardPage,
   type PlayerProfile,
   type PlayerStats,
@@ -37,8 +37,8 @@ export interface GameService {
   /** Cambia la foto de perfil propia. Devuelve la nueva URL. */
   setAvatar(file: File): Promise<string | null>;
   removeAvatar(): Promise<void>;
-  /** Marco y título que lleva el usuario (null = automático, 'none' = sin). */
-  setCosmetics(equipped: Equipped): Promise<void>;
+  /** Marco que lleva el usuario (null = automático, 'none' = sin marco). */
+  setFrame(frame: EquippedFrame): Promise<void>;
 }
 
 type StatsRow = {
@@ -54,7 +54,6 @@ type StatsRow = {
   categories: number;
   active_months: number;
   equipped_frame: string | null;
-  equipped_title: string | null;
 };
 
 function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
@@ -73,7 +72,7 @@ function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
     points: r.points,
     rank: r.rank ?? null,
     stats,
-    equipped: { frame: (r.equipped_frame as Equipped['frame']) ?? null, title: r.equipped_title ?? null },
+    equippedFrame: (r.equipped_frame as EquippedFrame) ?? null,
   };
 }
 
@@ -136,8 +135,8 @@ const supabaseGame: GameService = {
     if (old) void sb.storage.from(AVATAR_BUCKET).remove([old as string]).catch(() => undefined);
   },
 
-  async setCosmetics(eq) {
-    const { error } = await requireSupabase().rpc('set_my_cosmetics', { p_frame: eq.frame, p_title: eq.title });
+  async setFrame(frame) {
+    const { error } = await requireSupabase().rpc('set_my_frame', { p_frame: frame });
     if (error) fail(error);
   },
 };
@@ -153,8 +152,8 @@ const restGame: GameService = {
   async removeAvatar() {
     await api('/game/avatar', { method: 'DELETE' });
   },
-  async setCosmetics(eq) {
-    await api('/game/cosmetics', { method: 'PUT', body: eq });
+  async setFrame(frame) {
+    await api('/game/frame', { method: 'PUT', body: { frame } });
   },
 };
 
@@ -167,7 +166,7 @@ async function myProfile(): Promise<PlayerProfile> {
   return useSupabase ? gameService.profile(await currentUserId()) : api<PlayerProfile>('/game/players/me');
 }
 
-// Perfil de juego propio compartido (cabecera, marco, título): se refresca al
+// Perfil de juego propio compartido (marco de la foto en la cabecera): se refresca al
 // ganar puntos, al personalizar o al cambiar de usuario.
 let mine: PlayerProfile | null = null;
 const mineListeners = new Set<(p: PlayerProfile | null) => void>();
