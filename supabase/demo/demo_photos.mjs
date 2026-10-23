@@ -108,8 +108,11 @@ async function render(title, seed) {
 
 function connect() {
   const ref = fs.readFileSync(path.join(repo, 'supabase/.temp/project-ref'), 'utf8').trim();
-  const out = execFileSync(process.platform === 'win32' ? 'supabase.cmd' : 'supabase',
-    ['projects', 'api-keys', '--project-ref', ref, '-o', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], shell: process.platform === 'win32' });
+  if (!/^[a-z0-9]+$/.test(ref)) throw new Error('project-ref no válido');
+  const cliArgs = ['projects', 'api-keys', '--project-ref', ref, '-o', 'json'];
+  // En Windows la CLI es un .cmd: se lanza con cmd.exe (sin `shell: true`, obsoleto en Node 24).
+  const [cmd, argv] = process.platform === 'win32' ? ['cmd.exe', ['/d', '/c', 'supabase', ...cliArgs]] : ['supabase', cliArgs];
+  const out = execFileSync(cmd, argv, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const key = JSON.parse(out).find((k) => k.name === 'service_role')?.api_key;
   if (!key) throw new Error('No se pudo obtener la service_role key con la CLI (¿supabase login?)');
   const url = `https://${ref}.supabase.co`;
