@@ -8,8 +8,10 @@
  * estadísticas con earnedBadges()/bestBadges() de @laf/shared.
  */
 import {
+  badgeProgress,
   LEADERBOARD_MAX,
   TOP_PLAYERS,
+  ULTIMATE_BADGE,
   type LeaderboardPage,
   type PlayerProfile,
   type PlayerStats,
@@ -145,8 +147,9 @@ export const gameService: GameService = useSupabase ? supabaseGame : restGame;
 // --- Top del ranking (emblemas junto al nombre y perdidos destacados) ---------
 
 const TOP_TTL_MS = 60_000;
-let topCache: { ids: string[]; at: number } | null = null;
-let topInFlight: Promise<string[]> | null = null;
+type Snapshot = { top: string[]; legends: string[] };
+let topCache: (Snapshot & { at: number }) | null = null;
+let topInFlight: Promise<Snapshot> | null = null;
 
 let adminCache: { ids: string[]; at: number } | null = null;
 let adminInFlight: Promise<string[]> | null = null;
@@ -172,17 +175,30 @@ export function adminIds(): Promise<string[]> {
   return adminInFlight;
 }
 
-/** Ids de los primeros TOP_PLAYERS del ranking, en orden (cacheado 1 min). Vacío si falla. */
-export function topPlayerIds(): Promise<string[]> {
-  if (topCache && Date.now() - topCache.at < TOP_TTL_MS) return Promise.resolve(topCache.ids);
+/**
+ * Una sola lectura del ranking (top 100, cacheada 1 min) para los emblemas: el
+ * top 3 y quién tiene la insignia definitiva. Una Leyenda de OLO siempre está en
+ * el top 100: exige cientos de objetos publicados y devueltos.
+ */
+function rankingSnapshot(): Promise<Snapshot> {
+  if (topCache && Date.now() - topCache.at < TOP_TTL_MS) return Promise.resolve(topCache);
   topInFlight ??= gameService
-    .leaderboard(0, TOP_PLAYERS)
-    .then((p) => p.entries.map((e) => e.id))
-    .catch(() => [] as string[])
-    .then((ids) => {
-      topCache = { ids, at: Date.now() };
+    .leaderboard(0, LEADERBOARD_MAX)
+    .then((p) => ({
+      top: p.entries.slice(0, TOP_PLAYERS).map((e) => e.id),
+      legends: p.entries.filter((e) => badgeProgress(ULTIMATE_BADGE, e.stats).level > 0).map((e) => e.id),
+    }))
+    .catch(() => ({ top: [], legends: [] }))
+    .then((snap) => {
+      topCache = { ...snap, at: Date.now() };
       topInFlight = null;
-      return ids;
+      return snap;
     });
   return topInFlight;
 }
+
+/** Ids de los primeros TOP_PLAYERS del ranking, en orden. Vacío si falla. */
+export const topPlayerIds = () => rankingSnapshot().then((s) => s.top);
+
+/** Ids de quienes tienen la insignia definitiva (Leyenda de OLO). */
+export const legendIds = () => rankingSnapshot().then((s) => s.legends);

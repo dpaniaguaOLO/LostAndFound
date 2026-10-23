@@ -12,7 +12,7 @@ import {
   type PlayerStats,
 } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
-import { adminIds, topPlayerIds } from '../services/game';
+import { adminIds, legendIds, topPlayerIds } from '../services/game';
 import { Modal } from './ui';
 
 // --- Avatar --------------------------------------------------------------------
@@ -148,14 +148,51 @@ export function AdminEmblem({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-/** Emblemas junto a un nombre: administrador y/o puesto del top 3 (pueden salir los dos). */
+/** ¿Tiene la insignia definitiva (Leyenda de OLO)? */
+export function useIsLegend(userId: string | undefined): boolean {
+  const [legends, setLegends] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    void legendIds().then((ids) => active && setLegends(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return !!userId && legends.includes(userId);
+}
+
+/** Emblema de Leyenda de OLO: hexágono arcoíris con corona. */
+export function LegendEmblem({ className = 'h-5 w-5' }: { className?: string }) {
+  const gid = useId();
+  const label = 'Leyenda de OLO: todas las insignias al máximo';
+  return (
+    <svg viewBox="0 0 24 24" className={`inline-block shrink-0 drop-shadow-[0_0_3px_rgba(250,204,21,0.8)] ${className}`} role="img" aria-label={label}>
+      <title>{label}</title>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f472b6" />
+          <stop offset="0.35" stopColor="#facc15" />
+          <stop offset="0.65" stopColor="#34d399" />
+          <stop offset="1" stopColor="#818cf8" />
+        </linearGradient>
+      </defs>
+      <path d="M12 1.5 21.1 6.8v10.4L12 22.5l-9.1-5.3V6.8L12 1.5Z" fill={`url(#${gid})`} />
+      <path d="M12 4.2 18.8 8.1v7.8L12 19.8l-6.8-3.9V8.1L12 4.2Z" fill="#1e1b4b" />
+      <path d="M7.5 15.2h9l.8-6-3 2.2L12 7.5l-2.3 3.9-3-2.2.8 6Z" fill="#facc15" stroke="#fde68a" strokeWidth="0.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Emblemas junto a un nombre: administrador, Leyenda de OLO y puesto del top 3 (pueden salir todos). */
 export function NameEmblems({ id, className = 'h-[1.1em] w-[1.1em]' }: { id: string | undefined; className?: string }) {
   const admin = useIsAdmin(id);
+  const legend = useIsLegend(id);
   const rank = useTopRank(id);
-  if (!admin && !rank) return null;
+  if (!admin && !legend && !rank) return null;
   return (
     <span className="inline-flex shrink-0 items-center gap-0.5">
       {admin && <AdminEmblem className={className} />}
+      {legend && <LegendEmblem className={className} />}
       <RankEmblem rank={rank} className={className} />
     </span>
   );
