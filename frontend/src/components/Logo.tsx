@@ -43,7 +43,9 @@ export function Logo({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-olo-700 dark:text-olo-400">
             Lost &amp; Found
           </span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">
+          {/* No cabe junto a los iconos en pantallas muy estrechas (<360 px), ni junto al
+              menú de escritorio completo entre 1024 y 1279 px. */}
+          <span className="text-[10px] text-slate-500 max-[359px]:hidden lg:max-xl:hidden dark:text-slate-400">
             Overseas Logistics Operations
           </span>
         </span>

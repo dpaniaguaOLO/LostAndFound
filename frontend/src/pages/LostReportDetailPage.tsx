@@ -154,7 +154,7 @@ export function LostReportDetailPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {isOwner && (
                 <>
-                  <button className="btn-primary hidden md:inline-flex" onClick={() => setConfirmResolve(true)}>
+                  <button className="btn-primary hidden lg:inline-flex" onClick={() => setConfirmResolve(true)}>
                     Ya lo recuperé
                   </button>
                   <MobileActionBar>

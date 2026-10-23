@@ -204,7 +204,7 @@ export function Layout() {
             <Logo markClassName="h-6 w-auto sm:h-7" />
           </Link>
 
-          <nav className="hidden flex-1 items-center gap-0.5 md:flex lg:gap-1.5" aria-label="Principal">
+          <nav className="hidden flex-1 items-center gap-0.5 lg:flex xl:gap-1.5" aria-label="Principal">
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} end={'end' in item ? item.end : undefined} className={desktopLink}>
                 {item.label}
@@ -238,9 +238,9 @@ export function Layout() {
             {/* Menú de usuario (escritorio): patrón "disclosure" (botón + panel con
                 enlaces), no role="menu", que exigiría navegación con flechas. */}
             {/* Separador entre los iconos y el usuario (escritorio) */}
-            <span className="mx-1 hidden h-7 w-px bg-slate-200 dark:bg-olo-dark-800 md:block" aria-hidden />
+            <span className="mx-1 hidden h-7 w-px bg-slate-200 dark:bg-olo-dark-800 lg:block" aria-hidden />
 
-            <div ref={userMenuRef} className="relative hidden md:block">
+            <div ref={userMenuRef} className="relative hidden lg:block">
               <button
                 ref={userMenuButtonRef}
                 onClick={() => setUserMenu((v) => !v)}
@@ -324,7 +324,7 @@ export function Layout() {
       )}
 
       {/* Margen inferior en móvil para no quedar bajo la barra de navegación. */}
-      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-32 pt-5 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:px-6 sm:pt-8 md:pb-16">
+      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-6xl px-4 pb-32 pt-5 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:px-6 sm:pt-8 lg:pb-16">
         <div key={pathname} className="animate-page-in">
           <Outlet />
         </div>
@@ -332,7 +332,7 @@ export function Layout() {
 
       {/* Barra de navegación inferior (móvil): pulgar-friendly, Publicar destacado al centro */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 shadow-nav backdrop-blur-xl backdrop-saturate-150 safe-bottom dark:border-olo-dark-800 dark:bg-olo-dark-900/90 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 shadow-nav backdrop-blur-xl backdrop-saturate-150 safe-bottom dark:border-olo-dark-800 dark:bg-olo-dark-900/90 lg:hidden"
         aria-label="Principal"
       >
         <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center px-2">

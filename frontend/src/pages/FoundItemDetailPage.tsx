@@ -228,7 +228,7 @@ export function FoundItemDetailPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {canClaim && (
-              <button className="btn-primary hidden md:inline-flex" onClick={() => setClaimOpen(true)}>
+              <button className="btn-primary hidden lg:inline-flex" onClick={() => setClaimOpen(true)}>
                 Reclamar este objeto
               </button>
             )}
@@ -236,7 +236,7 @@ export function FoundItemDetailPage() {
               <button
                 className={
                   (item.status === 'CLAIMED' ? 'btn-primary' : 'btn-secondary') +
-                  (mobilePrimary === 'return' ? ' hidden md:inline-flex' : '')
+                  (mobilePrimary === 'return' ? ' hidden lg:inline-flex' : '')
                 }
                 onClick={() => setConfirmReturn(true)}
               >

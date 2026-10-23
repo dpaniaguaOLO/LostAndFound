@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Móvil: arriba (no compite con la barra inferior ni el teclado). Escritorio: abajo a la derecha. */}
       <div
-        className="pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-auto sm:items-end sm:px-0"
+        className="pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:right-6 sm:top-auto sm:items-end sm:px-0 lg:bottom-6"
       >
         {/* Cada aviso ya es una región viva (role status/alert): sin aria-live en el
             contenedor, que hacía que algunos lectores los anunciaran dos veces. */}
