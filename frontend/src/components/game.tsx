@@ -12,6 +12,8 @@ import {
   type PlayerStats,
 } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
+import { haptics } from '../lib/haptics';
+import { onReward, type Reward } from '../lib/rewards';
 import { adminIds, legendIds, topPlayerIds } from '../services/game';
 import { Modal } from './ui';
 
@@ -480,6 +482,109 @@ function BadgeDetail({ p, ownerName, onBack }: { p: BadgeProgress; ownerName: st
         Ver toda la colección
       </button>
     </div>
+  );
+}
+
+// --- Recompensa ("+N puntos") ------------------------------------------------------
+
+const RULE = Object.fromEntries(POINT_RULES.map((r) => [r.key, r])) as Record<(typeof POINT_RULES)[number]['key'], (typeof POINT_RULES)[number]>;
+
+/**
+ * Ventana de recompensa tras publicar o devolver: puntos ganados (con desglose),
+ * cambio de puesto e insignias nuevas o que subieron de nivel. Se monta una vez
+ * en el Layout y escucha onReward().
+ */
+export function RewardModal() {
+  const [reward, setReward] = useState<Reward | null>(null);
+  useEffect(
+    () =>
+      onReward((r) => {
+        haptics.success();
+        setReward(r);
+      }),
+    [],
+  );
+  if (!reward) return null;
+  const { before, after, badges, kind } = reward;
+  const delta = after.points - before.points;
+  const lines = [
+    { rule: RULE.published, n: after.stats.published - before.stats.published },
+    { rule: RULE.returned, n: after.stats.returned - before.stats.returned },
+    { rule: RULE.fast, n: after.stats.fastReturned - before.stats.fastReturned },
+  ].filter((l) => l.n > 0);
+  const climbed = after.rank !== null && (before.rank === null || after.rank < before.rank);
+
+  return (
+    <Modal open label={delta > 0 ? `Has ganado ${delta} puntos` : kind === 'returned' ? 'Objeto devuelto' : 'Nueva insignia'} onClose={() => setReward(null)}>
+      <div className="flex flex-col items-center text-center">
+        <div className="relative mb-2 text-5xl" aria-hidden>
+          <span className="inline-block animate-scale-in">{delta <= 0 && !badges.length ? '📦' : kind === 'returned' ? '🎉' : '🔍'}</span>
+          <span className="absolute -right-4 -top-1 animate-ping text-base text-amber-400 motion-reduce:animate-none">✦</span>
+          <span className="absolute -left-4 bottom-0 animate-ping text-sm text-olo-400 [animation-delay:400ms] motion-reduce:animate-none">✦</span>
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+          {kind === 'returned' ? '¡Objeto devuelto!' : '¡Objeto publicado!'}
+        </h2>
+        {delta > 0 && (
+          <p className="mt-2 animate-scale-in bg-gradient-to-r from-olo-500 via-emerald-400 to-amber-400 bg-clip-text text-5xl font-black tabular-nums text-transparent">
+            +{delta.toLocaleString('es')}
+            <span className="ml-1.5 text-xl font-extrabold">puntos</span>
+          </p>
+        )}
+        {delta <= 0 && kind === 'returned' && (
+          <p className="mt-2 max-w-xs text-sm text-slate-600 dark:text-slate-400">
+            Esta entrega no suma puntos: solo cuentan las devoluciones con una reclamación aprobada de otra persona.
+          </p>
+        )}
+      </div>
+
+      {lines.length > 0 && (
+        <ul className="mt-4 flex flex-col gap-1.5">
+          {lines.map(({ rule, n }) => (
+            <li key={rule.key} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-2 text-sm dark:bg-olo-dark-850">
+              <span className="text-slate-700 dark:text-slate-200">{rule.title}</span>
+              <span className="font-bold tabular-nums text-olo-700 dark:text-olo-300">+{rule.points * n}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
+        Ahora tienes <strong className="text-slate-900 dark:text-slate-100">{after.points.toLocaleString('es')} puntos</strong>
+        {after.rank !== null && <> · puesto #{after.rank}</>}
+        {climbed && <span className="ml-1 font-semibold text-olo-700 dark:text-olo-300">▲ ¡subiste!</span>}
+      </p>
+
+      {badges.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 px-4 pb-6 pt-4">
+          <p className="mb-4 text-center text-xs font-bold uppercase tracking-wider text-amber-300">
+            {badges.length === 1 ? 'Insignia' : 'Insignias'}
+          </p>
+          <ul className="flex flex-wrap justify-center gap-5">
+            {badges.map((p) => (
+              <li key={p.badge.id} className="flex w-24 animate-scale-in flex-col items-center gap-3 text-center">
+                <BadgeEmblem badge={p.badge} level={p.level} />
+                <span className="text-xs font-semibold leading-tight text-slate-100">
+                  {p.badge.name}
+                  <span className="block text-[11px] font-medium text-amber-300">
+                    {p.level === 1 ? '¡Nueva!' : `¡Nivel ${p.level}!`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+        <Link to="/perfil" className="btn-secondary flex-1" onClick={() => setReward(null)}>
+          Ver mi perfil
+        </Link>
+        <button className="btn-primary flex-1" onClick={() => setReward(null)}>
+          ¡Genial!
+        </button>
+      </div>
+    </Modal>
   );
 }
 

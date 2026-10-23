@@ -24,6 +24,10 @@
 - **Emblema de administrador** junto al nombre (sello verde con estrella, como la insignia
   de creador de Clash Royale); si un admin está en el top 3 lleva los dos emblemas.
   Express: `GET /api/game/admins`; Supabase lee `profiles.role`.
+- **Ventana de recompensa** al publicar o devolver: "+N puntos" con desglose, puesto,
+  insignias nuevas o que suben de nivel. Usa los puntos reales del servidor (antes/después);
+  si una devolución no suma (sin reclamación aprobada) lo explica. `GET /api/game/players/me`.
+- Muro: la etiqueta de estado de las tarjetas ya no muestra una franja oscura encima.
 - **Leyenda de OLO** 👑: insignia definitiva al llevar todas las demás a su nivel máximo
   (marco arcoíris giratorio, halo y cinta "LEYENDA"; siempre la primera del escaparate).
 - Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,

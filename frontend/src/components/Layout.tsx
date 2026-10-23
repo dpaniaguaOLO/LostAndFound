@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
-import { Avatar, NameEmblems } from './game';
+import { Avatar, NameEmblems, RewardModal } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -389,6 +389,9 @@ export function Layout() {
       <Assistant />
 
       <Onboarding open={onboarding} onClose={finishOnboarding} />
+
+      {/* "+N puntos" al publicar o devolver un objeto */}
+      <RewardModal />
     </div>
   );
 }

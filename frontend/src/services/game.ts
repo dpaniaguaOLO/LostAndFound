@@ -8,6 +8,7 @@
  * estadísticas con earnedBadges()/bestBadges() de @laf/shared.
  */
 import {
+  badgeCollection,
   badgeProgress,
   LEADERBOARD_MAX,
   TOP_PLAYERS,
@@ -24,6 +25,7 @@ import { AVATAR_BUCKET, signAvatars } from '../lib/avatars';
 import { useSupabase } from '../lib/config';
 import { NotAvailableError } from '../lib/errors';
 import { prepareAvatar } from '../lib/image';
+import { emitReward, type RewardKind } from '../lib/rewards';
 import { requireSupabase } from '../lib/supabase';
 
 export interface GameService {
@@ -143,6 +145,40 @@ const restGame: GameService = {
 };
 
 export const gameService: GameService = useSupabase ? supabaseGame : restGame;
+
+// --- Recompensas (ventana "+N puntos") -------------------------------------------
+
+/** Perfil de juego del usuario de la sesión. */
+async function myProfile(): Promise<PlayerProfile> {
+  return useSupabase ? gameService.profile(await currentUserId()) : api<PlayerProfile>('/game/players/me');
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
+/**
+ * Ejecuta una acción que puede dar puntos (publicar, devolver) y, si al terminar
+ * el usuario tiene más puntos o alguna insignia nueva/subida de nivel, emite la
+ * recompensa. Usa los datos reales del servidor (antes y después), así que nunca
+ * promete puntos que no se dieron. Si no se pueden leer, la acción sigue igual.
+ */
+export async function trackPoints<T>(kind: RewardKind, action: () => Promise<T>): Promise<T> {
+  const before = await withTimeout(myProfile(), 2500).catch(() => null);
+  const result = await action();
+  if (before) {
+    void myProfile()
+      .then((after) => {
+        topCache = null; // el ranking (y los emblemas) pudieron cambiar
+        const prev = new Map(badgeCollection(before.stats).map((p) => [p.badge.id, p.level]));
+        const badges = badgeCollection(after.stats).filter((p) => p.level > (prev.get(p.badge.id) ?? 0));
+        // Una devolución sin puntos también se avisa: la ventana explica por qué no sumó.
+        if (after.points > before.points || badges.length || kind === 'returned') emitReward({ kind, before, after, badges });
+      })
+      .catch(() => undefined);
+  }
+  return result;
+}
 
 // --- Top del ranking (emblemas junto al nombre y perdidos destacados) ---------
 

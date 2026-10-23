@@ -44,7 +44,7 @@ export function FoundItemCard({ item }: { item: FoundItem }) {
       <div className="relative">
         <ItemImage src={item.imageUrl} alt="" />
         <div className="absolute left-3 top-3">
-          <span className="rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
+          <span className="flex rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
             <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
           </span>
         </div>
@@ -95,7 +95,7 @@ function LostReportCardBody({ item }: { item: LostReport }) {
       <div className="relative">
         <ItemImage src={item.imageUrl} alt="" />
         <div className="absolute left-3 top-3">
-          <span className="rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
+          <span className="flex rounded-full bg-white/90 shadow-card backdrop-blur dark:bg-olo-dark-900/90">
             <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
           </span>
         </div>

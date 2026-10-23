@@ -365,6 +365,7 @@ test('juego: 50 por publicar, +100 por devolver con reclamación, +50 si es ráp
   assert.deepEqual([p.stats.returned, p.stats.fastReturned], [start.stats.returned + 1, start.stats.fastReturned + 1]);
   assert.ok(p.rank >= 1);
   assert.equal(p.role, 'EMPLOYEE');
+  assert.equal((await call('GET', '/api/game/players/me', { token: tokens.carla })).data.points, p.points, 'players/me');
 
   const board = (await call('GET', '/api/game/leaderboard?offset=0&limit=30', { token: tokens.beto })).data;
   assert.ok(board.entries.every((e: any) => e.points > 0));

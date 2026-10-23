@@ -30,12 +30,14 @@ gameRouter.get(
 );
 
 // GET /api/game/players/:id — perfil público (nombre, foto, puntos, puesto, estadísticas).
+// `me` = el usuario autenticado.
 gameRouter.get(
   '/players/:id',
   authenticate,
   asyncHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true, createdAt: true } });
-    const summary = user ? await playerSummary(req.params.id) : null;
+    const id = req.params.id === 'me' ? req.auth!.sub : req.params.id;
+    const user = await prisma.user.findUnique({ where: { id }, select: { role: true, createdAt: true } });
+    const summary = user ? await playerSummary(id) : null;
     if (!user || !summary) throw notFound('Colaborador no encontrado');
     res.json({ ...summary, role: user.role, createdAt: user.createdAt.toISOString() });
   }),
