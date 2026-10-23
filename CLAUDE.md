@@ -325,8 +325,8 @@ prefiere archivar.
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
 2026-10-22; 016 `game_profiles` y 017 `game_rules`, de la rama `features/game`, el
-2026-10-23; 018 `cosmetics` (marco equipado) el 2026-10-23; 019 `handover_reminders`
-pendiente). Datos demo del juego cargados en el proyecto alojado con
+2026-10-23; 018 `cosmetics` (marco equipado) el 2026-10-23; 019 `handover_reminders` el
+2026-10-24). Datos demo del juego cargados en el proyecto alojado con
 `supabase/demo/seed_game_demo.sql` (se quitan con `cleanup_game_demo.sql`).
 
 ---
