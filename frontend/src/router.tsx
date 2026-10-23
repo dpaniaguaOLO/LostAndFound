@@ -19,7 +19,9 @@ const LostReportDetailPage = lazyPage(() => import('./pages/LostReportDetailPage
 const MyThingsPage = lazyPage(() => import('./pages/MyThingsPage'), 'MyThingsPage');
 const NotFoundPage = lazyPage(() => import('./pages/NotFoundPage'), 'NotFoundPage');
 const NotificationsPage = lazyPage(() => import('./pages/NotificationsPage'), 'NotificationsPage');
+const ProfilePage = lazyPage(() => import('./pages/ProfilePage'), 'ProfilePage');
 const PublishPage = lazyPage(() => import('./pages/PublishPage'), 'PublishPage');
+const RankingPage = lazyPage(() => import('./pages/RankingPage'), 'RankingPage');
 
 const page = (node: ReactNode) => <Suspense fallback={<Spinner />}>{node}</Suspense>;
 
@@ -42,6 +44,9 @@ export const router = createBrowserRouter([
       { path: 'mis-objetos', element: page(<MyThingsPage />) },
       { path: 'reclamaciones', element: page(<ClaimsPage />) },
       { path: 'notificaciones', element: page(<NotificationsPage />) },
+      { path: 'perfil', element: page(<ProfilePage />) },
+      { path: 'perfil/:id', element: page(<ProfilePage />) },
+      { path: 'ranking', element: page(<RankingPage />) },
       {
         path: 'admin',
         element: (

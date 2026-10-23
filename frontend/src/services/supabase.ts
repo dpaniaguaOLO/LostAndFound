@@ -22,6 +22,7 @@ import type {
   User,
   UserRole,
 } from '@laf/shared';
+import { signAvatar } from '../lib/avatars';
 import { syntheticEmail } from '../lib/config';
 import { NotAvailableError } from '../lib/errors';
 import { requireSupabase, setRememberDevice } from '../lib/supabase';
@@ -295,6 +296,9 @@ const auth: AuthService = {
       await sb.auth.signOut();
       return null;
     }
+    // Foto de perfil (migración 016). Si falla, la app sigue con la inicial.
+    const { data: avatar } = await sb.from('profiles').select('avatar_path').eq('id', user.id).maybeSingle();
+    user.avatarUrl = await signAvatar(avatar?.avatar_path as string | null | undefined).catch(() => null);
     return user;
   },
 

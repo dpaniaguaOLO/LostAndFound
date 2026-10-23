@@ -18,6 +18,7 @@ model User {
   email        String?  @unique // opcional; ya no se usa para iniciar sesión
   passwordHash String
   role         String   @default("EMPLOYEE") // EMPLOYEE | ADMIN
+  avatarUrl    String?  // foto de perfil (/uploads/<archivo>), como imageUrl de los objetos
   // Se incrementa al restablecer la contraseña: invalida todos los JWT emitidos antes.
   sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())

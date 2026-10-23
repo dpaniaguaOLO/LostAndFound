@@ -13,6 +13,7 @@ import { aiRouter } from './routes/ai.js';
 import { authRouter } from './routes/auth.js';
 import { claimsRouter } from './routes/claims.js';
 import { foundItemsRouter } from './routes/foundItems.js';
+import { gameRouter } from './routes/game.js';
 import { lostReportsRouter } from './routes/lostReports.js';
 import { notificationsRouter } from './routes/notifications.js';
 
@@ -115,6 +116,7 @@ export function createApp() {
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/ai', aiRouter);
+  app.use('/api/game', gameRouter);
 
   app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND', message: 'Ruta no encontrada' }));
   app.use(errorHandler);

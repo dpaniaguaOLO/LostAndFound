@@ -1,0 +1,132 @@
+/**
+ * Juego: ranking, perfiles públicos y foto de perfil.
+ *
+ * - Supabase: RPC leaderboard() / player_profile() y set_my_avatar() (migración
+ *   016); la foto se sube al bucket privado `avatars`.
+ * - REST: /api/game/* del backend Express.
+ * Los puntos los calcula siempre el servidor; las insignias se derivan de las
+ * estadísticas con earnedBadges()/bestBadges() de @laf/shared.
+ */
+import {
+  LEADERBOARD_MAX,
+  type LeaderboardPage,
+  type PlayerProfile,
+  type PlayerStats,
+  type PlayerSummary,
+  type User,
+  type UserRole,
+} from '@laf/shared';
+import { api } from '../lib/api';
+import { AVATAR_BUCKET, signAvatars } from '../lib/avatars';
+import { useSupabase } from '../lib/config';
+import { NotAvailableError } from '../lib/errors';
+import { prepareAvatar } from '../lib/image';
+import { requireSupabase } from '../lib/supabase';
+
+export interface GameService {
+  /** Página del ranking (top LEADERBOARD_MAX). */
+  leaderboard(offset: number, limit: number): Promise<LeaderboardPage>;
+  /** Perfil público de un colaborador (NotAvailableError si no existe o está desactivado). */
+  profile(userId: string): Promise<PlayerProfile>;
+  /** Cambia la foto de perfil propia. Devuelve la nueva URL. */
+  setAvatar(file: File): Promise<string | null>;
+  removeAvatar(): Promise<void>;
+}
+
+type StatsRow = {
+  id: string;
+  name: string;
+  avatar_path: string | null;
+  points: number;
+  rank: number | null;
+  published: number;
+  returned: number;
+  fast_returned: number;
+};
+
+function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
+  const stats: PlayerStats = { published: r.published, returned: r.returned, fastReturned: r.fast_returned };
+  return {
+    id: r.id,
+    name: r.name,
+    avatarUrl: (r.avatar_path && urls.get(r.avatar_path)) || null,
+    points: r.points,
+    rank: r.rank ?? null,
+    stats,
+  };
+}
+
+/** Mensaje legible de un error de PostgREST/Storage. */
+function fail(error: { message?: string } | null): never {
+  throw new Error(error?.message || 'No se pudo completar la operación');
+}
+
+async function currentUserId(): Promise<string> {
+  const { data } = await requireSupabase().auth.getSession();
+  const uid = data.session?.user.id;
+  if (!uid) throw new Error('Sesión no válida');
+  return uid;
+}
+
+const supabaseGame: GameService = {
+  async leaderboard(offset, limit) {
+    // Se pide uno más para saber si hay otra página (sin pasar del puesto 100).
+    const want = Math.min(limit + 1, LEADERBOARD_MAX - offset);
+    if (want <= 0) return { entries: [], hasMore: false };
+    const { data, error } = await requireSupabase().rpc('leaderboard', { p_offset: offset, p_limit: want });
+    if (error) fail(error);
+    const rows = (data ?? []) as StatsRow[];
+    const urls = await signAvatars(rows.map((r) => r.avatar_path)).catch(() => new Map<string, string>());
+    return {
+      entries: rows.slice(0, limit).map((r) => toSummary(r, urls)),
+      hasMore: rows.length > limit,
+    };
+  },
+
+  async profile(userId) {
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new NotAvailableError('Este perfil no está disponible.');
+    const { data, error } = await requireSupabase().rpc('player_profile', { p_user_id: userId }).maybeSingle();
+    if (error) fail(error);
+    if (!data) throw new NotAvailableError('Este perfil no está disponible.');
+    const row = data as StatsRow & { role: string; created_at: string };
+    const urls = await signAvatars([row.avatar_path]).catch(() => new Map<string, string>());
+    return { ...toSummary(row, urls), role: row.role as UserRole, createdAt: row.created_at };
+  },
+
+  async setAvatar(file) {
+    const sb = requireSupabase();
+    const photo = await prepareAvatar(file);
+    const path = `${await currentUserId()}/${crypto.randomUUID()}.jpg`;
+    const { error: upErr } = await sb.storage.from(AVATAR_BUCKET).upload(path, photo, { contentType: 'image/jpeg', upsert: false });
+    if (upErr) fail(upErr);
+    const { data: old, error } = await sb.rpc('set_my_avatar', { p_path: path });
+    if (error) {
+      void sb.storage.from(AVATAR_BUCKET).remove([path]).catch(() => undefined);
+      fail(error);
+    }
+    if (old) void sb.storage.from(AVATAR_BUCKET).remove([old as string]).catch(() => undefined);
+    return (await signAvatars([path])).get(path) ?? null;
+  },
+
+  async removeAvatar() {
+    const sb = requireSupabase();
+    const { data: old, error } = await sb.rpc('set_my_avatar', { p_path: null });
+    if (error) fail(error);
+    if (old) void sb.storage.from(AVATAR_BUCKET).remove([old as string]).catch(() => undefined);
+  },
+};
+
+const restGame: GameService = {
+  leaderboard: (offset, limit) => api<LeaderboardPage>(`/game/leaderboard?offset=${offset}&limit=${limit}`),
+  profile: (userId) => api<PlayerProfile>(`/game/players/${encodeURIComponent(userId)}`),
+  async setAvatar(file) {
+    const form = new FormData();
+    form.set('image', await prepareAvatar(file));
+    return (await api<User>('/game/avatar', { method: 'PUT', formData: form })).avatarUrl ?? null;
+  },
+  async removeAvatar() {
+    await api('/game/avatar', { method: 'DELETE' });
+  },
+};
+
+export const gameService: GameService = useSupabase ? supabaseGame : restGame;

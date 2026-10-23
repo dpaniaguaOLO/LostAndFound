@@ -237,6 +237,16 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | POST | `/api/admin/users/reset-password` | admin | `{ employeeId, newPassword(≥8) }` | `{ ok }` |
 | GET | `/api/admin/archived` | admin | — | `ArchivedResponse` |
 | POST | `/api/admin/restore` | admin | `{ kind: found\|lost, id }` | `{ ok }` |
+| GET | `/api/game/leaderboard` | sí | query: `offset, limit` (máx. puesto 100) | `LeaderboardPage` (Supabase: RPC `leaderboard`) |
+| GET | `/api/game/players/:id` | sí | — | `PlayerProfile` (Supabase: RPC `player_profile`) |
+| PUT | `/api/game/avatar` | sí | `multipart/form-data`: `image` | `User` con `avatarUrl` (Supabase: bucket `avatars` + RPC `set_my_avatar`) |
+| DELETE | `/api/game/avatar` | sí | — | `User` |
+
+Juego (rama `features/game`): los puntos se calculan en el servidor a partir de los datos
+(`game_stats()` en Supabase, `backend/src/lib/game.ts` en Express) con las reglas de
+`POINT_RULES` de `@laf/shared`; las insignias se derivan de las estadísticas con
+`earnedBadges()/bestBadges()` (`BADGES`). Reglas e insignias son provisionales: si cambian,
+actualizar los tres sitios.
 
 Reglas añadidas en v0.15.x: `PATCH /admin/users/:id/role` no permite dejar el sistema sin
 administradores (400). `PATCH /claims/:id/review` con `APPROVED` exige que el objeto siga
@@ -255,7 +265,9 @@ cascada reciben notificación `CLAIM_REJECTED`.
 Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `String`
 (SQLite no soporta enums nativos) y su conjunto de valores vive en `@laf/shared`.
 
-**User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
+**User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), avatarUrl?, createdAt, updatedAt`.
+- Foto de perfil: `avatarUrl` (Express, `/uploads`) / `profiles.avatar_path` (Supabase, bucket
+  privado `avatars`, `<uid>/<uuid>.<ext>`; solo se fija con `set_my_avatar()`, mig. 016).
 
 **FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, imageSignature?, status, returnedAt?, reporterId→User, createdAt, updatedAt`.
 - `returnedAt` (`returned_at` en Supabase, mig. 015): cuándo pasó a `RETURNED` (trigger en
@@ -303,8 +315,8 @@ prefiere archivar.
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–015, todas aplicadas en el proyecto alojado; 012–015 el
-2026-10-22).
+`supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
+2026-10-22; 016 `game_profiles` en la rama `features/game`, **sin aplicar**).
 
 ---
 
@@ -412,7 +424,8 @@ prefiere archivar.
 - **Terminado**: monorepo, shared, backend completo (auth, found-items, lost-reports,
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
-- **En desarrollo**: —
+- **En desarrollo**: rama `features/game`: perfil con foto, puntos, insignias y ranking
+  (reglas de puntos e insignias provisionales; migración 016 sin aplicar).
 - **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).

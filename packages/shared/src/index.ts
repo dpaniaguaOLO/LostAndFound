@@ -71,6 +71,8 @@ export interface User {
   role: UserRole;
   active: boolean; // false = desactivado (no puede iniciar sesión; conserva su historial)
   createdAt: string; // ISO 8601
+  /** Foto de perfil (URL firmada) o null. Opcional: no lo envían APIs antiguas. */
+  avatarUrl?: string | null;
 }
 
 export interface FoundItem {
@@ -310,4 +312,89 @@ export interface AuditEntry {
   summary: string;
   actor: Pick<User, 'id' | 'name'>;
   createdAt: string; // ISO 8601
+}
+
+// ---------------------------------------------------------------------------
+// Juego: puntos, insignias y ranking (rama features/game)
+// ---------------------------------------------------------------------------
+//
+// Los puntos y las estadísticas los calcula SIEMPRE el servidor a partir de los
+// datos reales (nadie puede escribirlos): función SQL game_stats() en Supabase
+// (migración 016) y backend/src/lib/game.ts en Express. Si cambian las reglas de
+// POINT_RULES hay que cambiar también esos dos sitios.
+// Las insignias se derivan de las estadísticas aquí, en un único lugar.
+
+/** Una devolución cuenta si el objeto quedó RETURNED con una reclamación aprobada de otra persona. */
+export interface PlayerStats {
+  published: number; // objetos encontrados publicados (sin contar los archivados)
+  returned: number; // devoluciones válidas
+  fastReturned: number; // devoluciones válidas en ≤ FAST_RETURN_HOURS desde que se publicó
+}
+
+/** Reglas de puntos (provisionales). `key` identifica la regla en el servidor. */
+export const POINT_RULES = [
+  { key: 'returned', points: 100, title: 'Devuelves un objeto', description: 'Un objeto que encontraste llega a su dueño: se aprobó su reclamación y lo marcaste como devuelto.' },
+  { key: 'fast', points: 50, title: 'Entrega rápida', description: 'Extra si la devolución ocurre en menos de 24 horas desde que lo publicaste.' },
+] as const;
+export const FAST_RETURN_HOURS = 24;
+
+export type BadgeTier = 'common' | 'rare' | 'epic' | 'legendary';
+export const BADGE_TIER_ORDER: Record<BadgeTier, number> = { common: 1, rare: 2, epic: 3, legendary: 4 };
+export const BADGE_TIER_LABEL: Record<BadgeTier, string> = { common: 'Común', rare: 'Rara', epic: 'Épica', legendary: 'Legendaria' };
+
+export interface Badge {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string; // cómo se consigue
+  tier: BadgeTier;
+}
+
+/** Catálogo de insignias (provisional). Orden = orden de visualización. */
+export const BADGES: readonly (Badge & { earned: (s: PlayerStats) => boolean })[] = [
+  { id: 'first_find', name: 'Primer hallazgo', emoji: '🔍', tier: 'common', description: 'Publica tu primer objeto encontrado.', earned: (s) => s.published >= 1 },
+  { id: 'good_samaritan', name: 'Buen samaritano', emoji: '🤝', tier: 'common', description: 'Devuelve tu primer objeto a su dueño.', earned: (s) => s.returned >= 1 },
+  { id: 'lightning', name: 'Rayo', emoji: '⚡', tier: 'rare', description: 'Devuelve un objeto en menos de 24 horas.', earned: (s) => s.fastReturned >= 1 },
+  { id: 'hero', name: 'Héroe de OLO', emoji: '🦸', tier: 'rare', description: 'Devuelve 5 objetos.', earned: (s) => s.returned >= 5 },
+  { id: 'supersonic', name: 'Supersónico', emoji: '🚀', tier: 'epic', description: 'Devuelve 5 objetos en menos de 24 horas cada uno.', earned: (s) => s.fastReturned >= 5 },
+  { id: 'legend', name: 'Leyenda', emoji: '🏆', tier: 'epic', description: 'Devuelve 10 objetos.', earned: (s) => s.returned >= 10 },
+  { id: 'guardian', name: 'Guardián de OLO', emoji: '👑', tier: 'legendary', description: 'Devuelve 25 objetos.', earned: (s) => s.returned >= 25 },
+];
+
+/** Insignias conseguidas, en el orden del catálogo. */
+export function earnedBadges(stats: PlayerStats): Badge[] {
+  return BADGES.filter((b) => b.earned(stats)).map(({ earned: _e, ...b }) => b);
+}
+
+/** Las `n` mejores insignias (mayor rareza primero; a igual rareza, la más avanzada del catálogo). */
+export function bestBadges(stats: PlayerStats, n = 3): Badge[] {
+  return earnedBadges(stats)
+    .map((b, i) => ({ b, i }))
+    .sort((x, y) => BADGE_TIER_ORDER[y.b.tier] - BADGE_TIER_ORDER[x.b.tier] || y.i - x.i)
+    .slice(0, n)
+    .map((x) => x.b);
+}
+
+/** Colaborador en el ranking o en un perfil. `rank` null = aún sin puntos. */
+export interface PlayerSummary {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  points: number;
+  rank: number | null;
+  stats: PlayerStats;
+}
+
+export interface PlayerProfile extends PlayerSummary {
+  role: UserRole;
+  createdAt: string; // ISO 8601
+}
+
+/** El ranking solo muestra el top LEADERBOARD_MAX, en páginas de LEADERBOARD_PAGE. */
+export const LEADERBOARD_MAX = 100;
+export const LEADERBOARD_PAGE = 30;
+
+export interface LeaderboardPage {
+  entries: PlayerSummary[];
+  hasMore: boolean;
 }

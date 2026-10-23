@@ -1,5 +1,22 @@
 # Changelog
 
+## [Sin publicar] — rama `features/game`
+
+### Añadido
+- **Perfil** (`/perfil`, `/perfil/:id`): foto de perfil personalizable (recorte cuadrado
+  512 px, sin EXIF), puntos, puesto en el ranking, estadísticas e insignias (las propias
+  también muestran las que faltan). Enlace "¿Cómo ganar puntos?" con las reglas.
+- **Ranking** (`/ranking`): top 100 por puntos, de 30 en 30 ("Cargar más"), con podio,
+  mejores insignias de cada colaborador, tu posición y acceso a cada perfil.
+- La foto de perfil se ve en la cabecera, la barra inferior y la hoja de perfil.
+- Puntos e insignias **provisionales** (por definir): 100 por objeto devuelto con
+  reclamación aprobada de otra persona, +50 si fue en < 24 h. Catálogo de insignias en
+  `@laf/shared` (`BADGES`).
+- Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,
+  `leaderboard()`, `player_profile()`; los puntos los calcula `game_stats()`, nunca el
+  cliente). **Pendiente de aplicar** en el proyecto alojado.
+- Express: `/api/game/*` y migración Prisma `avatar`.
+
 ## [0.29.0] - 2026-10-22 — APK de prueba (debug)
 
 **Desplegado**: migración 015 aplicada y Edge Function `api` redesplegada. APK

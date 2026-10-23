@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
+import { Avatar } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -19,6 +20,7 @@ const icons: Record<string, ReactNode> = {
   bell: <path d="M12 4a5.5 5.5 0 0 0-5.5 5.5v3L5 15.5h14L17.5 12.5v-3A5.5 5.5 0 0 0 12 4Zm-2.5 14a2.5 2.5 0 0 0 5 0" />,
   logout: <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4m-4 4h10" />,
   help: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-2.5-11.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6m0 3h.01" />,
+  trophy: <path d="M8 4h8v5a4 4 0 0 1-8 0V4Zm0 2H5a3 3 0 0 0 3 4m8-4h3a3 3 0 0 1-3 4m-4 3v4m-3.5 3h7l-.5-3h-6l-.5 3Z" />,
 };
 
 function Icon({ name, className = 'h-[22px] w-[22px]' }: { name: keyof typeof icons; className?: string }) {
@@ -35,9 +37,12 @@ function pageTitle(pathname: string): string {
   if (pathname.endsWith('/editar')) return 'Editar publicación';
   if (pathname.startsWith('/objetos/')) return 'Objeto encontrado';
   if (pathname.startsWith('/perdidos/')) return 'Objeto perdido';
+  if (pathname.startsWith('/perfil/')) return 'Perfil';
   const map: Record<string, string> = {
     '/publicar': 'Publicar',
     '/mis-objetos': 'Mis objetos',
+    '/perfil': 'Mi perfil',
+    '/ranking': 'Ranking',
     '/reclamaciones': 'Reclamaciones',
     '/notificaciones': 'Notificaciones',
     '/admin': 'Administración',
@@ -167,8 +172,6 @@ export function Layout() {
     navigate('/login');
   }
 
-  const initial = user?.name?.trim().slice(0, 1).toUpperCase() || '?';
-
   const desktopLink = ({ isActive }: { isActive: boolean }) =>
     'relative flex items-center whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-200 ' +
     (isActive
@@ -203,6 +206,9 @@ export function Layout() {
                 {item.label}
               </NavLink>
             ))}
+            <NavLink to="/ranking" className={desktopLink}>
+              Ranking
+            </NavLink>
             {isAdmin && (
               <NavLink to="/admin" className={desktopLink}>
                 Admin
@@ -235,9 +241,7 @@ export function Layout() {
                 aria-controls="user-menu"
                 aria-expanded={userMenu}
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 text-xs font-bold text-white shadow-glow">
-                  {initial}
-                </span>
+                <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" />
                 <span className="max-w-[9rem] truncate">{user?.name}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -253,6 +257,13 @@ export function Layout() {
                     </p>
                   </div>
                   <div className="my-1 h-px bg-slate-100 dark:bg-olo-dark-800" />
+                  <Link
+                    to="/perfil"
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
+                  >
+                    <Icon name="user" className="h-[18px] w-[18px]" />
+                    Mi perfil
+                  </Link>
                   <Link
                     to="/mis-objetos"
                     className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-olo-dark-850"
@@ -328,9 +339,7 @@ export function Layout() {
             className="group flex h-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400"
             aria-label="Perfil y más opciones"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 text-[11px] font-bold text-white transition group-active:scale-90">
-              {initial}
-            </span>
+            <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-7 w-7 text-[11px]" className="transition group-active:scale-90" />
             Perfil
           </button>
         </div>
@@ -338,18 +347,18 @@ export function Layout() {
 
       {/* Hoja de perfil (móvil) */}
       <Modal open={sheet} label="Perfil" onClose={() => setSheet(false)}>
-        <div className="mb-5 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 text-lg font-bold text-white shadow-glow">
-            {initial}
-          </span>
-          <div className="min-w-0">
+        <Link to="/perfil" className="-mx-2 mb-5 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-slate-100 active:bg-slate-100 dark:hover:bg-olo-dark-850">
+          <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="md" className="shadow-glow" />
+          <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{user?.name}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
             </p>
           </div>
-        </div>
+          <span className="text-xs font-semibold text-olo-700 dark:text-olo-300">Ver perfil</span>
+        </Link>
         <div className="flex flex-col gap-1">
+          <SheetLink to="/ranking" icon="trophy" label="Ranking" />
           <SheetLink to="/notificaciones" icon="bell" label="Notificaciones" badge={unread} />
           <SheetLink to="/mis-objetos" icon="mine" label="Mis objetos" />
           {isAdmin && <SheetLink to="/admin" icon="admin" label="Panel de administración" />}

@@ -457,3 +457,79 @@ test('returned_at: la fija el trigger al devolver y el cliente no puede escribir
   await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [item]);
   assert.equal((await one(`select returned_at from public.found_items where id = $1`, [item])).returned_at, null);
 });
+
+// --- Migración 016: juego (foto de perfil, puntos, ranking) ---------------------
+const E = '00000000-0000-0000-0000-0000000000a1'; // jugador (encuentra objetos)
+const F = '00000000-0000-0000-0000-0000000000a2'; // dueño de los objetos
+const G = '00000000-0000-0000-0000-0000000000a3'; // colaborador que se desactiva
+const profileOf = async (viewer, uid) => (await asUser(viewer, `select * from public.player_profile($1)`, [uid])).rows[0];
+/** Objeto de E reclamado por F, aprobado y devuelto. `hoursAgo`: antigüedad de la publicación. */
+async function returnedItem(hoursAgo = 0) {
+  const item = await newItem(E);
+  await asServer(`update public.found_items set created_at = now() - make_interval(hours => $2) where id = $1`, [item, hoursAgo]);
+  await review(await newClaim(item, F), E, 'APPROVED');
+  await asUser(E, `update public.found_items set status = 'RETURNED' where id = $1`, [item]);
+  return item;
+}
+
+test('juego: puntos solo por devoluciones con reclamación aprobada de otra persona', async () => {
+  for (const [id, emp] of [[E, 'game-1'], [F, 'game-2'], [G, 'game-3']]) {
+    await asServer(`insert into auth.users values ($1, $2, $3)`, [id, `${emp}@x`, { name: `User ${emp}`, employee_id: emp }]);
+  }
+  assert.equal((await profileOf(F, E)).points, 0);
+  assert.equal((await profileOf(F, E)).rank, null, 'sin puntos no tiene puesto');
+
+  // Publicar no da puntos; devolver sin reclamación tampoco.
+  const solo = await newItem(E);
+  await asUser(E, `update public.found_items set status = 'RETURNED' where id = $1`, [solo]);
+  let p = await profileOf(F, E);
+  assert.deepEqual([p.points, p.published, p.returned], [0, 1, 0]);
+
+  await returnedItem(0); // rápida: 100 + 50
+  await returnedItem(48); // lenta: 100
+  p = await profileOf(F, E);
+  assert.deepEqual([p.points, p.returned, p.fast_returned], [250, 2, 1]);
+  assert.ok(p.rank >= 1);
+
+  // Moderación: archivar quita los puntos de ese objeto.
+  const archived = await returnedItem(0);
+  assert.equal((await profileOf(F, E)).points, 400);
+  await asUser(A, `update public.found_items set status = 'ARCHIVED' where id = $1`, [archived]);
+  assert.equal((await profileOf(F, E)).points, 250);
+});
+
+test('juego: ranking ordenado, top 100 y solo para colaboradores activos', async () => {
+  const board = (await asUser(F, `select * from public.leaderboard(0, 30)`)).rows;
+  assert.ok(board.length >= 1 && board.every((r) => r.points > 0), 'solo quien tiene puntos');
+  for (let i = 1; i < board.length; i++) assert.ok(board[i - 1].points >= board[i].points, 'orden descendente');
+  assert.equal(board.find((r) => r.id === E)?.rank, (await profileOf(F, E)).rank, 'mismo puesto en ranking y perfil');
+  assert.deepEqual(Object.keys(board[0]).sort(), ['avatar_path', 'fast_returned', 'id', 'name', 'points', 'published', 'rank', 'returned']);
+  assert.equal((await asUser(F, `select * from public.leaderboard(100, 30)`)).rows.length, 0, 'nada más allá del puesto 100');
+  assert.equal((await asUser(F, `select * from public.leaderboard(0, 500)`)).rows.length, board.length, 'el límite se acota');
+
+  assert.match((await error(() => asRole('anon', `select * from public.leaderboard(0, 30)`))).message, /permission denied/);
+  assert.match((await error(() => asUser(F, `select * from public.game_stats()`))).message, /permission denied/);
+  await asServer(`update public.profiles set active = false where id = $1`, [G]);
+  assert.ok(await error(() => asUser(G, `select * from public.leaderboard(0, 30)`)), 'cuenta desactivada');
+  assert.equal(await profileOf(F, G), undefined, 'el perfil de un desactivado no se muestra');
+});
+
+test('juego: foto de perfil solo en la carpeta propia y mediante set_my_avatar()', async () => {
+  const mine = `${E}/11111111-1111-1111-1111-111111111111.jpg`;
+  const foreign = `${F}/22222222-2222-2222-2222-222222222222.jpg`;
+  assert.ok(await error(() => asUser(E, `insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [foreign])), 'carpeta ajena');
+  await asUser(E, `insert into storage.objects (bucket_id, name) values ('avatars', $1)`, [mine]);
+  assert.ok(await error(() => asUser(E, `update public.profiles set avatar_path = $2 where id = $1`, [E, mine])), 'sin UPDATE directo');
+  assert.ok(await error(() => asUser(E, `select public.set_my_avatar($1)`, [foreign])), 'ruta ajena');
+  assert.ok(await error(() => asUser(E, `select public.set_my_avatar($1)`, [`${E}/33333333-3333-3333-3333-333333333333.jpg`])), 'archivo inexistente');
+  assert.ok(await error(() => asUser(E, `select public.set_my_avatar($1)`, [`${E}/../x.jpg`])));
+
+  // Antes de fijarla, un tercero no la ve; después, sí (y la ruta es legible).
+  assert.equal((await asUser(F, `select 1 from storage.objects where name = $1`, [mine])).rows.length, 0);
+  assert.equal((await asUser(E, `select public.set_my_avatar($1) as old`, [mine])).rows[0].old, null);
+  assert.equal((await asUser(F, `select 1 from storage.objects where name = $1`, [mine])).rows.length, 1);
+  assert.equal((await asUser(F, `select avatar_path from public.profiles where id = $1`, [E])).rows[0].avatar_path, mine);
+  assert.equal((await profileOf(F, E)).avatar_path, mine);
+  assert.equal((await asUser(E, `select public.set_my_avatar(null) as old`)).rows[0].old, mine, 'devuelve la anterior');
+  assert.equal((await asUser(F, `delete from storage.objects where name = $1 returning 1`, [mine])).rows.length, 0, 'un tercero no la borra');
+});

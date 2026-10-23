@@ -35,3 +35,26 @@ export async function prepareImage(file: File): Promise<File> {
     return file;
   }
 }
+
+const AVATAR_SIDE = 512;
+
+/**
+ * Foto de perfil: recorte cuadrado centrado de AVATAR_SIDE px en JPEG (sin EXIF).
+ * A diferencia de prepareImage, si el navegador no puede procesarla falla: el
+ * bucket de avatares solo admite JPEG/PNG/WEBP pequeños.
+ */
+export async function prepareAvatar(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => {
+    throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPG o PNG).');
+  });
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = Math.min(AVATAR_SIDE, side);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('No se pudo procesar la imagen.');
+  ctx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  if (!blob) throw new Error('No se pudo procesar la imagen.');
+  return new File([blob], 'avatar.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+}

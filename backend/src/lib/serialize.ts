@@ -17,6 +17,7 @@ export function serializeUser(u: AnyRecord) {
     // El backend REST (Prisma) no modela desactivación; sus usuarios son siempre activos.
     active: (u.active as boolean | undefined) ?? true,
     createdAt: iso(u.createdAt),
+    avatarUrl: signUploadUrl(u.avatarUrl as string | null),
   };
 }
 

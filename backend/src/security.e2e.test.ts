@@ -342,3 +342,67 @@ test('asistente: "¿qué se devolvió esta semana?" usa la fecha de devolución'
   const wall = await call('POST', '/api/ai/assistant', { token: tokens.beto, body: { question: 'bufanda' } });
   assert.ok(!wall.data.foundItems.some((f: any) => f.id === item.id));
 });
+
+// --- Juego: puntos, ranking y foto de perfil (paridad con la migración 016) --------
+test('juego: puntos solo por devoluciones con reclamación aprobada; ranking top 100', async () => {
+  const points = async () => (await call('GET', `/api/game/players/${ids.carla}`, { token: tokens.ana })).data;
+  const start = await points();
+  // Publicar y "devolver" sin reclamación no da puntos.
+  const solo = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Llavero' }) })).data;
+  await call('PATCH', `/api/found-items/${solo.id}/return`, { token: tokens.carla });
+  let p = await points();
+  assert.equal(p.points, start.points);
+  assert.equal(p.stats.published, start.stats.published + 1);
+
+  // Con reclamación aprobada de otra persona, el mismo día: 100 + 50.
+  const item = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Cargador' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.ana, body: { foundItemId: item.id, message: 'Es mío' } })).data;
+  await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.carla, body: { status: 'APPROVED' } });
+  await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.carla });
+  p = await points();
+  assert.equal(p.points, start.points + 150);
+  assert.deepEqual([p.stats.returned, p.stats.fastReturned], [start.stats.returned + 1, start.stats.fastReturned + 1]);
+  assert.ok(p.rank >= 1);
+  assert.equal(p.role, 'EMPLOYEE');
+
+  const board = (await call('GET', '/api/game/leaderboard?offset=0&limit=30', { token: tokens.beto })).data;
+  assert.ok(board.entries.every((e: any) => e.points > 0));
+  assert.equal(board.entries.find((e: any) => e.id === ids.carla)?.rank, p.rank);
+  assert.equal(board.entries[0].passwordHash, undefined);
+  assert.equal((await call('GET', '/api/game/leaderboard?offset=100', { token: tokens.beto })).data.entries.length, 0);
+  assert.equal((await call('GET', '/api/game/leaderboard')).status, 401);
+  assert.equal((await call('GET', '/api/game/players/no-existe', { token: tokens.beto })).status, 404);
+
+  // Archivar (moderación) quita los puntos.
+  await call('PATCH', `/api/found-items/${item.id}/archive`, { token: tokens.admin });
+  assert.equal((await points()).points, start.points);
+});
+
+test('juego: foto de perfil cuadrada, sin EXIF, con URL firmada y reemplazable', async () => {
+  const jpeg = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#3a3' } })
+    .jpeg().withMetadata({ exif: { IFD0: { Make: 'CamaraEspia' } } }).toBuffer();
+  const form = () => {
+    const f = new FormData();
+    f.set('image', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'yo.jpg');
+    return f;
+  };
+  const html = new FormData();
+  html.set('image', new Blob(['<script>x</script>'], { type: 'image/png' }), 'x.png');
+  assert.equal((await call('PUT', '/api/game/avatar', { token: tokens.beto, form: html })).status, 400);
+
+  const first = await call('PUT', '/api/game/avatar', { token: tokens.beto, form: form() });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  assert.match(first.data.avatarUrl, /^\/uploads\/[A-Za-z0-9_-]+\.jpg\?exp=\d+&sig=/);
+  const file1 = path.join(process.env.UPLOAD_DIR!, first.data.avatarUrl.split('?')[0].split('/').pop()!);
+  const meta = await sharp(file1).metadata();
+  assert.deepEqual([meta.width, meta.height, meta.exif], [512, 512, undefined]);
+  assert.equal((await fetch(base + first.data.avatarUrl)).status, 200);
+  assert.ok((await call('GET', '/api/auth/me', { token: tokens.beto })).data.avatarUrl);
+  assert.ok((await call('GET', `/api/game/players/${ids.beto}`, { token: tokens.ana })).data.avatarUrl, 'visible para otros');
+
+  const second = await call('PUT', '/api/game/avatar', { token: tokens.beto, form: form() });
+  assert.equal(second.status, 200);
+  assert.equal(fs.existsSync(file1), false, 'la foto anterior se borra');
+  const removed = await call('DELETE', '/api/game/avatar', { token: tokens.beto });
+  assert.equal(removed.data.avatarUrl, null);
+});
