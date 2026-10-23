@@ -10,7 +10,7 @@
 ### Corregido
 - Coincidencias (modo Supabase): la foto del propio objeto perdido ("Tu objeto", la
   referencia para comparar) salía siempre vacía: la Edge Function `api` devolvía
-  `imageUrl: null`. Ahora se firma como las demás. Requiere `supabase functions deploy api`.
+  `imageUrl: null`. Ahora se firma como las demás. Edge Function `api` desplegada (2026-10-23).
 
 ### Cambiado
 - Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
