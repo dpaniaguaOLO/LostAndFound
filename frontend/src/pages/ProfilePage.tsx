@@ -110,25 +110,48 @@ export function ProfilePage() {
   const totalLevels = BADGES.reduce((n, b) => n + b.levels.length, 0);
   const levels = badgeCollection(profile.stats).reduce((n, p) => n + p.level, 0);
 
+  // Acciones del perfil propio (a la derecha de la foto en escritorio, debajo en móvil).
+  const actions = (
+    <>
+      <button type="button" onClick={() => setFramePicker(true)} className={PILL}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2 2" />
+        </svg>
+        Personalizar marco
+      </button>
+      {profile.avatarUrl && (
+        <button
+          type="button"
+          onClick={() => void removePhoto()}
+          disabled={uploading}
+          className={`${PILL} hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Quitar foto
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="mx-auto max-w-3xl">
       {!isMe && <BackButton />}
 
-      {/* Cabecera: fondo (especial desde Maestro), foto con marco, nombre y puntos */}
+      {/* Cabecera: fondo (especial desde Maestro), foto con marco, nombre y cifras */}
       <section className="card overflow-hidden">
-        <div className={`relative h-28 bg-gradient-to-br sm:h-32 ${BANNERS[rank.id] ?? BANNERS.default}`} aria-hidden>
+        <div className={`relative h-32 bg-gradient-to-br sm:h-40 ${BANNERS[rank.id] ?? BANNERS.default}`} aria-hidden>
           {/* Textura sutil de puntos sobre el degradado */}
           <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:14px_14px]" />
-          <span className="absolute right-3 top-3 rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur">
-            Rango {rank.name}
-          </span>
         </div>
 
-        <div className="px-5 pb-5 sm:px-7 sm:pb-6">
-          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-end sm:gap-5 sm:text-left">
-            {/* Foto (sube sobre el fondo) */}
-            <div className="relative -mt-14 shrink-0 sm:-mt-16">
-              <span className="block rounded-full bg-white p-1 shadow-elevated dark:bg-olo-dark-900">
+        <div className="px-5 pb-6 sm:px-8 sm:pb-7">
+          {/* Fila 1: foto (sube sobre el fondo) y, en escritorio, las acciones a la derecha */}
+          <div className="flex items-end justify-between gap-4">
+            <div className="relative -mt-16 shrink-0 sm:-mt-20">
+              <span className="block rounded-full bg-white p-1.5 shadow-elevated dark:bg-olo-dark-900">
                 <Avatar name={profile.name} url={profile.avatarUrl} size="lg" frame={frame} />
               </span>
               {isMe && (
@@ -137,7 +160,7 @@ export function ProfilePage() {
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={uploading}
-                    className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-olo-600 text-white shadow-glow ring-4 ring-white transition hover:bg-olo-700 active:scale-90 disabled:opacity-60 dark:bg-olo-500 dark:text-slate-950 dark:ring-olo-dark-900"
+                    className="absolute bottom-1.5 right-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-olo-600 text-white shadow-glow ring-4 ring-white transition hover:bg-olo-700 active:scale-90 disabled:opacity-60 dark:bg-olo-500 dark:text-slate-950 dark:ring-olo-dark-900"
                     aria-label={profile.avatarUrl ? 'Cambiar foto de perfil' : 'Añadir foto de perfil'}
                   >
                     {uploading ? (
@@ -161,59 +184,44 @@ export function ProfilePage() {
                 </>
               )}
             </div>
-
-            {/* Nombre */}
-            <div className="min-w-0 flex-1 sm:pb-1">
-              <h1 className={`inline-flex max-w-full items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl ${rankNameClass(profile.points)}`}>
-                <span className="break-words">{profile.name}</span>
-                <NameEmblems id={profile.id} className="h-7 w-7" />
-              </h1>
-              <LegendTitle id={profile.id} className="text-sm" />
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
-              </p>
-            </div>
-
-            {/* Puntos */}
-            <div className="flex shrink-0 flex-col items-center rounded-2xl bg-olo-50 px-5 py-3 dark:bg-olo-500/10 sm:mt-5 sm:items-end">
-              <p className="flex items-baseline gap-1.5">
-                <span className="text-3xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300">{profile.points.toLocaleString('es')}</span>
-                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">puntos</span>
-              </p>
-              <Link to="/ranking" className="mt-0.5 text-xs font-bold text-amber-700 hover:underline dark:text-amber-300">
-                {profile.rank ? `#${profile.rank} en el ranking` : 'Aún sin puesto en el ranking'}
-              </Link>
-            </div>
+            {isMe && <div className="hidden flex-wrap justify-end gap-2 pb-2 sm:flex">{actions}</div>}
           </div>
 
-          {/* Acciones (perfil propio) y ayuda */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2 border-t border-slate-100 pt-4 dark:border-olo-dark-800 sm:justify-between">
-            {isMe ? (
-              <div className="flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => setFramePicker(true)} className={PILL}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="2" />
-                    <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.6" strokeDasharray="2 2" />
-                  </svg>
-                  Personalizar marco
-                </button>
-                {profile.avatarUrl && (
-                  <button
-                    type="button"
-                    onClick={() => void removePhoto()}
-                    disabled={uploading}
-                    className={`${PILL} hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/30 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 7h14M10 11v6m4-6v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Quitar foto
-                  </button>
-                )}
-              </div>
-            ) : (
-              <span />
-            )}
+          {/* Fila 2: nombre, título y rol */}
+          <div className="mt-4">
+            <h1 className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-extrabold tracking-tight sm:text-3xl ${rankNameClass(profile.points)}`}>
+              <span className="break-words">{profile.name}</span>
+              <NameEmblems id={profile.id} className="h-7 w-7" />
+            </h1>
+            <LegendTitle id={profile.id} className="mt-1 text-sm" />
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
+            </p>
+          </div>
+
+          {/* Fila 3: cifras principales */}
+          <div className="mt-6 grid grid-cols-3 gap-2.5 sm:gap-4">
+            <div className="flex flex-col-reverse rounded-2xl bg-olo-50 px-3 py-3.5 text-center dark:bg-olo-500/10 sm:py-4">
+              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Puntos</span>
+              <span className="text-2xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300 sm:text-3xl">{profile.points.toLocaleString('es')}</span>
+            </div>
+            <Link to="/ranking" className="flex flex-col-reverse rounded-2xl bg-amber-50 px-3 py-3.5 text-center transition hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/15 sm:py-4">
+              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">En el ranking</span>
+              <span className="text-2xl font-extrabold tabular-nums text-amber-700 dark:text-amber-300 sm:text-3xl">{profile.rank ? `#${profile.rank}` : '—'}</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => setRanksOpen(true)}
+              className="flex flex-col-reverse items-center rounded-2xl bg-slate-50 px-3 py-3.5 text-center transition hover:bg-slate-100 dark:bg-olo-dark-850 dark:hover:bg-olo-dark-800 sm:py-4"
+            >
+              <span className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">Rango</span>
+              <span className={`text-lg font-extrabold leading-8 sm:text-xl sm:leading-9 ${rankNameClass(profile.points)}`}>{rank.name}</span>
+            </button>
+          </div>
+
+          {/* Fila 4: acciones (móvil) y ayuda */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-end">
+            {isMe && <div className="flex flex-wrap justify-center gap-2 sm:hidden">{actions}</div>}
             <button type="button" onClick={() => setHelp(true)} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300">
               ¿Cómo ganar puntos?
             </button>
