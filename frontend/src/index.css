@@ -81,8 +81,19 @@
     animation: laf-rainbow 4s linear infinite;
     filter: drop-shadow(0 0 4px rgb(250 204 21 / 0.35));
   }
+  /* Título "GRAN MAESTRO": brillo de diamante (cian → blanco → violeta) que se desplaza. */
+  .text-diamond {
+    background-image: linear-gradient(90deg, #22d3ee, #e0f2fe, #a78bfa, #22d3ee);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: laf-rainbow 3s linear infinite;
+    filter: drop-shadow(0 0 4px rgb(34 211 238 / 0.35));
+  }
   @media (prefers-reduced-motion: reduce) {
-    .text-rainbow {
+    .text-rainbow,
+    .text-diamond {
       animation: none;
     }
   }

@@ -13,6 +13,7 @@ import {
   LEADERBOARD_MAX,
   TOP_PLAYERS,
   ULTIMATE_BADGE,
+  type Equipped,
   type LeaderboardPage,
   type PlayerProfile,
   type PlayerStats,
@@ -36,6 +37,8 @@ export interface GameService {
   /** Cambia la foto de perfil propia. Devuelve la nueva URL. */
   setAvatar(file: File): Promise<string | null>;
   removeAvatar(): Promise<void>;
+  /** Marco y título que lleva el usuario (null = automático, 'none' = sin). */
+  setCosmetics(equipped: Equipped): Promise<void>;
 }
 
 type StatsRow = {
@@ -50,6 +53,8 @@ type StatsRow = {
   fast_returned: number;
   categories: number;
   active_months: number;
+  equipped_frame: string | null;
+  equipped_title: string | null;
 };
 
 function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
@@ -68,6 +73,7 @@ function toSummary(r: StatsRow, urls: Map<string, string>): PlayerSummary {
     points: r.points,
     rank: r.rank ?? null,
     stats,
+    equipped: { frame: (r.equipped_frame as Equipped['frame']) ?? null, title: r.equipped_title ?? null },
   };
 }
 
@@ -129,6 +135,11 @@ const supabaseGame: GameService = {
     if (error) fail(error);
     if (old) void sb.storage.from(AVATAR_BUCKET).remove([old as string]).catch(() => undefined);
   },
+
+  async setCosmetics(eq) {
+    const { error } = await requireSupabase().rpc('set_my_cosmetics', { p_frame: eq.frame, p_title: eq.title });
+    if (error) fail(error);
+  },
 };
 
 const restGame: GameService = {
@@ -142,6 +153,9 @@ const restGame: GameService = {
   async removeAvatar() {
     await api('/game/avatar', { method: 'DELETE' });
   },
+  async setCosmetics(eq) {
+    await api('/game/cosmetics', { method: 'PUT', body: eq });
+  },
 };
 
 export const gameService: GameService = useSupabase ? supabaseGame : restGame;
@@ -151,6 +165,31 @@ export const gameService: GameService = useSupabase ? supabaseGame : restGame;
 /** Perfil de juego del usuario de la sesión. */
 async function myProfile(): Promise<PlayerProfile> {
   return useSupabase ? gameService.profile(await currentUserId()) : api<PlayerProfile>('/game/players/me');
+}
+
+// Perfil de juego propio compartido (cabecera, marco, título): se refresca al
+// ganar puntos, al personalizar o al cambiar de usuario.
+let mine: PlayerProfile | null = null;
+const mineListeners = new Set<(p: PlayerProfile | null) => void>();
+
+function setMine(p: PlayerProfile | null) {
+  mine = p;
+  mineListeners.forEach((l) => l(p));
+}
+
+/** Vuelve a leer el perfil de juego propio y avisa a quien lo use. */
+export async function refreshMyPlayer(): Promise<PlayerProfile | null> {
+  setMine(await myProfile().catch(() => mine));
+  return mine;
+}
+
+export const currentMyPlayer = () => mine;
+
+export function onMyPlayer(l: (p: PlayerProfile | null) => void): () => void {
+  mineListeners.add(l);
+  return () => {
+    mineListeners.delete(l);
+  };
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
@@ -170,6 +209,7 @@ export async function trackPoints<T>(kind: RewardKind, action: () => Promise<T>)
     void myProfile()
       .then((after) => {
         topCache = null; // el ranking (y los emblemas) pudieron cambiar
+        setMine(after);
         const prev = new Map(badgeCollection(before.stats).map((p) => [p.badge.id, p.level]));
         const badges = badgeCollection(after.stats).filter((p) => p.level > (prev.get(p.badge.id) ?? 0));
         // Una devolución sin puntos también se avisa: la ventana explica por qué no sumó.

@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
-import { Avatar, LegendTitle, NameEmblems, RewardModal } from './game';
+import { displayedCosmetics } from '@laf/shared';
+import { Avatar, NameEmblems, PlayerTitle, RewardModal, useMyPlayer } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -69,6 +70,9 @@ export function Layout() {
   const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
+  // Perfil de juego propio: marco y título en la cabecera (se refresca al ganar puntos o personalizar).
+  const myPlayer = useMyPlayer();
+  const myFrame = myPlayer ? displayedCosmetics(myPlayer).frame : null;
 
   // Contador de no leídas: se refresca al navegar, al marcarlas como leídas y al
   // volver a la app (en el móvil la app queda abierta en segundo plano).
@@ -241,10 +245,10 @@ export function Layout() {
                 aria-controls="user-menu"
                 aria-expanded={userMenu}
               >
-                <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" />
+                <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" frame={myFrame} />
                 <span className="flex min-w-0 flex-col items-start text-left">
                   <span className="max-w-[9rem] truncate">{user?.name}</span>
-                  <LegendTitle id={user?.id} className="text-[9px]" />
+                  <PlayerTitle player={myPlayer} className="text-[9px]" />
                 </span>
                 <NameEmblems id={user?.id} className="h-5 w-5" />
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
@@ -343,7 +347,7 @@ export function Layout() {
             className="group flex h-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400"
             aria-label="Perfil y más opciones"
           >
-            <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-7 w-7 text-[11px]" className="transition group-active:scale-90" />
+            <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-7 w-7 text-[11px]" className="transition group-active:scale-90" frame={myFrame} />
             Perfil
           </button>
         </div>
@@ -352,13 +356,13 @@ export function Layout() {
       {/* Hoja de perfil (móvil) */}
       <Modal open={sheet} label="Perfil" onClose={() => setSheet(false)}>
         <Link to="/perfil" className="-mx-2 mb-5 flex items-center gap-3 rounded-2xl p-2 transition hover:bg-slate-100 active:bg-slate-100 dark:hover:bg-olo-dark-850">
-          <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="md" className="shadow-glow" />
+          <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="md" className="shadow-glow" frame={myFrame} />
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
               <span className="truncate">{user?.name}</span>
               <NameEmblems id={user?.id} className="h-5 w-5" />
             </p>
-            <LegendTitle id={user?.id} />
+            <PlayerTitle player={myPlayer} />
             <p className="text-sm text-slate-500 dark:text-slate-400">
               N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}
             </p>

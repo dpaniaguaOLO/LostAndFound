@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BADGES, badgeCollection, showcaseBadges, type PlayerProfile } from '@laf/shared';
-import { Avatar, BadgeCollectionModal, BadgeShowcase, LegendTitle, NameEmblems, PointsHelpModal } from '../components/game';
+import { BADGES, badgeCollection, displayedCosmetics, rankFor, showcaseBadges, type PlayerProfile } from '@laf/shared';
+import {
+  Avatar,
+  BadgeCollectionModal,
+  BadgeShowcase,
+  CustomizeModal,
+  NameEmblems,
+  PlayerTitle,
+  PointsHelpModal,
+  RankProgress,
+  RanksModal,
+} from '../components/game';
 import { BackButton, ErrorState, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage, isNotAvailable } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { haptics } from '../lib/haptics';
-import { gameService } from '../services/game';
+import { gameService, refreshMyPlayer } from '../services/game';
 
 /** Perfil de un colaborador: foto, puntos, puesto en el ranking e insignias. `/perfil` = el propio. */
 export function ProfilePage() {
@@ -25,6 +35,8 @@ export function ProfilePage() {
   // Colección de insignias: null = cerrada; '' = lista completa; id = detalle de una.
   const [badgeView, setBadgeView] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [ranksOpen, setRanksOpen] = useState(false);
+  const [customize, setCustomize] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function load() {
@@ -81,6 +93,8 @@ export function ProfilePage() {
   if (!profile) return null;
 
   const showcase = showcaseBadges(profile.stats);
+  const cosmetics = displayedCosmetics(profile);
+  const rank = rankFor(profile.points);
   const totalLevels = BADGES.reduce((n, b) => n + b.levels.length, 0);
   const levels = badgeCollection(profile.stats).reduce((n, p) => n + p.level, 0);
 
@@ -90,10 +104,21 @@ export function ProfilePage() {
 
       {/* Cabecera: foto, nombre y puntos */}
       <section className="card relative overflow-hidden p-5 sm:p-7">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-olo-500/20 via-olo-400/10 to-transparent dark:from-olo-500/25" aria-hidden />
+        {/* Fondo de cabecera: el de Maestro / Gran Maestro es especial (se desbloquea). */}
+        <div
+          className={
+            'pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-br ' +
+            (rank.id === 'gran_maestro'
+              ? 'h-32 from-cyan-400/40 via-violet-400/30 to-fuchsia-400/20'
+              : rank.banner
+                ? 'h-32 from-rose-500/35 via-amber-400/25 to-transparent'
+                : 'h-24 from-olo-500/20 via-olo-400/10 to-transparent dark:from-olo-500/25')
+          }
+          aria-hidden
+        />
         <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
           <div className="relative">
-            <Avatar name={profile.name} url={profile.avatarUrl} size="lg" className="ring-4 ring-white shadow-elevated dark:ring-olo-dark-900" />
+            <Avatar name={profile.name} url={profile.avatarUrl} size="lg" frame={cosmetics.frame} className="shadow-elevated" />
             {isMe && (
               <>
                 <button
@@ -130,14 +155,21 @@ export function ProfilePage() {
               {profile.name}
               <NameEmblems id={profile.id} className="h-7 w-7" />
             </h1>
-            <LegendTitle id={profile.id} className="text-sm" />
+            <PlayerTitle player={profile} className="text-sm" />
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}
             </p>
-            {isMe && profile.avatarUrl && (
-              <button type="button" onClick={() => void removePhoto()} disabled={uploading} className="mt-1 text-xs font-semibold text-slate-500 underline-offset-2 hover:text-red-600 hover:underline dark:text-slate-400">
-                Quitar foto
-              </button>
+            {isMe && (
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-start">
+                <button type="button" onClick={() => setCustomize(true)} className="btn-secondary min-h-8 px-3 text-xs">
+                  Personalizar marco y título
+                </button>
+                {profile.avatarUrl && (
+                  <button type="button" onClick={() => void removePhoto()} disabled={uploading} className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-red-600 hover:underline dark:text-slate-400">
+                    Quitar foto
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -155,6 +187,8 @@ export function ProfilePage() {
           </div>
         </div>
       </section>
+
+      <RankProgress points={profile.points} onShowRanks={() => setRanksOpen(true)} />
 
       {/* Estadísticas */}
       <dl className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-3">
@@ -207,6 +241,19 @@ export function ProfilePage() {
       </div>
 
       <PointsHelpModal open={help} onClose={() => setHelp(false)} />
+      <RanksModal open={ranksOpen} onClose={() => setRanksOpen(false)} points={profile.points} />
+      {isMe && (
+        <CustomizeModal
+          open={customize}
+          onClose={() => setCustomize(false)}
+          player={profile}
+          onSaved={(equipped) => {
+            setProfile((p) => (p ? { ...p, equipped } : p));
+            notify('Perfil personalizado', 'success');
+            void refreshMyPlayer(); // la cabecera usa el perfil propio
+          }}
+        />
+      )}
     </div>
   );
 }

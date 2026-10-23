@@ -409,6 +409,17 @@ test('juego: los perdidos activos del top 3 salen primero en el muro, en orden d
   assert.ok(!after.some((r: any) => r.id === mine.id && r.pinned));
 });
 
+test('juego: cosméticos equipados (formato validado, visibles en el perfil)', async () => {
+  const ok = await call('PUT', '/api/game/cosmetics', { token: tokens.beto, body: { frame: 'gold', title: 'rank:detective' } });
+  assert.equal(ok.status, 200);
+  const p = (await call('GET', `/api/game/players/${ids.beto}`, { token: tokens.ana })).data;
+  assert.deepEqual(p.equipped, { frame: 'gold', title: 'rank:detective' });
+  assert.equal((await call('PUT', '/api/game/cosmetics', { token: tokens.beto, body: { frame: 'platino', title: null } })).status, 400);
+  assert.equal((await call('PUT', '/api/game/cosmetics', { token: tokens.beto, body: { frame: null, title: '<b>x</b>' } })).status, 400);
+  assert.equal((await call('PUT', '/api/game/cosmetics', { body: { frame: null, title: null } })).status, 401);
+  await call('PUT', '/api/game/cosmetics', { token: tokens.beto, body: { frame: null, title: null } });
+});
+
 test('juego: foto de perfil cuadrada, sin EXIF, con URL firmada y reemplazable', async () => {
   const jpeg = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#3a3' } })
     .jpeg().withMetadata({ exif: { IFD0: { Make: 'CamaraEspia' } } }).toBuffer();

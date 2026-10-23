@@ -504,7 +504,7 @@ test('juego: ranking ordenado, top 100 y solo para colaboradores activos', async
   assert.ok(board.length >= 1 && board.every((r) => r.points > 0), 'solo quien tiene puntos');
   for (let i = 1; i < board.length; i++) assert.ok(board[i - 1].points >= board[i].points, 'orden descendente');
   assert.equal(board.find((r) => r.id === E)?.rank, (await profileOf(F, E)).rank, 'mismo puesto en ranking y perfil');
-  assert.deepEqual(Object.keys(board[0]).sort(), ['active_months', 'avatar_path', 'categories', 'fast_returned', 'id', 'name', 'points', 'published', 'published_photo', 'rank', 'returned']);
+  assert.deepEqual(Object.keys(board[0]).sort(), ['active_months', 'avatar_path', 'categories', 'equipped_frame', 'equipped_title', 'fast_returned', 'id', 'name', 'points', 'published', 'published_photo', 'rank', 'returned']);
   assert.equal((await asUser(F, `select * from public.leaderboard(100, 30)`)).rows.length, 0, 'nada más allá del puesto 100');
   assert.equal((await asUser(F, `select * from public.leaderboard(0, 500)`)).rows.length, board.length, 'el límite se acota');
 
@@ -513,6 +513,21 @@ test('juego: ranking ordenado, top 100 y solo para colaboradores activos', async
   await asServer(`update public.profiles set active = false where id = $1`, [G]);
   assert.ok(await error(() => asUser(G, `select * from public.leaderboard(0, 30)`)), 'cuenta desactivada');
   assert.equal(await profileOf(F, G), undefined, 'el perfil de un desactivado no se muestra');
+});
+
+test('juego: cosméticos equipados solo por su dueño y con formato válido', async () => {
+  assert.ok(await error(() => asUser(E, `update public.profiles set equipped_frame = 'gold' where id = $1`, [E])), 'sin UPDATE directo');
+  await asUser(E, `select public.set_my_cosmetics('gold', 'rank:detective')`);
+  let p = await profileOf(F, E);
+  assert.deepEqual([p.equipped_frame, p.equipped_title], ['gold', 'rank:detective']);
+  await asUser(E, `select public.set_my_cosmetics('none', null)`);
+  p = await profileOf(F, E);
+  assert.deepEqual([p.equipped_frame, p.equipped_title], ['none', null]);
+  assert.ok(await error(() => asUser(E, `select public.set_my_cosmetics('platino', null)`)), 'marco desconocido');
+  assert.ok(await error(() => asUser(E, `select public.set_my_cosmetics(null, '<script>')`)), 'título con formato inválido');
+  assert.match((await error(() => asRole('anon', `select public.set_my_cosmetics(null, null)`))).message, /permission denied/);
+  // Solo cambia el propio perfil.
+  assert.equal((await profileOf(E, F)).equipped_frame, null);
 });
 
 test('juego: foto de perfil solo en la carpeta propia y mediante set_my_avatar()', async () => {

@@ -452,6 +452,116 @@ export const bestBadges = (stats: PlayerStats, n = 3) => showcaseBadges(stats, n
 /** Los primeros puestos del ranking tienen ventajas (emblema y perdidos destacados). */
 export const TOP_PLAYERS = 3;
 
+// ---------------------------------------------------------------------------
+// Rangos por puntos y cosméticos (marcos y títulos)
+// ---------------------------------------------------------------------------
+//
+// Cada rango se alcanza al llegar a `min` puntos y desbloquea un marco para la
+// foto y/o un título bajo el nombre. Los cosméticos que alguien lleva puestos se
+// guardan en su perfil (equipped_frame / equipped_title), pero SOLO se muestran si
+// están desbloqueados según sus puntos e insignias reales (displayedCosmetics):
+// elegir uno no ganado no tiene efecto.
+
+export type FrameId = 'bronze' | 'silver' | 'gold' | 'emerald' | 'ruby' | 'diamond';
+
+export interface RankDef {
+  id: string;
+  name: string;
+  min: number; // puntos para alcanzarlo
+  frame: FrameId | null;
+  /** Título que desbloquea (texto en mayúsculas) o null. */
+  title: string | null;
+  /** Desbloquea el fondo especial en la cabecera del perfil. */
+  banner?: boolean;
+}
+
+/** Escalera de rangos (orden ascendente). */
+export const RANKS: readonly RankDef[] = [
+  { id: 'novato', name: 'Novato', min: 0, frame: null, title: null },
+  { id: 'explorador', name: 'Explorador', min: 250, frame: 'bronze', title: null },
+  { id: 'rastreador', name: 'Rastreador', min: 750, frame: 'silver', title: 'Rastreador' },
+  { id: 'detective', name: 'Detective', min: 1500, frame: 'gold', title: 'Detective' },
+  { id: 'experto', name: 'Experto', min: 3000, frame: 'emerald', title: 'Experto' },
+  { id: 'maestro', name: 'Maestro', min: 6000, frame: 'ruby', title: 'Maestro', banner: true },
+  { id: 'gran_maestro', name: 'Gran Maestro', min: 10000, frame: 'diamond', title: 'Gran Maestro', banner: true },
+];
+
+export const FRAME_NAMES: Record<FrameId, string> = {
+  bronze: 'Bronce', silver: 'Plata', gold: 'Oro', emerald: 'Esmeralda', ruby: 'Rubí', diamond: 'Diamante',
+};
+
+/** Rango actual para unos puntos. */
+export function rankFor(points: number): RankDef {
+  return [...RANKS].reverse().find((r) => points >= r.min) ?? RANKS[0];
+}
+
+/** Siguiente rango (null si ya es el máximo). */
+export function nextRank(points: number): RankDef | null {
+  return RANKS.find((r) => r.min > points) ?? null;
+}
+
+export interface TitleDef {
+  /** 'rank:<id>' | 'badge:<id>' | 'legend' (es lo que se guarda en equipped_title). */
+  id: string;
+  text: string;
+  source: 'rank' | 'badge' | 'legend';
+  /** Cómo se desbloquea (para la pantalla de personalizar). */
+  unlock: string;
+}
+
+/** Todos los títulos posibles: de rango, de insignia al máximo y el de Leyenda. */
+export const TITLES: readonly TitleDef[] = [
+  { id: 'legend', text: 'Leyenda', source: 'legend', unlock: 'Consigue la insignia Leyenda de OLO' },
+  ...RANKS.filter((r) => r.title).map((r) => ({
+    id: `rank:${r.id}`, text: r.title!, source: 'rank' as const, unlock: `Llega al rango ${r.name} (${r.min.toLocaleString('es')} puntos)`,
+  })),
+  ...BASE_BADGES.filter((b) => b.levels.length > 1).map((b) => ({
+    id: `badge:${b.id}`, text: b.name, source: 'badge' as const, unlock: `Lleva la insignia ${b.name} a su nivel máximo`,
+  })),
+];
+
+export function frameUnlocked(frame: FrameId, points: number): boolean {
+  return RANKS.some((r) => r.frame === frame && points >= r.min);
+}
+
+export function titleUnlocked(title: TitleDef, points: number, stats: PlayerStats): boolean {
+  if (title.source === 'legend') return badgeProgress(ULTIMATE_BADGE, stats).level > 0;
+  if (title.source === 'rank') return points >= (RANKS.find((r) => `rank:${r.id}` === title.id)?.min ?? Infinity);
+  const badge = BADGES.find((b) => `badge:${b.id}` === title.id);
+  return !!badge && badgeProgress(badge, stats).maxed;
+}
+
+/**
+ * Cosméticos que alguien lleva puestos (lo guardado en su perfil).
+ * null = automático; 'none' = sin marco / sin título.
+ */
+export interface Equipped {
+  frame: FrameId | 'none' | null;
+  title: string | null;
+}
+
+/**
+ * Lo que se muestra de verdad: lo elegido si está desbloqueado; si no (o si no
+ * eligió nada), lo automático: el mejor marco y, como título, Leyenda si la
+ * tiene o el de su rango.
+ */
+export function displayedCosmetics(p: { points: number; stats: PlayerStats; equipped?: Equipped | null }): {
+  frame: FrameId | null;
+  title: TitleDef | null;
+} {
+  const eq = p.equipped;
+  const autoFrame = [...RANKS].reverse().find((r) => r.frame && p.points >= r.min)?.frame ?? null;
+  const frame =
+    eq?.frame === 'none' ? null : eq?.frame && frameUnlocked(eq.frame, p.points) ? eq.frame : autoFrame;
+  const chosen = TITLES.find((t) => t.id === eq?.title);
+  const auto =
+    (titleUnlocked(TITLES[0], p.points, p.stats) ? TITLES[0] : null) ??
+    TITLES.find((t) => t.id === `rank:${rankFor(p.points).id}`) ??
+    null;
+  const title = eq?.title === 'none' ? null : chosen && titleUnlocked(chosen, p.points, p.stats) ? chosen : auto;
+  return { frame, title };
+}
+
 /** Colaborador en el ranking o en un perfil. `rank` null = aún sin puntos. */
 export interface PlayerSummary {
   id: string;
@@ -460,6 +570,8 @@ export interface PlayerSummary {
   points: number;
   rank: number | null;
   stats: PlayerStats;
+  /** Cosméticos elegidos (puede faltar en APIs antiguas = automático). */
+  equipped?: Equipped;
 }
 
 export interface PlayerProfile extends PlayerSummary {

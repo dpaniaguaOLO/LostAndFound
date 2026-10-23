@@ -3,6 +3,16 @@
 ## [Sin publicar]
 
 ### Añadido
+- **Rangos por puntos**: Novato (0), Explorador (250), Rastreador (750), Detective (1.500),
+  Experto (3.000), Maestro (6.000) y Gran Maestro (10.000). Cada uno desbloquea un marco para
+  la foto (bronce, plata, oro, esmeralda animado, rubí, diamante animado), un título bajo el
+  nombre y, desde Maestro, un fondo especial en el perfil. Desde Detective el nombre lleva el
+  color del rango en el ranking. Progreso y "Ver rangos" en el perfil; la ventana de
+  recompensa anuncia el nuevo rango.
+- **Personalizar marco y título** (perfil propio): elegir entre los desbloqueados, "sin" o
+  automático; también títulos de insignias al máximo y LEYENDA. Se guarda solo la elección
+  (migración 018, `set_my_cosmetics()`; Express `PUT /api/game/cosmetics`) y solo se muestra
+  si está desbloqueado según puntos e insignias reales (`displayedCosmetics`).
 - Muro: sección **"Devueltos recientemente"** (pestaña Encontrados, página 1 sin filtros):
   tira horizontal con los objetos devueltos en los últimos 7 días (máx. 12), quién los
   encontró (con sus emblemas) y cuándo. Express: `GET /api/found-items/returned/recent`.

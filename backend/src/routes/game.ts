@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { Router } from 'express';
 import sharp from 'sharp';
+import { z } from 'zod';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { leaderboard, LEADERBOARD_MAX, playerSummary } from '../lib/game.js';
@@ -9,6 +10,7 @@ import { badRequest, notFound } from '../lib/http.js';
 import { queryInt } from '../lib/query.js';
 import { byUser, rateLimit } from '../lib/rateLimit.js';
 import { serializeUser } from '../lib/serialize.js';
+import { parseOrThrow } from '../lib/validation.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 
@@ -51,6 +53,26 @@ gameRouter.get(
   asyncHandler(async (_req, res) => {
     const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
     res.json(admins.map((a) => a.id));
+  }),
+);
+
+// PUT /api/game/cosmetics — { frame, title }: marco y título que lleva el usuario
+// (como set_my_cosmetics en Supabase). Solo se valida el formato: si están
+// desbloqueados lo decide la app al mostrarlos (displayedCosmetics de @laf/shared).
+const cosmeticsSchema = z.object({
+  frame: z.enum(['none', 'bronze', 'silver', 'gold', 'emerald', 'ruby', 'diamond']).nullable(),
+  title: z.string().regex(/^(none|legend|(rank|badge):[a-z_]{1,40})$/).nullable(),
+});
+gameRouter.put(
+  '/cosmetics',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const body = parseOrThrow(cosmeticsSchema, req.body);
+    const user = await prisma.user.update({
+      where: { id: req.auth!.sub },
+      data: { equippedFrame: body.frame, equippedTitle: body.title },
+    });
+    res.json({ frame: user.equippedFrame, title: user.equippedTitle });
   }),
 );
 

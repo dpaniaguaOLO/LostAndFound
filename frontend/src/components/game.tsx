@@ -5,16 +5,29 @@ import {
   badgeCollection,
   badgeProgress,
   BADGES,
+  displayedCosmetics,
+  FRAME_NAMES,
+  frameUnlocked,
+  nextRank,
   POINT_RULES,
+  rankFor,
+  RANKS,
+  TITLES,
+  titleUnlocked,
   ULTIMATE_BADGE,
   type BadgeDef,
   type BadgeProgress,
+  type Equipped,
+  type FrameId,
+  type PlayerProfile,
   type PlayerStats,
+  type RankDef,
+  type TitleDef,
 } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
 import { haptics } from '../lib/haptics';
 import { onReward, type Reward } from '../lib/rewards';
-import { adminIds, legendIds, topPlayerIds } from '../services/game';
+import { adminIds, currentMyPlayer, gameService, legendIds, onMyPlayer, refreshMyPlayer, topPlayerIds } from '../services/game';
 import { Modal } from './ui';
 
 // --- Avatar --------------------------------------------------------------------
@@ -25,41 +38,338 @@ const AVATAR_SIZES = {
   lg: 'h-24 w-24 text-4xl sm:h-28 sm:w-28',
 } as const;
 
-/** Foto de perfil, o la inicial del nombre si no hay foto (o no carga). */
+/** Degradado de cada marco (los animados giran: ver ANIMATED_FRAMES). */
+const FRAME_BG: Record<FrameId, string> = {
+  bronze: 'linear-gradient(135deg, #b45309, #fdba74, #92400e)',
+  silver: 'linear-gradient(135deg, #94a3b8, #ffffff, #64748b)',
+  gold: 'linear-gradient(135deg, #eab308, #fef3c7, #ca8a04)',
+  emerald: 'conic-gradient(from 0deg, #059669, #a7f3d0, #10b981, #064e3b, #059669)',
+  ruby: 'linear-gradient(135deg, #b91c1c, #fda4af, #991b1b)',
+  diamond: 'conic-gradient(from 0deg, #22d3ee, #ffffff, #a78bfa, #e0f2fe, #22d3ee)',
+};
+const ANIMATED_FRAMES = new Set<FrameId>(['emerald', 'diamond']);
+const FRAME_GLOW: Partial<Record<FrameId, string>> = {
+  ruby: 'shadow-[0_0_10px_rgba(244,63,94,0.55)]',
+  diamond: 'shadow-[0_0_14px_rgba(34,211,238,0.6)]',
+};
+
+/**
+ * Foto de perfil (o la inicial si no hay foto o no carga), con el marco de su
+ * rango si se indica `frame`. Los marcos Esmeralda y Diamante giran.
+ */
 export function Avatar({
   name,
   url,
   size = 'sm',
   className = '',
+  frame = null,
 }: {
   name: string;
   url?: string | null;
   size?: keyof typeof AVATAR_SIZES | string;
   className?: string;
+  frame?: FrameId | null;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
   const box = AVATAR_SIZES[size as keyof typeof AVATAR_SIZES] ?? size;
   const initial = name.trim().slice(0, 1).toUpperCase() || '?';
-  if (url && !failed) {
-    return (
+  const photo = (extra: string) =>
+    url && !failed ? (
       <img
         src={url}
         alt=""
-        className={`shrink-0 rounded-full bg-slate-100 object-cover dark:bg-olo-dark-850 ${box} ${className}`}
+        className={`shrink-0 rounded-full bg-slate-100 object-cover dark:bg-olo-dark-850 ${box} ${extra}`}
         onError={() => setFailed(true)}
         loading="lazy"
         decoding="async"
       />
+    ) : (
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 font-bold text-white ${box} ${extra}`}
+        aria-hidden
+      >
+        {initial}
+      </span>
     );
-  }
+  if (!frame) return photo(className);
+
+  const pad = size === 'lg' ? 'p-1.5' : size === 'md' ? 'p-[3px]' : 'p-[2px]';
   return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 font-bold text-white ${box} ${className}`}
-      aria-hidden
-    >
-      {initial}
+    <span className={`relative inline-flex shrink-0 rounded-full ${pad} ${FRAME_GLOW[frame] ?? ''} ${className}`} title={`Marco ${FRAME_NAMES[frame]}`}>
+      <span className="absolute inset-0 overflow-hidden rounded-full" aria-hidden>
+        <span
+          className={`absolute ${ANIMATED_FRAMES.has(frame) ? '-inset-1/2 animate-[spin_4s_linear_infinite] motion-reduce:animate-none' : 'inset-0'}`}
+          style={{ background: FRAME_BG[frame] }}
+        />
+      </span>
+      {photo('relative ring-2 ring-white dark:ring-olo-dark-900')}
     </span>
+  );
+}
+
+// --- Rangos y títulos ------------------------------------------------------------
+
+/** Estilo de cada título (los de rango con el color de su marco). */
+function titleClass(t: TitleDef): string {
+  if (t.id === 'legend') return 'text-rainbow';
+  if (t.id === 'rank:gran_maestro') return 'text-diamond';
+  const gradient: Record<string, string> = {
+    'rank:maestro': 'from-red-600 via-rose-400 to-red-700',
+    'rank:experto': 'from-emerald-600 via-green-400 to-emerald-700',
+    'rank:detective': 'from-yellow-600 via-amber-400 to-yellow-700',
+    'rank:rastreador': 'from-slate-500 via-slate-400 to-slate-600 dark:from-slate-300 dark:via-white dark:to-slate-400',
+  };
+  const g = gradient[t.id];
+  return g ? `bg-gradient-to-r ${g} bg-clip-text text-transparent` : 'text-olo-600 dark:text-olo-300';
+}
+
+/** Color del nombre en el ranking desde Detective (como el color de nombre de los juegos). */
+export function rankNameClass(points: number): string {
+  const byRank: Record<string, string> = {
+    detective: 'text-amber-700 dark:text-amber-300',
+    experto: 'text-emerald-700 dark:text-emerald-300',
+    maestro: 'text-rose-700 dark:text-rose-300',
+    gran_maestro: 'text-cyan-700 dark:text-cyan-300',
+  };
+  return byRank[rankFor(points).id] ?? 'text-slate-900 dark:text-slate-100';
+}
+
+type Cosmetic = { points: number; stats: PlayerStats; equipped?: Equipped | null };
+
+/** Título bajo el nombre (el elegido si está desbloqueado; si no, el automático). */
+export function PlayerTitle({ player, className = 'text-[10px]' }: { player: Cosmetic | null | undefined; className?: string }) {
+  if (!player) return null;
+  const { title } = displayedCosmetics(player);
+  if (!title) return null;
+  return (
+    <span className={`block font-black uppercase leading-tight tracking-[0.25em] ${titleClass(title)} ${className}`} title={title.unlock}>
+      {title.text}
+    </span>
+  );
+}
+
+/** Perfil de juego propio compartido (cabecera, personalizar). */
+export function useMyPlayer(): PlayerProfile | null {
+  const { user } = useAuth();
+  const [me, setMe] = useState<PlayerProfile | null>(() => currentMyPlayer());
+  useEffect(() => {
+    const off = onMyPlayer(setMe);
+    // Al entrar (o cambiar de usuario) se vuelve a leer.
+    if (user && currentMyPlayer()?.id !== user.id) void refreshMyPlayer();
+    return off;
+  }, [user?.id]);
+  return me && me.id === user?.id ? me : null;
+}
+
+/** Lo que desbloquea un rango, en texto. */
+function rankUnlocks(r: RankDef): string[] {
+  return [
+    r.frame && `Marco ${FRAME_NAMES[r.frame]}`,
+    r.title && `Título ${r.title.toUpperCase()}`,
+    r.banner && 'Fondo especial en el perfil',
+  ].filter(Boolean) as string[];
+}
+
+/** Rango actual y progreso hacia el siguiente (perfil). */
+export function RankProgress({ points, onShowRanks }: { points: number; onShowRanks: () => void }) {
+  const rank = rankFor(points);
+  const next = nextRank(points);
+  const pct = next ? Math.round(((points - rank.min) / (next.min - rank.min)) * 100) : 100;
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-olo-dark-800 dark:bg-olo-dark-900">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Rango <strong className={`text-base font-extrabold ${rankNameClass(points)}`}>{rank.name}</strong>
+        </p>
+        <button type="button" onClick={onShowRanks} className="text-xs font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
+          Ver rangos
+        </button>
+      </div>
+      <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-olo-dark-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Progreso al siguiente rango">
+        <div className="h-full rounded-full bg-gradient-to-r from-olo-500 to-amber-400" style={{ width: `${Math.max(pct, 2)}%` }} />
+      </div>
+      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+        {next
+          ? `${points.toLocaleString('es')} / ${next.min.toLocaleString('es')} para ${next.name} · desbloquea: ${rankUnlocks(next).join(', ').toLowerCase()}`
+          : '¡Rango máximo alcanzado!'}
+      </p>
+    </div>
+  );
+}
+
+/** Escalera de rangos con lo que desbloquea cada uno. */
+export function RanksModal({ open, onClose, points }: { open: boolean; onClose: () => void; points: number }) {
+  const current = rankFor(points);
+  return (
+    <Modal open={open} label="Rangos" onClose={onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Rangos</h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Sube de rango sumando puntos. Cada rango desbloquea cosméticos que puedes equipar.</p>
+      <ol className="mt-4 flex flex-col gap-2">
+        {RANKS.map((r) => {
+          const reached = points >= r.min;
+          return (
+            <li
+              key={r.id}
+              className={
+                'flex items-center gap-3 rounded-2xl p-2.5 ' +
+                (r.id === current.id ? 'bg-olo-50 ring-2 ring-olo-400/60 dark:bg-olo-500/10' : reached ? '' : 'opacity-60')
+              }
+            >
+              <Avatar name={r.name} size="h-10 w-10 text-sm" frame={r.frame} />
+              <div className="min-w-0 flex-1">
+                <p className={`font-bold ${reached ? rankNameClass(r.min) : 'text-slate-500 dark:text-slate-400'}`}>
+                  {r.name} <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">· {r.min.toLocaleString('es')} pts</span>
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{rankUnlocks(r).join(' · ') || 'Punto de partida'}</p>
+              </div>
+              {reached && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 text-olo-600 dark:text-olo-400" role="img" aria-label="alcanzado">
+                  <path d="m6 12.5 4 4L18 8" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <button className="btn-secondary mt-5 w-full" onClick={onClose}>
+        Cerrar
+      </button>
+    </Modal>
+  );
+}
+
+/** Elegir marco y título entre los desbloqueados (con vista previa). */
+export function CustomizeModal({
+  open,
+  onClose,
+  player,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  player: PlayerProfile;
+  onSaved: (eq: Equipped) => void;
+}) {
+  const [frame, setFrame] = useState<Equipped['frame']>(player.equipped?.frame ?? null);
+  const [title, setTitle] = useState<string | null>(player.equipped?.title ?? null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setFrame(player.equipped?.frame ?? null);
+    setTitle(player.equipped?.title ?? null);
+    setError(null);
+  }, [open, player]);
+
+  const preview = displayedCosmetics({ points: player.points, stats: player.stats, equipped: { frame, title } });
+  const frames = RANKS.filter((r) => r.frame);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await gameService.setCosmetics({ frame, title });
+      haptics.success();
+      onSaved({ frame, title });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const option = (active: boolean, disabled = false) =>
+    'flex items-center gap-3 rounded-2xl border p-2.5 text-left transition ' +
+    (active
+      ? 'border-olo-500 bg-olo-50 ring-2 ring-olo-400/50 dark:bg-olo-500/10'
+      : 'border-slate-200 hover:bg-slate-50 dark:border-olo-dark-800 dark:hover:bg-olo-dark-850') +
+    (disabled ? ' cursor-not-allowed opacity-50 hover:bg-transparent' : '');
+
+  return (
+    <Modal open={open} label="Personalizar perfil" onClose={saving ? () => undefined : onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Personalizar</h2>
+
+      {/* Vista previa */}
+      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-olo-dark-850">
+        <Avatar name={player.name} url={player.avatarUrl} size="md" frame={preview.frame} />
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{player.name}</p>
+          <PlayerTitle player={{ points: player.points, stats: player.stats, equipped: { frame, title } }} />
+        </div>
+      </div>
+
+      <h3 className="mb-2 mt-5 text-sm font-bold text-slate-800 dark:text-slate-200">Marco</h3>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className={option(frame === null)} onClick={() => setFrame(null)} aria-pressed={frame === null}>
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automático</span>
+        </button>
+        <button type="button" className={option(frame === 'none')} onClick={() => setFrame('none')} aria-pressed={frame === 'none'}>
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Sin marco</span>
+        </button>
+        {frames.map((r) => {
+          const unlocked = frameUnlocked(r.frame!, player.points);
+          return (
+            <button
+              key={r.id}
+              type="button"
+              disabled={!unlocked}
+              className={option(frame === r.frame, !unlocked)}
+              onClick={() => setFrame(r.frame)}
+              aria-pressed={frame === r.frame}
+              title={unlocked ? undefined : `Llega a ${r.name} (${r.min.toLocaleString('es')} pts)`}
+            >
+              <Avatar name={player.name} url={player.avatarUrl} size="h-8 w-8 text-xs" frame={r.frame} />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{FRAME_NAMES[r.frame!]}</span>
+                {!unlocked && <span className="block text-[11px] text-slate-500 dark:text-slate-400">🔒 {r.name}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <h3 className="mb-2 mt-5 text-sm font-bold text-slate-800 dark:text-slate-200">Título</h3>
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className={option(title === null)} onClick={() => setTitle(null)} aria-pressed={title === null}>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automático</span>
+          </button>
+          <button type="button" className={option(title === 'none')} onClick={() => setTitle('none')} aria-pressed={title === 'none'}>
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Sin título</span>
+          </button>
+        </div>
+        {TITLES.map((t) => {
+          const unlocked = titleUnlocked(t, player.points, player.stats);
+          return (
+            <button
+              key={t.id}
+              type="button"
+              disabled={!unlocked}
+              className={option(title === t.id, !unlocked)}
+              onClick={() => setTitle(t.id)}
+              aria-pressed={title === t.id}
+            >
+              <span className="min-w-0 flex-1">
+                <span className={`block text-xs font-black uppercase tracking-[0.25em] ${unlocked ? titleClass(t) : 'text-slate-400'}`}>{t.text}</span>
+                {!unlocked && <span className="block text-[11px] text-slate-500 dark:text-slate-400">🔒 {t.unlock}</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>}
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+        <button className="btn-secondary flex-1" onClick={onClose} disabled={saving}>
+          Cancelar
+        </button>
+        <button className="btn-primary flex-1" onClick={() => void save()} disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -185,19 +495,6 @@ export function LegendEmblem({ className = 'h-5 w-5' }: { className?: string }) 
   );
 }
 
-/**
- * Título "LEYENDA" bajo el nombre de quien tiene la insignia definitiva (como los
- * títulos de Rocket League). No muestra nada para el resto.
- */
-export function LegendTitle({ id, className = 'text-[10px]' }: { id: string | undefined; className?: string }) {
-  const legend = useIsLegend(id);
-  if (!legend) return null;
-  return (
-    <span className={`text-rainbow block font-black uppercase leading-tight tracking-[0.25em] ${className}`} title="Leyenda de OLO: todas las insignias al máximo">
-      Leyenda
-    </span>
-  );
-}
 
 /** Emblemas junto a un nombre: administrador, Leyenda de OLO y puesto del top 3 (pueden salir todos). */
 export function NameEmblems({ id, className = 'h-[1.1em] w-[1.1em]' }: { id: string | undefined; className?: string }) {
@@ -527,6 +824,7 @@ export function RewardModal() {
     { rule: RULE.fast, n: after.stats.fastReturned - before.stats.fastReturned },
   ].filter((l) => l.n > 0);
   const climbed = after.rank !== null && (before.rank === null || after.rank < before.rank);
+  const newRank = rankFor(after.points).id !== rankFor(before.points).id && after.points > before.points ? rankFor(after.points) : null;
 
   return (
     <Modal open label={delta > 0 ? `Has ganado ${delta} puntos` : kind === 'returned' ? 'Objeto devuelto' : 'Nueva insignia'} onClose={() => setReward(null)}>
@@ -568,6 +866,17 @@ export function RewardModal() {
         {after.rank !== null && <> · puesto #{after.rank}</>}
         {climbed && <span className="ml-1 font-semibold text-olo-700 dark:text-olo-300">▲ ¡subiste!</span>}
       </p>
+
+      {newRank && (
+        <div className="mt-4 flex animate-scale-in items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-olo-50 p-3.5 ring-1 ring-amber-300/60 dark:from-amber-500/10 dark:to-olo-500/10">
+          <Avatar name={after.name} url={after.avatarUrl} size="md" frame={newRank.frame} />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">¡Nuevo rango!</p>
+            <p className={`text-lg font-extrabold ${rankNameClass(after.points)}`}>{newRank.name}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Desbloqueaste: {rankUnlocks(newRank).join(', ').toLowerCase()}</p>
+          </div>
+        </div>
+      )}
 
       {badges.length > 0 && (
         <div className="mt-4 rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 px-4 pb-6 pt-4">
@@ -625,6 +934,10 @@ export function PointsHelpModal({ open, onClose }: { open: boolean; onClose: () 
           </li>
         ))}
       </ul>
+      <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+        Con tus puntos subes de <strong className="text-slate-800 dark:text-slate-200">rango</strong> ({RANKS.slice(1).map((r) => r.name).join(', ')}) y
+        desbloqueas marcos para tu foto y títulos para tu nombre.
+      </p>
       <div className="mt-4 rounded-2xl bg-amber-50 p-3.5 dark:bg-amber-500/10">
         <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
           <RankEmblem rank={1} /> Ventajas del top 3

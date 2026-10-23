@@ -241,6 +241,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | GET | `/api/game/leaderboard` | sí | query: `offset, limit` (máx. puesto 100) | `LeaderboardPage` (Supabase: RPC `leaderboard`) |
 | GET | `/api/game/players/:id` | sí | — | `PlayerProfile` (Supabase: RPC `player_profile`) |
 | GET | `/api/game/admins` | sí | — | `string[]` ids de admins, para su emblema (Supabase: `profiles.role`) |
+| PUT | `/api/game/cosmetics` | sí | `{ frame, title }` (null = auto, 'none') | `{ frame, title }` (Supabase: RPC `set_my_cosmetics`) |
 | PUT | `/api/game/avatar` | sí | `multipart/form-data`: `image` | `User` con `avatarUrl` (Supabase: bucket `avatars` + RPC `set_my_avatar`) |
 | DELETE | `/api/game/avatar` | sí | — | `User` |
 
@@ -322,7 +323,7 @@ prefiere archivar.
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
 `supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
 2026-10-22; 016 `game_profiles` y 017 `game_rules`, de la rama `features/game`, el
-2026-10-23). Datos demo del juego cargados en el proyecto alojado con
+2026-10-23; 018 `cosmetics` pendiente). Datos demo del juego cargados en el proyecto alojado con
 `supabase/demo/seed_game_demo.sql` (se quitan con `cleanup_game_demo.sql`).
 
 ---

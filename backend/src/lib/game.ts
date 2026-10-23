@@ -24,13 +24,14 @@ type PlayerStats = {
   categories: number;
   activeMonths: number;
 };
-type PlayerSummary = { id: string; name: string; avatarUrl: string | null; points: number; rank: number | null; stats: PlayerStats };
-type Scored = { id: string; name: string; avatarUrl: string | null; points: number; stats: PlayerStats };
+type Equipped = { frame: string | null; title: string | null };
+type PlayerSummary = { id: string; name: string; avatarUrl: string | null; points: number; rank: number | null; stats: PlayerStats; equipped: Equipped };
+type Scored = { id: string; name: string; avatarUrl: string | null; equippedFrame: string | null; equippedTitle: string | null; points: number; stats: PlayerStats };
 
 /** Estadísticas y puntos de todos los usuarios, ordenados como el ranking. */
 async function scoreAll(): Promise<Scored[]> {
   const [users, items] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, name: true, avatarUrl: true } }),
+    prisma.user.findMany({ select: { id: true, name: true, avatarUrl: true, equippedFrame: true, equippedTitle: true } }),
     prisma.foundItem.findMany({
       where: { status: { not: 'ARCHIVED' } },
       select: {
@@ -78,7 +79,15 @@ function rankOf(all: Scored[], points: number): number | null {
 }
 
 function toSummary(all: Scored[], s: Scored): PlayerSummary {
-  return { id: s.id, name: s.name, avatarUrl: signUploadUrl(s.avatarUrl), points: s.points, rank: rankOf(all, s.points), stats: s.stats };
+  return {
+    id: s.id,
+    name: s.name,
+    avatarUrl: signUploadUrl(s.avatarUrl),
+    points: s.points,
+    rank: rankOf(all, s.points),
+    stats: s.stats,
+    equipped: { frame: s.equippedFrame, title: s.equippedTitle },
+  };
 }
 
 /** Página del ranking (solo quien tiene puntos, nunca más allá del puesto 100). */
