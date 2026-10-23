@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { onUnreadChanged } from '../lib/unread';
 import { services } from '../services';
 import { Assistant } from './Assistant';
-import { Avatar, RankEmblem, useTopRank } from './game';
+import { Avatar, NameEmblems } from './game';
 import { Logo } from './Logo';
 import { Onboarding } from './Onboarding';
 import { ThemeToggle } from './ThemeToggle';
@@ -69,7 +69,6 @@ export function Layout() {
   const [scrolled, setScrolled] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const topRank = useTopRank(user?.id);
 
   // Contador de no leídas: se refresca al navegar, al marcarlas como leídas y al
   // volver a la app (en el móvil la app queda abierta en segundo plano).
@@ -244,7 +243,7 @@ export function Layout() {
               >
                 <Avatar name={user?.name ?? ''} url={user?.avatarUrl} size="h-8 w-8 text-xs" className="shadow-glow" />
                 <span className="max-w-[9rem] truncate">{user?.name}</span>
-                <RankEmblem rank={topRank} />
+                <NameEmblems id={user?.id} className="h-5 w-5" />
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (userMenu ? 'rotate-180' : '')}>
                   <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
@@ -354,7 +353,7 @@ export function Layout() {
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
               <span className="truncate">{user?.name}</span>
-              <RankEmblem rank={topRank} />
+              <NameEmblems id={user?.id} className="h-5 w-5" />
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               N° {user?.employeeId} · {isAdmin ? 'Administrador' : 'Colaborador'}

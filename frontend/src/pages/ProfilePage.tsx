@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BADGES, badgeCollection, showcaseBadges, type PlayerProfile } from '@laf/shared';
-import { Avatar, BadgeCollectionModal, BadgeShowcase, PointsHelpModal, RankEmblem, useTopRank } from '../components/game';
+import { Avatar, BadgeCollectionModal, BadgeShowcase, NameEmblems, PointsHelpModal } from '../components/game';
 import { BackButton, ErrorState, Spinner, UnavailableState } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -26,7 +26,6 @@ export function ProfilePage() {
   const [badgeView, setBadgeView] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const topRank = useTopRank(userId);
 
   function load() {
     setLoading(true);
@@ -129,7 +128,7 @@ export function ProfilePage() {
           <div className="min-w-0 flex-1">
             <h1 className="page-title inline-flex items-center gap-2 break-words">
               {profile.name}
-              <RankEmblem rank={topRank} className="h-7 w-7" />
+              <NameEmblems id={profile.id} className="h-7 w-7" />
             </h1>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               {profile.role === 'ADMIN' ? 'Administrador' : 'Colaborador'} · En OLO desde {formatDate(profile.createdAt)}

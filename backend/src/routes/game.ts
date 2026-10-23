@@ -41,6 +41,17 @@ gameRouter.get(
   }),
 );
 
+// GET /api/game/admins — ids de los administradores (emblema junto al nombre). En
+// Supabase se lee profiles.role directamente (columna legible por todos).
+gameRouter.get(
+  '/admins',
+  authenticate,
+  asyncHandler(async (_req, res) => {
+    const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    res.json(admins.map((a) => a.id));
+  }),
+);
+
 // PUT /api/game/avatar — multipart `image`: recorta a cuadrado, guarda JPEG y
 // sustituye la foto anterior. Devuelve el User actualizado.
 gameRouter.put(

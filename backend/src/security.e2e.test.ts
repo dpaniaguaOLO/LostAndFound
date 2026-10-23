@@ -372,6 +372,7 @@ test('juego: 50 por publicar, +100 por devolver con reclamación, +50 si es ráp
   assert.equal(board.entries[0].passwordHash, undefined);
   assert.equal((await call('GET', '/api/game/leaderboard?offset=100', { token: tokens.beto })).data.entries.length, 0);
   assert.equal((await call('GET', '/api/game/leaderboard')).status, 401);
+  assert.deepEqual((await call('GET', '/api/game/admins', { token: tokens.beto })).data, [ids.admin]);
   assert.equal((await call('GET', '/api/game/players/no-existe', { token: tokens.beto })).status, 404);
 
   // Archivar (moderación) quita todos los puntos de ese objeto.

@@ -148,6 +148,30 @@ const TOP_TTL_MS = 60_000;
 let topCache: { ids: string[]; at: number } | null = null;
 let topInFlight: Promise<string[]> | null = null;
 
+let adminCache: { ids: string[]; at: number } | null = null;
+let adminInFlight: Promise<string[]> | null = null;
+
+/** Ids de los administradores (emblema de admin junto al nombre; cacheado 1 min). Vacío si falla. */
+export function adminIds(): Promise<string[]> {
+  if (adminCache && Date.now() - adminCache.at < TOP_TTL_MS) return Promise.resolve(adminCache.ids);
+  const load = useSupabase
+    ? async () => {
+        // `role` es legible por cualquier colaborador (migración 007).
+        const { data, error } = await requireSupabase().from('profiles').select('id').eq('role', 'ADMIN');
+        if (error) throw error;
+        return (data ?? []).map((r) => r.id as string);
+      }
+    : () => api<string[]>('/game/admins');
+  adminInFlight ??= load()
+    .catch(() => [] as string[])
+    .then((ids) => {
+      adminCache = { ids, at: Date.now() };
+      adminInFlight = null;
+      return ids;
+    });
+  return adminInFlight;
+}
+
 /** Ids de los primeros TOP_PLAYERS del ranking, en orden (cacheado 1 min). Vacío si falla. */
 export function topPlayerIds(): Promise<string[]> {
   if (topCache && Date.now() - topCache.at < TOP_TTL_MS) return Promise.resolve(topCache.ids);

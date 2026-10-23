@@ -21,6 +21,11 @@
 - **Ventajas del top 3**: sus perdidos en búsqueda salen primero en el muro (en orden de
   ranking, "Destacado") y llevan un emblema con su puesto junto al nombre.
 - Los nombres (detalle de objetos, reclamaciones, panel admin, ranking) enlazan al perfil.
+- **Emblema de administrador** junto al nombre (sello verde con estrella, como la insignia
+  de creador de Clash Royale); si un admin está en el top 3 lleva los dos emblemas.
+  Express: `GET /api/game/admins`; Supabase lee `profiles.role`.
+- **Leyenda de OLO** 👑: insignia definitiva al llevar todas las demás a su nivel máximo
+  (marco arcoíris giratorio, halo y cinta "LEYENDA"; siempre la primera del escaparate).
 - Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,
   `leaderboard()`, `player_profile()`; los puntos los calcula `game_stats()`, nunca el
   cliente). Aplicada en el proyecto alojado (2026-10-23).

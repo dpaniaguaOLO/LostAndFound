@@ -358,8 +358,8 @@ export interface BadgeDef {
   id: string;
   name: string;
   emoji: string;
-  /** Estadística que hace subir de nivel la insignia. */
-  stat: keyof PlayerStats;
+  /** Estadística que hace subir de nivel la insignia ('allBadges' = insignias al máximo). */
+  stat: keyof PlayerStats | 'allBadges';
   /** Umbral de cada nivel (nivel 1 = levels[0]). Máximo BADGE_FRAMES.length niveles; uno solo = hito. */
   levels: readonly number[];
   /** Objetivo legible para alcanzar `n`. */
@@ -368,8 +368,8 @@ export interface BadgeDef {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-/** Catálogo de insignias. Orden = orden de la colección. */
-export const BADGES: readonly BadgeDef[] = [
+/** Insignias normales (las que cuentan para la definitiva). */
+const BASE_BADGES: readonly BadgeDef[] = [
   // Hitos de un solo nivel (insignias aparte de las que suben de nivel).
   { id: 'first_return', name: 'Primera devolución', emoji: '🎉', stat: 'returned', levels: [1], goal: () => 'Devuelve tu primer objeto a su dueño' },
   { id: 'first_find', name: 'Primer hallazgo', emoji: '🌟', stat: 'published', levels: [1], goal: () => 'Publica tu primer objeto encontrado' },
@@ -399,6 +399,19 @@ export const BADGES: readonly BadgeDef[] = [
   },
 ];
 
+/** La insignia definitiva: se consigue al llevar todas las demás a su nivel máximo. */
+export const ULTIMATE_BADGE: BadgeDef = {
+  id: 'olo_legend',
+  name: 'Leyenda de OLO',
+  emoji: '👑',
+  stat: 'allBadges',
+  levels: [BASE_BADGES.length],
+  goal: (n) => `Lleva todas las demás insignias (${n}) a su nivel máximo`,
+};
+
+/** Catálogo de insignias. Orden = orden de la colección (la definitiva, la primera). */
+export const BADGES: readonly BadgeDef[] = [ULTIMATE_BADGE, ...BASE_BADGES];
+
 export interface BadgeProgress {
   badge: BadgeDef;
   level: number; // 0 = aún bloqueada
@@ -408,7 +421,10 @@ export interface BadgeProgress {
 }
 
 export function badgeProgress(badge: BadgeDef, stats: PlayerStats): BadgeProgress {
-  const value = stats[badge.stat] ?? 0;
+  const value =
+    badge.stat === 'allBadges'
+      ? BASE_BADGES.filter((b) => badgeProgress(b, stats).maxed).length
+      : (stats[badge.stat] ?? 0);
   const level = badge.levels.filter((t) => value >= t).length;
   const next = badge.levels[level] ?? null;
   return { badge, level, value, next, maxed: next === null };
@@ -424,7 +440,8 @@ export function showcaseBadges(stats: PlayerStats, n = 8): BadgeProgress[] {
   return badgeCollection(stats)
     .map((p, i) => ({ p, i }))
     .filter((x) => x.p.level > 0)
-    .sort((a, b) => b.p.level - a.p.level || a.i - b.i)
+    // La definitiva siempre la primera; después, las de mayor nivel.
+    .sort((a, b) => Number(b.p.badge === ULTIMATE_BADGE) - Number(a.p.badge === ULTIMATE_BADGE) || b.p.level - a.p.level || a.i - b.i)
     .slice(0, n)
     .map((x) => x.p);
 }

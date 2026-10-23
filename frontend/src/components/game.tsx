@@ -6,12 +6,13 @@ import {
   badgeProgress,
   BADGES,
   POINT_RULES,
+  ULTIMATE_BADGE,
   type BadgeDef,
   type BadgeProgress,
   type PlayerStats,
 } from '@laf/shared';
 import { useAuth } from '../context/AuthContext';
-import { topPlayerIds } from '../services/game';
+import { adminIds, topPlayerIds } from '../services/game';
 import { Modal } from './ui';
 
 // --- Avatar --------------------------------------------------------------------
@@ -105,13 +106,67 @@ export function RankEmblem({ rank, className = 'h-5 w-5' }: { rank: number | nul
   );
 }
 
+/** ¿Es administrador? (para el emblema junto al nombre). */
+export function useIsAdmin(userId: string | undefined): boolean {
+  const [admins, setAdmins] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    void adminIds().then((ids) => active && setAdmins(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return !!userId && admins.includes(userId);
+}
+
 /**
- * Nombre de un colaborador enlazado a su perfil, con el emblema si está en el
- * top 3. No usar dentro de otro enlace (los <a> no se anidan).
+ * Emblema de administrador (como la insignia de creador de contenido de Clash
+ * Royale): sello verde OLO con una estrella.
+ */
+export function AdminEmblem({ className = 'h-5 w-5' }: { className?: string }) {
+  const gid = useId();
+  const label = 'Administrador de Lost & Found';
+  return (
+    <svg viewBox="0 0 24 24" className={`inline-block shrink-0 drop-shadow-sm ${className}`} role="img" aria-label={label}>
+      <title>{label}</title>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#34d399" />
+          <stop offset="0.5" stopColor="#00a785" />
+          <stop offset="1" stopColor="#047857" />
+        </linearGradient>
+      </defs>
+      {/* Sello de 8 puntas */}
+      <path
+        d="M12 1.5l2.6 2.1 3.3-.4.9 3.2 3 1.5-1.2 3.1 1.2 3.1-3 1.5-.9 3.2-3.3-.4L12 22.5l-2.6-2.1-3.3.4-.9-3.2-3-1.5 1.2-3.1-1.2-3.1 3-1.5.9-3.2 3.3.4L12 1.5Z"
+        fill={`url(#${gid})`}
+        stroke="#065f46"
+        strokeWidth="0.8"
+      />
+      <path d="m12 6.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5L12 6.8Z" fill="#fff" />
+    </svg>
+  );
+}
+
+/** Emblemas junto a un nombre: administrador y/o puesto del top 3 (pueden salir los dos). */
+export function NameEmblems({ id, className = 'h-[1.1em] w-[1.1em]' }: { id: string | undefined; className?: string }) {
+  const admin = useIsAdmin(id);
+  const rank = useTopRank(id);
+  if (!admin && !rank) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5">
+      {admin && <AdminEmblem className={className} />}
+      <RankEmblem rank={rank} className={className} />
+    </span>
+  );
+}
+
+/**
+ * Nombre de un colaborador enlazado a su perfil, con sus emblemas (admin, top 3).
+ * No usar dentro de otro enlace (los <a> no se anidan).
  */
 export function PlayerName({ id, name, className = '' }: { id: string | undefined; name: string; className?: string }) {
   const { user } = useAuth();
-  const rank = useTopRank(id);
   if (!id) return <span className={className}>{name}</span>;
   return (
     <Link
@@ -119,7 +174,7 @@ export function PlayerName({ id, name, className = '' }: { id: string | undefine
       className={`inline-flex max-w-full items-center gap-1 font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300 ${className}`}
     >
       <span className="truncate">{name}</span>
-      <RankEmblem rank={rank} className="h-[1.1em] w-[1.1em]" />
+      <NameEmblems id={id} />
     </Link>
   );
 }
@@ -152,6 +207,7 @@ const EMBLEM_SIZES = {
  * lleva el número de nivel debajo, como las insignias del perfil de Clash Royale.
  */
 export function BadgeEmblem({ badge, level, size = 'md' }: { badge: BadgeDef; level: number; size?: keyof typeof EMBLEM_SIZES }) {
+  if (badge === ULTIMATE_BADGE) return <UltimateEmblem level={level} size={size} />;
   const s = EMBLEM_SIZES[size];
   const locked = level <= 0;
   const milestone = isMilestone(badge);
@@ -185,6 +241,47 @@ export function BadgeEmblem({ badge, level, size = 'md' }: { badge: BadgeDef; le
   );
 }
 
+const RAINBOW = 'conic-gradient(from 0deg, #f472b6, #facc15, #34d399, #38bdf8, #a78bfa, #f472b6)';
+
+/**
+ * Insignia definitiva (todas las demás al máximo): marco arcoíris giratorio,
+ * halo dorado, destellos y cinta "LEYENDA". Bloqueada, se ve como silueta.
+ */
+function UltimateEmblem({ level, size }: { level: number; size: keyof typeof EMBLEM_SIZES }) {
+  const s = EMBLEM_SIZES[size];
+  const locked = level <= 0;
+  const big = size !== 'sm';
+  return (
+    <span className={`relative inline-flex shrink-0 ${s.box}`} aria-hidden>
+      {!locked && big && (
+        <>
+          <span className="absolute -inset-3 animate-pulse rounded-full bg-gradient-to-r from-amber-300/50 via-fuchsia-400/40 to-sky-300/50 blur-xl motion-reduce:animate-none" />
+          <span className="absolute -right-1 -top-1 animate-ping text-xs text-amber-300 motion-reduce:animate-none">✦</span>
+          <span className="absolute -left-1.5 bottom-3 animate-ping text-[10px] text-sky-200 [animation-delay:600ms] motion-reduce:animate-none">✦</span>
+        </>
+      )}
+      <span className="absolute inset-0 overflow-hidden" style={HEX}>
+        {locked ? (
+          <span className="absolute inset-0 bg-gradient-to-br from-slate-300 to-slate-400 dark:from-olo-dark-700 dark:to-olo-dark-800" />
+        ) : (
+          <span className="absolute -inset-1/2 animate-[spin_4s_linear_infinite] motion-reduce:animate-none" style={{ background: RAINBOW }} />
+        )}
+      </span>
+      <span
+        className={`absolute ${s.inset} flex items-center justify-center bg-gradient-to-b ${locked ? 'from-slate-100 to-slate-200 dark:from-olo-dark-850 dark:to-olo-dark-900' : 'from-indigo-950 via-purple-950 to-slate-950'}`}
+        style={HEX}
+      >
+        <span className={`${s.emoji} ${locked ? 'opacity-30 grayscale' : 'drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]'}`}>{ULTIMATE_BADGE.emoji}</span>
+      </span>
+      {big && !locked && (
+        <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-400 font-black tracking-wider text-amber-950 shadow-lg ring-1 ring-amber-600/40 ${s.pill}`}>
+          LEYENDA
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** Barra de progreso hacia el siguiente nivel. */
 function ProgressBar({ p }: { p: BadgeProgress }) {
   const prev = p.level > 0 ? p.badge.levels[p.level - 1] : 0;
@@ -197,9 +294,10 @@ function ProgressBar({ p }: { p: BadgeProgress }) {
 }
 
 /** Insignia de un solo nivel (hito): se consigue una vez y no sube de nivel. */
-const isMilestone = (b: BadgeDef) => b.levels.length === 1;
+const isMilestone = (b: BadgeDef) => b.levels.length === 1 && b !== ULTIMATE_BADGE;
 
 function levelLabel(p: BadgeProgress): string {
+  if (p.badge === ULTIMATE_BADGE) return p.level ? 'Completada · La insignia definitiva' : `Bloqueada · ${p.value}/${p.next} insignias al máximo`;
   if (p.level === 0) return 'Bloqueada';
   if (isMilestone(p.badge)) return 'Hito conseguido';
   return `Nivel ${p.level} · ${BADGE_FRAMES[p.level - 1]}${p.maxed ? ' · Máximo' : ''}`;
@@ -306,13 +404,17 @@ function BadgeDetail({ p, ownerName, onBack }: { p: BadgeProgress; ownerName: st
           <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
             {isMilestone(p.badge)
               ? p.level ? `Hito: ${p.badge.goal(1).toLowerCase()}. ¡Conseguida!` : `Hito: ${p.badge.goal(1).toLowerCase()}.`
+              : p.badge === ULTIMATE_BADGE
+                ? p.level
+                  ? `${ownerName ?? 'Tú'}: todas las insignias al nivel máximo. ¡Leyenda!`
+                  : `${p.value}/${p.next} insignias al nivel máximo. ${p.badge.goal(p.next!)}.`
               : p.maxed
                 ? ownerName ? `${ownerName} alcanzó el nivel máximo` : 'Has alcanzado el nivel máximo'
                 : `${p.value}/${p.next} para el nivel ${p.level + 1}: ${p.badge.goal(p.next!).toLowerCase()}`}
           </p>
         </div>
       </div>
-      <ol className={'mt-5 flex flex-col gap-1.5 ' + (isMilestone(p.badge) ? 'hidden' : '')}>
+      <ol className={'mt-5 flex flex-col gap-1.5 ' + (p.badge.levels.length === 1 ? 'hidden' : '')}>
         {p.badge.levels.map((t, i) => {
           const done = p.level > i;
           return (
