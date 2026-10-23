@@ -335,20 +335,26 @@ export function AdminPage() {
           </div>
 
           {visibleUsers.length > USERS_FIRST && (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-                Mostrando {shownUsers.length} de {visibleUsers.length} colaboradores
-                {q ? ' que coinciden' : ''}
-              </p>
-              <div className="flex gap-2">
+            <div className="mt-3 flex flex-col gap-2">
+              {shownUsers.length < visibleUsers.length && (
+                <button className="btn-secondary w-full" onClick={() => setUserLimit((n) => n + USERS_MORE)}>
+                  Cargar {Math.min(USERS_MORE, visibleUsers.length - shownUsers.length)} más
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+                  Mostrando {shownUsers.length} de {visibleUsers.length} colaboradores
+                  {q ? ' que coinciden' : ''}
+                </p>
                 {shownUsers.length > USERS_FIRST && (
-                  <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => setUserLimit(USERS_FIRST)}>
+                  <button
+                    className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300"
+                    onClick={() => setUserLimit(USERS_FIRST)}
+                  >
                     Mostrar menos
-                  </button>
-                )}
-                {shownUsers.length < visibleUsers.length && (
-                  <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => setUserLimit((n) => n + USERS_MORE)}>
-                    Cargar {Math.min(USERS_MORE, visibleUsers.length - shownUsers.length)} más
                   </button>
                 )}
               </div>
