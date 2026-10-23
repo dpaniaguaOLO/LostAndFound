@@ -410,6 +410,20 @@ const foundItems: FoundItemsService = {
     return mapWithImages(data ?? [], (r) => r.image_path, toFoundItem);
   },
 
+  async recentlyReturned() {
+    // Como GET /found-items/returned/recent en Express: últimos 7 días, máx. 12.
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const { data, error } = await requireSupabase()
+      .from('found_items')
+      .select(REPORTER_SELECT)
+      .eq('status', 'RETURNED')
+      .gte('returned_at', since)
+      .order('returned_at', { ascending: false })
+      .limit(12);
+    if (error) throw error;
+    return mapWithImages(data ?? [], (r) => r.image_path, toFoundItem);
+  },
+
   async create(form) {
     const sb = requireSupabase();
     const f = readItemForm(form);

@@ -36,6 +36,8 @@ export interface FoundItemsService {
   list(params: FoundItemsQueryParams): Promise<Paginated<FoundItem>>;
   get(id: string): Promise<FoundItem>;
   mine(): Promise<FoundItem[]>;
+  /** Devueltos en los últimos 7 días (máx. 12), los más recientes primero. */
+  recentlyReturned(): Promise<FoundItem[]>;
   create(form: FormData): Promise<FoundItem>;
   /** Editar (autor o admin). Mismos campos que `create`; `removeImage=1` quita la foto. */
   update(id: string, form: FormData): Promise<FoundItem>;

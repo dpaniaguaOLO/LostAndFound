@@ -338,6 +338,10 @@ test('asistente: "¿qué se devolvió esta semana?" usa la fecha de devolución'
   assert.equal(r.status, 200);
   assert.ok(r.data.foundItems.some((f: any) => f.id === item.id && f.status === 'RETURNED'));
   assert.match(r.data.answer, /devuelto/);
+  // Muro: sección "Devueltos recientemente" (devuelto hoy, aunque se encontró hace un mes).
+  const recent = (await call('GET', '/api/found-items/returned/recent', { token: tokens.ana })).data;
+  assert.ok(recent.some((f: any) => f.id === item.id && f.returnedAt));
+  assert.ok(recent.every((f: any) => f.status === 'RETURNED'));
   // Sin "devuelto", el asistente sigue mostrando solo lo disponible del muro.
   const wall = await call('POST', '/api/ai/assistant', { token: tokens.beto, body: { question: 'bufanda' } });
   assert.ok(!wall.data.foundItems.some((f: any) => f.id === item.id));

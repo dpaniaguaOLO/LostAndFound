@@ -67,6 +67,7 @@ const foundItems: FoundItemsService = {
   list: (p) => api<Paginated<FoundItem>>(`/found-items${buildQuery(p)}`),
   get: (id) => api<FoundItem>(`/found-items/${id}`),
   mine: () => api<FoundItem[]>('/found-items/mine/list'),
+  recentlyReturned: () => api<FoundItem[]>('/found-items/returned/recent'),
   create: (form) => api<FoundItem>('/found-items', { method: 'POST', formData: form }),
   update: (id, form) => api<FoundItem>(`/found-items/${id}`, { method: 'PATCH', formData: form }),
   markReturned: (id) => api<FoundItem>(`/found-items/${id}/return`, { method: 'PATCH' }),

@@ -209,6 +209,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | PATCH | `/api/found-items/:id/archive` | sí (admin) | — | `FoundItem` |
 | DELETE | `/api/found-items/:id` | sí (admin, o autor si `PUBLISHED`/`RETURNED`) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
+| GET | `/api/found-items/returned/recent` | sí | — | `FoundItem[]` devueltos en 7 días (máx. 12; Supabase: consulta directa) |
 | GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status` oculta `CLOSED`) |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
 | POST | `/api/lost-reports` | sí | `multipart/form-data`: `title, description, category, location, lostAt(ISO)`, `image?` | `201 LostReport` |

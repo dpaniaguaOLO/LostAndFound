@@ -2,6 +2,11 @@
 
 ## [Sin publicar]
 
+### Añadido
+- Muro: sección **"Devueltos recientemente"** (pestaña Encontrados, página 1 sin filtros):
+  tira horizontal con los objetos devueltos en los últimos 7 días (máx. 12), quién los
+  encontró (con sus emblemas) y cuándo. Express: `GET /api/found-items/returned/recent`.
+
 ### Cambiado
 - Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
   10) y "Mostrar menos"; la búsqueda sigue abarcando a todos. Así el alta de colaboradores
