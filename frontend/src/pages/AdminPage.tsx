@@ -17,6 +17,10 @@ type Stats = AdminStats;
 
 type Tab = 'overview' | 'claims' | 'audit' | 'archived';
 
+/** Colaboradores visibles al principio y cuántos más se cargan cada vez. */
+const USERS_FIRST = 5;
+const USERS_MORE = 10;
+
 const ACTION_LABELS: Record<string, string> = {
   FOUND_ITEM_EDITED: 'Editó un objeto encontrado',
   FOUND_ITEM_ARCHIVED: 'Archivó un objeto',
@@ -68,6 +72,8 @@ export function AdminPage() {
   const [confirmRole, setConfirmRole] = useState<{ user: User; role: 'ADMIN' | 'EMPLOYEE' } | null>(null);
   const [reviewing, setReviewing] = useState<{ claim: Claim; decision: 'APPROVED' | 'REJECTED' } | null>(null);
   const [userFilter, setUserFilter] = useState('');
+  // Con cientos de colaboradores la lista se muestra por partes (la búsqueda abarca a todos).
+  const [userLimit, setUserLimit] = useState(USERS_FIRST);
   // Error al cargar una pestaña: antes se mostraba como "no hay datos" (UX-08).
   const [tabError, setTabError] = useState<Partial<Record<Tab, string>>>({});
 
@@ -203,6 +209,7 @@ export function AdminPage() {
   const visibleUsers = q
     ? users.filter((u) => u.name.toLowerCase().includes(q) || u.employeeId.toLowerCase().includes(q))
     : users;
+  const shownUsers = visibleUsers.slice(0, userLimit);
 
   const cards = [
     { label: 'Usuarios', value: stats?.users ?? 0 },
@@ -260,7 +267,10 @@ export function AdminPage() {
               className="input"
               placeholder="Buscar por nombre o número…"
               value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
+              onChange={(e) => {
+                setUserFilter(e.target.value);
+                setUserLimit(USERS_FIRST);
+              }}
             />
           </div>
           {visibleUsers.length === 0 && (
@@ -268,7 +278,7 @@ export function AdminPage() {
           )}
 
           <ul className="flex flex-col gap-2.5 md:hidden">
-            {visibleUsers.map((u) => (
+            {shownUsers.map((u) => (
               <li key={u.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -302,7 +312,7 @@ export function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.map((u) => (
+                {shownUsers.map((u) => (
                   <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-olo-dark-800">
                     <td className="px-4 py-3">
                       <PlayerName id={u.id} name={u.name} />
@@ -323,6 +333,27 @@ export function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {visibleUsers.length > USERS_FIRST && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+                Mostrando {shownUsers.length} de {visibleUsers.length} colaboradores
+                {q ? ' que coinciden' : ''}
+              </p>
+              <div className="flex gap-2">
+                {shownUsers.length > USERS_FIRST && (
+                  <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => setUserLimit(USERS_FIRST)}>
+                    Mostrar menos
+                  </button>
+                )}
+                {shownUsers.length < visibleUsers.length && (
+                  <button className="btn-secondary min-h-9 px-3 text-sm" onClick={() => setUserLimit((n) => n + USERS_MORE)}>
+                    Cargar {Math.min(USERS_MORE, visibleUsers.length - shownUsers.length)} más
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Alta de colaborador por el admin (no hay auto-registro) */}
           <CreateUserCard onCreated={(u) => setUsers((prev) => [u, ...prev])} />

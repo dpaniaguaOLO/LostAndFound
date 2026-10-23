@@ -1,5 +1,12 @@
 # Changelog
 
+## [Sin publicar]
+
+### Cambiado
+- Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
+  10) y "Mostrar menos"; la búsqueda sigue abarcando a todos. Así el alta de colaboradores
+  y el cambio de contraseña no quedan al final de una lista de cientos.
+
 ## [0.30.0] - 2026-10-23 — APK de prueba (debug) · rama `features/game`
 
 **Desplegado**: migraciones 016 y 017 aplicadas y datos demo del juego cargados en
