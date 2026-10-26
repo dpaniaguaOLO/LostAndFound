@@ -70,7 +70,10 @@ export function badgeProgress(badge: BadgeDef, stats: PlayerStats) {
   return { badge, level, value, next, maxed: next === null };
 }
 
-export type FrameId = 'bronze' | 'silver' | 'gold' | 'emerald' | 'ruby' | 'diamond';
+/** Rangos visibles; con false Olivia solo habla de marcos por puntos (ver @laf/shared). */
+export const RANKS_ENABLED = false;
+
+export type FrameId ='bronze' | 'silver' | 'gold' | 'emerald' | 'ruby' | 'diamond';
 
 export interface RankDef {
   id: string;

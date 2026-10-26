@@ -12,6 +12,7 @@ import {
   POINT_RULES,
   rankFor,
   RANKS,
+  RANKS_ENABLED,
   ULTIMATE_BADGE,
   type BadgeDef,
   type BadgeProgress,
@@ -110,6 +111,7 @@ export function Avatar({
 
 /** Color del nombre en el ranking desde Detective (como el color de nombre de los juegos). */
 export function rankNameClass(points: number): string {
+  if (!RANKS_ENABLED) return 'text-slate-900 dark:text-slate-100';
   const byRank: Record<string, string> = {
     detective: 'text-amber-700 dark:text-amber-300',
     experto: 'text-emerald-700 dark:text-emerald-300',
@@ -278,7 +280,9 @@ export function FrameModal({
   return (
     <Modal open={open} label="Marco de la foto" onClose={saving ? () => undefined : onClose}>
       <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Marco de la foto</h2>
-      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Elige entre los marcos que has desbloqueado con tu rango.</p>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        Elige entre los marcos que has desbloqueado con tu {RANKS_ENABLED ? 'rango' : 'puntos'}.
+      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {choices.map((c) => {
@@ -296,8 +300,13 @@ export function FrameModal({
               <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{c.label}</span>
               {!unlocked && c.rank && (
                 <span className="-mt-1 text-[10px] leading-tight text-slate-500 dark:text-slate-400">
-                  🔒 {c.rank.name}
-                  <br />
+                  🔒{' '}
+                  {RANKS_ENABLED && (
+                    <>
+                      {c.rank.name}
+                      <br />
+                    </>
+                  )}
                   {c.rank.min.toLocaleString('es')} pts
                 </span>
               )}
@@ -826,7 +835,19 @@ export function RewardModal() {
         {climbed && <span className="ml-1 font-semibold text-olo-700 dark:text-olo-300">▲ ¡subiste!</span>}
       </p>
 
-      {newRank && (
+      {/* Sin rangos visibles, subir de umbral se anuncia como marco nuevo. */}
+      {newRank && !RANKS_ENABLED && newRank.frame && (
+        <div className="mt-4 flex animate-scale-in items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-olo-50 p-3.5 ring-1 ring-amber-300/60 dark:from-amber-500/10 dark:to-olo-500/10">
+          <Avatar name={after.name} url={after.avatarUrl} size="md" frame={newRank.frame} />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">¡Nuevo marco!</p>
+            <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{FRAME_NAMES[newRank.frame]}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Elígelo en tu perfil, en «Personalizar marco».</p>
+          </div>
+        </div>
+      )}
+
+      {newRank && RANKS_ENABLED && (
         <div className="mt-4 flex animate-scale-in items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-olo-50 p-3.5 ring-1 ring-amber-300/60 dark:from-amber-500/10 dark:to-olo-500/10">
           <Avatar name={after.name} url={after.avatarUrl} size="md" frame={newRank.frame} />
           <div className="min-w-0">
@@ -893,10 +914,17 @@ export function PointsHelpModal({ open, onClose }: { open: boolean; onClose: () 
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
-        Con tus puntos subes de <strong className="text-slate-800 dark:text-slate-200">rango</strong> ({RANKS.slice(1).map((r) => r.name).join(', ')}) y
-        desbloqueas marcos para tu foto.
-      </p>
+      {RANKS_ENABLED ? (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          Con tus puntos subes de <strong className="text-slate-800 dark:text-slate-200">rango</strong> ({RANKS.slice(1).map((r) => r.name).join(', ')}) y
+          desbloqueas marcos para tu foto.
+        </p>
+      ) : (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          Con tus puntos desbloqueas <strong className="text-slate-800 dark:text-slate-200">marcos</strong> para tu foto (
+          {RANKS.filter((r) => r.frame).map((r) => `${FRAME_NAMES[r.frame!]} ${r.min.toLocaleString('es')}`).join(', ')} pts).
+        </p>
+      )}
       <div className="mt-4 rounded-2xl bg-amber-50 p-3.5 dark:bg-amber-500/10">
         <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
           <RankEmblem rank={1} /> Ventajas del top 3

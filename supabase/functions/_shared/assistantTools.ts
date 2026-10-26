@@ -24,12 +24,14 @@ import {
   BADGE_FRAMES,
   BADGES,
   badgeProgress,
+  FRAME_NAMES,
   LEADERBOARD_MAX,
   nextRank,
   type PlayerStats,
   POINT_RULES,
   rankFor,
   RANKS,
+  RANKS_ENABLED,
   rankUnlocks,
   TOP_PLAYERS,
   ULTIMATE_BADGE,
@@ -167,7 +169,9 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: 'mi_juego',
       description:
-        'Puntos, rango y progreso del USUARIO que pregunta: puntos, puesto en el ranking, rango actual, siguiente rango y cuántos puntos le faltan, ' +
+        (RANKS_ENABLED
+          ? 'Puntos, rango y progreso del USUARIO que pregunta: puntos, puesto en el ranking, rango actual, siguiente rango y cuántos puntos le faltan, '
+          : 'Puntos y progreso del USUARIO que pregunta: puntos, puesto en el ranking, siguiente marco de foto y cuántos puntos le faltan, ') +
         'quién está justo por encima y la diferencia, si está en el top 3, si es Leyenda de OLO, estadísticas e insignias (nivel y lo que falta para el siguiente).',
       parameters: { type: 'object', properties: {}, additionalProperties: false },
     },
@@ -176,7 +180,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'ranking_juego',
-      description: 'Ranking global por puntos: los primeros puestos (nombre, puntos, rango) y la posición del usuario que pregunta.',
+      description: `Ranking global por puntos: los primeros puestos (nombre, puntos${RANKS_ENABLED ? ', rango' : ''}) y la posición del usuario que pregunta.`,
       parameters: {
         type: 'object',
         properties: { limite: { type: 'integer', minimum: 1, maximum: 30, description: 'Cuántos puestos (por defecto 10).' } },
@@ -188,7 +192,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'jugador',
-      description: 'Puntos, puesto, rango e insignias de otro colaborador, buscándolo por su nombre (es lo mismo que muestra su perfil en la app).',
+      description: `Puntos, puesto${RANKS_ENABLED ? ', rango' : ''} e insignias de otro colaborador, buscándolo por su nombre (es lo mismo que muestra su perfil en la app).`,
       parameters: {
         type: 'object',
         properties: { nombre: { type: 'string', description: 'Nombre o parte del nombre.' } },
@@ -202,7 +206,9 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: 'reglas_juego',
       description:
-        'Reglas del sistema de puntos: cómo se ganan puntos, todos los rangos (puntos necesarios y qué desbloquean), el catálogo de insignias con sus niveles, ' +
+        'Reglas del sistema de puntos: cómo se ganan puntos, ' +
+        (RANKS_ENABLED ? 'todos los rangos (puntos necesarios y qué desbloquean)' : 'los marcos de foto y los puntos que desbloquean cada uno') +
+        ', el catálogo de insignias con sus niveles, ' +
         'la insignia Leyenda de OLO, las ventajas del top 3 y los emblemas junto al nombre.',
       parameters: { type: 'object', properties: {}, additionalProperties: false },
     },
@@ -585,7 +591,7 @@ function playerCard(all: Player[], p: Player) {
     administrador: p.role === 'ADMIN',
     puntos: p.points,
     puesto: positionOf(all, p.points),
-    rango: rank.name,
+    ...(RANKS_ENABLED ? { rango: rank.name } : {}),
     en_top_3: top.includes(p.id),
     leyenda_de_olo: badgeProgress(ULTIMATE_BADGE, p.stats).level > 0,
     estadisticas: {
@@ -609,9 +615,18 @@ async function miJuego(ctx: ToolContext) {
   return {
     ...playerCard(all, me),
     jugadores_con_puntos: all.filter((p) => p.points > 0).length,
-    siguiente_rango: next
-      ? { rango: next.name, puntos_necesarios: next.min, te_faltan: next.min - me.points, desbloquea: rankUnlocks(next) }
-      : null,
+    ...(RANKS_ENABLED
+      ? {
+          siguiente_rango: next
+            ? { rango: next.name, puntos_necesarios: next.min, te_faltan: next.min - me.points, desbloquea: rankUnlocks(next) }
+            : null,
+        }
+      : {
+          // Sin rangos, cada umbral de RANKS solo desbloquea un marco.
+          siguiente_marco: next?.frame
+            ? { marco: FRAME_NAMES[next.frame], puntos_necesarios: next.min, te_faltan: next.min - me.points }
+            : null,
+        }),
     justo_por_encima: above ? { nombre: above.name, puntos: above.points, diferencia: above.points - me.points } : null,
     insignias: badgesOf(me.stats),
   };
@@ -627,7 +642,7 @@ async function rankingJuego(ctx: ToolContext, args: Row) {
       puesto: positionOf(all, p.points),
       nombre: p.name,
       puntos: p.points,
-      rango: rankFor(p.points).name,
+      ...(RANKS_ENABLED ? { rango: rankFor(p.points).name } : {}),
       administrador: p.role === 'ADMIN',
     })),
     tu_puesto: me ? positionOf(all, me.points) : null,
@@ -662,9 +677,17 @@ async function reglasJuego() {
       'Devolver sin una reclamación aprobada de otra persona no suma los 100 puntos.',
       'Archivar (un admin) o eliminar una publicación descuenta sus puntos.',
     ],
-    rangos: RANKS.map((r) => ({ rango: r.name, desde_puntos: r.min, desbloquea: rankUnlocks(r) })),
-    marcos:
-      'El marco de la foto se elige en "Mi perfil" > "Personalizar marco" entre los desbloqueados por rango (o automático / sin marco).',
+    ...(RANKS_ENABLED
+      ? {
+          rangos: RANKS.map((r) => ({ rango: r.name, desde_puntos: r.min, desbloquea: rankUnlocks(r) })),
+          marcos:
+            'El marco de la foto se elige en "Mi perfil" > "Personalizar marco" entre los desbloqueados por rango (o automático / sin marco).',
+        }
+      : {
+          marcos_de_foto: RANKS.filter((r) => r.frame).map((r) => ({ marco: FRAME_NAMES[r.frame!], desde_puntos: r.min })),
+          marcos:
+            'El marco de la foto se elige en "Mi perfil" > "Personalizar marco" entre los desbloqueados por puntos (o automático / sin marco).',
+        }),
     insignias: BADGES.map((b) => ({
       insignia: b.name,
       como: b === ULTIMATE_BADGE
@@ -681,7 +704,7 @@ async function reglasJuego() {
       'Un emblema con su puesto (oro, plata o bronce) junto a su nombre.',
     ],
     emblemas_junto_al_nombre: 'Administrador (sello verde con estrella), Leyenda de OLO (corona) y puesto del top 3. Pueden salir juntos.',
-    donde_verlo: 'Mi perfil (puntos, rango, insignias, "¿Cómo ganar puntos?") y la sección Ranking.',
+    donde_verlo: `Mi perfil (puntos${RANKS_ENABLED ? ', rango' : ', marco'}, insignias, "¿Cómo ganar puntos?") y la sección Ranking.`,
   };
 }
 

@@ -251,7 +251,10 @@ Juego (rama `features/game`): los puntos se calculan en el servidor a partir de 
 `badgeProgress()/showcaseBadges()` (`BADGES`, insignias con niveles). Si cambian las reglas
 o las estadísticas, actualizar los tres sitios, y también la copia para Olivia en
 `supabase/functions/_shared/game.ts` (sus herramientas `mi_juego`, `ranking_juego`, `jugador`,
-`reglas_juego`; `assistant.test.mjs` falla si la copia difiere de `@laf/shared`). El top 3 (`TOP_PLAYERS`) tiene sus perdidos
+`reglas_juego`; `assistant.test.mjs` falla si la copia difiere de `@laf/shared`). Los
+**rangos están ocultos** (`RANKS_ENABLED = false`, 2026-10-26): `RANKS` sigue definiendo los
+umbrales de puntos de los marcos de la foto, pero no se muestra el nombre del rango ni sus
+ventajas; para recuperarlos, `true` en `@laf/shared` y en `_shared/game.ts`. El top 3 (`TOP_PLAYERS`) tiene sus perdidos
 OPEN/MATCHED destacados al principio del listado (`pinned: true`; Express en
 `GET /lost-reports`, Supabase en `services/supabase.ts`) y un emblema junto al nombre
 (`PlayerName`/`RankEmblem` en `components/game.tsx`).

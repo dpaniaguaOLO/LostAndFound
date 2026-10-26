@@ -178,6 +178,7 @@ test('juego: la copia de reglas de la Edge Function coincide con @laf/shared', a
   const shared = await import('../../packages/shared/dist/index.js');
   assert.deepEqual(edge.POINT_RULES, shared.POINT_RULES);
   assert.deepEqual(edge.RANKS, shared.RANKS);
+  assert.equal(edge.RANKS_ENABLED, shared.RANKS_ENABLED);
   assert.deepEqual(edge.FRAME_NAMES, shared.FRAME_NAMES);
   assert.deepEqual([...edge.BADGE_FRAMES], [...shared.BADGE_FRAMES]);
   assert.equal(edge.TOP_PLAYERS, shared.TOP_PLAYERS);
@@ -195,8 +196,14 @@ test('mi_juego: puntos, puesto, siguiente rango, quién va delante e insignias',
   const r = await tool(ctxFor(ME), 'mi_juego', {});
   assert.equal(r.puntos, 2650);
   assert.equal(r.puesto, 2);
-  assert.equal(r.rango, 'Detective');
-  assert.deepEqual([r.siguiente_rango.rango, r.siguiente_rango.te_faltan], ['Experto', 350]);
+  const { RANKS_ENABLED } = await import('../functions/_shared/game.ts');
+  if (RANKS_ENABLED) {
+    assert.equal(r.rango, 'Detective');
+    assert.deepEqual([r.siguiente_rango.rango, r.siguiente_rango.te_faltan], ['Experto', 350]);
+  } else {
+    assert.equal(r.rango, undefined, 'sin rangos visibles');
+    assert.deepEqual([r.siguiente_marco.marco, r.siguiente_marco.te_faltan], ['Esmeralda', 350]);
+  }
   assert.deepEqual(r.justo_por_encima, { nombre: 'Beto', puntos: 5600, diferencia: 2950 });
   assert.equal(r.en_top_3, true);
   const samaritan = r.insignias.find((b) => b.insignia === 'Buen samaritano');
@@ -212,7 +219,11 @@ test('ranking_juego y jugador: top, puesto propio y perfil de otro sin datos sen
   ];
   const rk = await tool(ctxFor(ME), 'ranking_juego', { limite: 5 });
   assert.equal(rk.jugadores_con_puntos, 2);
-  assert.deepEqual(rk.top.map((p) => [p.puesto, p.nombre, p.rango]), [[1, 'Beto', 'Experto'], [2, 'Ana', 'Novato']]);
+  const { RANKS_ENABLED } = await import('../functions/_shared/game.ts');
+  assert.deepEqual(
+    rk.top.map((p) => [p.puesto, p.nombre, p.rango]),
+    RANKS_ENABLED ? [[1, 'Beto', 'Experto'], [2, 'Ana', 'Novato']] : [[1, 'Beto', undefined], [2, 'Ana', undefined]],
+  );
   assert.equal(rk.tu_puesto, 2);
 
   const j = await tool(ctxFor(ME), 'jugador', { nombre: 'bet' });
@@ -222,7 +233,8 @@ test('ranking_juego y jugador: top, puesto propio y perfil de otro sin datos sen
   assert.equal((await tool(ctxFor(ME), 'jugador', { nombre: 'zzz' })).encontrados, 0);
 
   const reglas = await tool(ctxFor(ME), 'reglas_juego', {});
-  assert.equal(reglas.rangos.length, 7);
+  if (RANKS_ENABLED) assert.equal(reglas.rangos.length, 7);
+  else assert.deepEqual([reglas.rangos, reglas.marcos_de_foto.length], [undefined, 6]);
   assert.ok(reglas.puntos.some((p) => p.puntos === 100));
 });
 

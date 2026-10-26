@@ -2,6 +2,14 @@
 
 ## [Sin publicar]
 
+### Cambiado
+- **Rangos ocultos** (`RANKS_ENABLED = false` en `@laf/shared` y en la copia de la Edge
+  Function): ya no se muestran el rango ni su progreso, "Ver rangos", el nombre con color, el
+  fondo especial del perfil ni "¡Nuevo rango!". Los **marcos siguen desbloqueándose por
+  puntos** con los mismos umbrales; la ventana de recompensa anuncia "¡Nuevo marco!" y Olivia
+  habla de marcos (`siguiente_marco`, `marcos_de_foto`). El código de los rangos se conserva:
+  se recuperan poniendo el flag a `true` en ambos sitios.
+
 ### Añadido
 - **Quién lo publicó, en las tarjetas del muro**: foto con su marco, nombre y emblemas,
   enlazados al perfil (la tarjeta usa un enlace extendido para no anidar enlaces). Los

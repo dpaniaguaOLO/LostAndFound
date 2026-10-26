@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BADGES, badgeCollection, displayedFrame, rankFor, showcaseBadges, type PlayerProfile } from '@laf/shared';
+import { BADGES, badgeCollection, displayedFrame, rankFor, RANKS_ENABLED, showcaseBadges, type PlayerProfile } from '@laf/shared';
 import {
   Avatar,
   BadgeCollectionModal,
@@ -142,7 +142,7 @@ export function ProfilePage() {
 
       {/* Cabecera: fondo (especial desde Maestro), foto con marco, nombre y cifras */}
       <section className="card overflow-hidden">
-        <div className={`relative h-32 bg-gradient-to-br sm:h-40 ${BANNERS[rank.id] ?? BANNERS.default}`} aria-hidden>
+        <div className={`relative h-32 bg-gradient-to-br sm:h-40 ${(RANKS_ENABLED && BANNERS[rank.id]) || BANNERS.default}`} aria-hidden>
           {/* Textura sutil de puntos sobre el degradado */}
           <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(255,255,255,0.5)_1px,transparent_1px)] [background-size:14px_14px]" />
         </div>
@@ -200,7 +200,7 @@ export function ProfilePage() {
           </div>
 
           {/* Fila 3: cifras principales */}
-          <div className="mt-6 grid grid-cols-3 gap-2.5 sm:gap-4">
+          <div className={`mt-6 grid gap-2.5 sm:gap-4 ${RANKS_ENABLED ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div className="flex flex-col-reverse rounded-2xl bg-olo-50 px-3 py-3.5 text-center dark:bg-olo-500/10 sm:py-4">
               <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">Puntos</span>
               <span className="text-2xl font-extrabold tabular-nums text-olo-700 dark:text-olo-300 sm:text-3xl">{profile.points.toLocaleString('es')}</span>
@@ -209,14 +209,16 @@ export function ProfilePage() {
               <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">En el ranking</span>
               <span className="text-2xl font-extrabold tabular-nums text-amber-700 dark:text-amber-300 sm:text-3xl">{profile.rank ? `#${profile.rank}` : '—'}</span>
             </Link>
-            <button
-              type="button"
-              onClick={() => setRanksOpen(true)}
-              className="flex flex-col-reverse items-center rounded-2xl bg-slate-50 px-3 py-3.5 text-center transition hover:bg-slate-100 dark:bg-olo-dark-850 dark:hover:bg-olo-dark-800 sm:py-4"
-            >
-              <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">Rango</span>
-              <span className={`text-lg font-extrabold leading-8 sm:text-xl sm:leading-9 ${rankNameClass(profile.points)}`}>{rank.name}</span>
-            </button>
+            {RANKS_ENABLED && (
+              <button
+                type="button"
+                onClick={() => setRanksOpen(true)}
+                className="flex flex-col-reverse items-center rounded-2xl bg-slate-50 px-3 py-3.5 text-center transition hover:bg-slate-100 dark:bg-olo-dark-850 dark:hover:bg-olo-dark-800 sm:py-4"
+              >
+                <span className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">Rango</span>
+                <span className={`text-lg font-extrabold leading-8 sm:text-xl sm:leading-9 ${rankNameClass(profile.points)}`}>{rank.name}</span>
+              </button>
+            )}
           </div>
 
           {/* Fila 4: acciones (móvil) y ayuda */}
@@ -229,7 +231,7 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <RankProgress points={profile.points} onShowRanks={() => setRanksOpen(true)} />
+      {RANKS_ENABLED && <RankProgress points={profile.points} onShowRanks={() => setRanksOpen(true)} />}
 
       {/* Estadísticas */}
       <dl className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-3">
@@ -282,7 +284,7 @@ export function ProfilePage() {
       </div>
 
       <PointsHelpModal open={help} onClose={() => setHelp(false)} />
-      <RanksModal open={ranksOpen} onClose={() => setRanksOpen(false)} points={profile.points} />
+      {RANKS_ENABLED && <RanksModal open={ranksOpen} onClose={() => setRanksOpen(false)} points={profile.points} />}
       {isMe && (
         <FrameModal
           open={framePicker}

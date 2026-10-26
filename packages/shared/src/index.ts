@@ -464,6 +464,15 @@ export const TOP_PLAYERS = 3;
 // desbloqueado según sus puntos reales (displayedFrame): elegir uno no ganado no
 // tiene efecto.
 
+/**
+ * Rangos visibles (nombre del rango, progreso, "Ver rangos", nombre con color,
+ * fondo especial del perfil y "¡Nuevo rango!"). Desactivados el 2026-10-26 a
+ * petición del usuario: los MARCOS siguen desbloqueándose por puntos con los
+ * umbrales de RANKS. Para recuperarlos, poner true aquí y en la copia de la Edge
+ * Function (supabase/functions/_shared/game.ts).
+ */
+export const RANKS_ENABLED = false;
+
 export type FrameId = 'bronze' | 'silver' | 'gold' | 'emerald' | 'ruby' | 'diamond';
 
 export interface RankDef {
