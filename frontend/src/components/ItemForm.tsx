@@ -260,7 +260,7 @@ export function ItemForm({
           <label className="label" htmlFor="description">
             Descripción
           </label>
-          <span className="text-xs text-slate-500" aria-hidden>
+          <span className="text-xs text-slate-500 dark:text-slate-400" aria-hidden>
             {values.description.length}/{MAX_DESCRIPTION}
           </span>
         </div>

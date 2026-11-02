@@ -1,0 +1,942 @@
+import { useEffect, useId, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  BADGE_FRAMES,
+  badgeCollection,
+  badgeProgress,
+  BADGES,
+  displayedFrame,
+  FRAME_NAMES,
+  frameUnlocked,
+  nextRank,
+  POINT_RULES,
+  rankFor,
+  RANKS,
+  RANKS_ENABLED,
+  ULTIMATE_BADGE,
+  type BadgeDef,
+  type BadgeProgress,
+  type EquippedFrame,
+  type FrameId,
+  type PlayerProfile,
+  type PlayerStats,
+  type RankDef,
+} from '@laf/shared';
+import { useAuth } from '../context/AuthContext';
+import { getErrorMessage } from '../lib/errors';
+import { haptics } from '../lib/haptics';
+import { onReward, type Reward } from '../lib/rewards';
+import { adminIds, currentMyPlayer, gameService, legendIds, onMyPlayer, playerFrame, refreshMyPlayer, topPlayerIds } from '../services/game';
+import { Modal } from './ui';
+
+// --- Avatar --------------------------------------------------------------------
+
+const AVATAR_SIZES = {
+  sm: 'h-9 w-9 text-sm',
+  md: 'h-12 w-12 text-lg',
+  lg: 'h-24 w-24 text-4xl sm:h-28 sm:w-28',
+} as const;
+
+/** Degradado de cada marco (los animados giran: ver ANIMATED_FRAMES). */
+const FRAME_BG: Record<FrameId, string> = {
+  bronze: 'linear-gradient(135deg, #b45309, #fdba74, #92400e)',
+  silver: 'linear-gradient(135deg, #94a3b8, #ffffff, #64748b)',
+  gold: 'linear-gradient(135deg, #eab308, #fef3c7, #ca8a04)',
+  emerald: 'conic-gradient(from 0deg, #059669, #a7f3d0, #10b981, #064e3b, #059669)',
+  ruby: 'linear-gradient(135deg, #b91c1c, #fda4af, #991b1b)',
+  diamond: 'conic-gradient(from 0deg, #22d3ee, #ffffff, #a78bfa, #e0f2fe, #22d3ee)',
+};
+const ANIMATED_FRAMES = new Set<FrameId>(['emerald', 'diamond']);
+const FRAME_GLOW: Partial<Record<FrameId, string>> = {
+  ruby: 'shadow-[0_0_10px_rgba(244,63,94,0.55)]',
+  diamond: 'shadow-[0_0_14px_rgba(34,211,238,0.6)]',
+};
+
+/**
+ * Foto de perfil (o la inicial si no hay foto o no carga), con el marco de su
+ * rango si se indica `frame`. Los marcos Esmeralda y Diamante giran.
+ */
+export function Avatar({
+  name,
+  url,
+  size = 'sm',
+  className = '',
+  frame = null,
+}: {
+  name: string;
+  url?: string | null;
+  size?: keyof typeof AVATAR_SIZES | string;
+  className?: string;
+  frame?: FrameId | null;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [url]);
+  const box = AVATAR_SIZES[size as keyof typeof AVATAR_SIZES] ?? size;
+  const initial = name.trim().slice(0, 1).toUpperCase() || '?';
+  const photo = (extra: string) =>
+    url && !failed ? (
+      <img
+        src={url}
+        alt=""
+        className={`shrink-0 rounded-full bg-slate-100 object-cover dark:bg-olo-dark-850 ${box} ${extra}`}
+        onError={() => setFailed(true)}
+        loading="lazy"
+        decoding="async"
+      />
+    ) : (
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-olo-700 to-olo-800 font-bold text-white ${box} ${extra}`}
+        aria-hidden
+      >
+        {initial}
+      </span>
+    );
+  if (!frame) return photo(className);
+
+  const pad = size === 'lg' ? 'p-1.5' : size === 'md' ? 'p-[3px]' : 'p-[2px]';
+  return (
+    <span className={`relative inline-flex shrink-0 rounded-full ${pad} ${FRAME_GLOW[frame] ?? ''} ${className}`} title={`Marco ${FRAME_NAMES[frame]}`}>
+      <span className="absolute inset-0 overflow-hidden rounded-full" aria-hidden>
+        <span
+          className={`absolute ${ANIMATED_FRAMES.has(frame) ? '-inset-1/2 animate-[spin_4s_linear_infinite] motion-reduce:animate-none' : 'inset-0'}`}
+          style={{ background: FRAME_BG[frame] }}
+        />
+      </span>
+      {photo('relative ring-2 ring-white dark:ring-olo-dark-900')}
+    </span>
+  );
+}
+
+// --- Rangos y marcos ---------------------------------------------------------------
+
+/** Color del nombre en el ranking desde Detective (como el color de nombre de los juegos). */
+export function rankNameClass(points: number): string {
+  if (!RANKS_ENABLED) return 'text-slate-900 dark:text-slate-100';
+  const byRank: Record<string, string> = {
+    detective: 'text-amber-700 dark:text-amber-300',
+    experto: 'text-emerald-700 dark:text-emerald-300',
+    maestro: 'text-rose-700 dark:text-rose-300',
+    gran_maestro: 'text-cyan-700 dark:text-cyan-300',
+  };
+  return byRank[rankFor(points).id] ?? 'text-slate-900 dark:text-slate-100';
+}
+
+/**
+ * Título "LEYENDA" bajo el nombre de quien tiene la insignia definitiva (como los
+ * títulos de Rocket League). No muestra nada para el resto.
+ */
+export function LegendTitle({ id, className = 'text-[10px]' }: { id: string | undefined; className?: string }) {
+  const legend = useIsLegend(id);
+  if (!legend) return null;
+  return (
+    <span className={`text-rainbow block font-black uppercase leading-tight tracking-[0.25em] ${className}`} title="Leyenda de OLO: todas las insignias al máximo">
+      Leyenda
+    </span>
+  );
+}
+
+/** Perfil de juego propio compartido (marco en la cabecera). */
+export function useMyPlayer(): PlayerProfile | null {
+  const { user } = useAuth();
+  const [me, setMe] = useState<PlayerProfile | null>(() => currentMyPlayer());
+  useEffect(() => {
+    const off = onMyPlayer(setMe);
+    // Al entrar (o cambiar de usuario) se vuelve a leer.
+    if (user && currentMyPlayer()?.id !== user.id) void refreshMyPlayer();
+    return off;
+  }, [user?.id]);
+  return me && me.id === user?.id ? me : null;
+}
+
+/** Lo que desbloquea un rango, en texto. */
+function rankUnlocks(r: RankDef): string[] {
+  return [
+    r.frame && `Marco ${FRAME_NAMES[r.frame]}`,
+    r.banner && 'Fondo especial en el perfil',
+    r.min >= 1500 && 'Nombre con color en el ranking',
+  ].filter(Boolean) as string[];
+}
+
+/** Rango actual y progreso hacia el siguiente (perfil). */
+export function RankProgress({ points, onShowRanks }: { points: number; onShowRanks: () => void }) {
+  const rank = rankFor(points);
+  const next = nextRank(points);
+  const pct = next ? Math.round(((points - rank.min) / (next.min - rank.min)) * 100) : 100;
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-olo-dark-800 dark:bg-olo-dark-900">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Rango <strong className={`text-base font-extrabold ${rankNameClass(points)}`}>{rank.name}</strong>
+        </p>
+        <button type="button" onClick={onShowRanks} className="-my-2 inline-flex min-h-9 items-center text-xs font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300">
+          Ver rangos
+        </button>
+      </div>
+      <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-olo-dark-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Progreso al siguiente rango">
+        <div className="h-full rounded-full bg-gradient-to-r from-olo-500 to-amber-400" style={{ width: `${Math.max(pct, 2)}%` }} />
+      </div>
+      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+        {next
+          ? `${points.toLocaleString('es')} / ${next.min.toLocaleString('es')} para ${next.name} · desbloquea: ${rankUnlocks(next).join(', ').toLowerCase()}`
+          : '¡Rango máximo alcanzado!'}
+      </p>
+    </div>
+  );
+}
+
+/** Escalera de rangos con lo que desbloquea cada uno. */
+export function RanksModal({ open, onClose, points }: { open: boolean; onClose: () => void; points: number }) {
+  const current = rankFor(points);
+  return (
+    <Modal open={open} label="Rangos" onClose={onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Rangos</h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Sube de rango sumando puntos. Cada rango desbloquea un marco para tu foto.</p>
+      <ol className="mt-4 flex flex-col gap-2">
+        {RANKS.map((r) => {
+          const reached = points >= r.min;
+          return (
+            <li
+              key={r.id}
+              className={
+                'flex items-center gap-3 rounded-2xl p-2.5 ' +
+                (r.id === current.id ? 'bg-olo-50 ring-2 ring-olo-400/60 dark:bg-olo-500/10' : '')
+              }
+            >
+              {/* Atenuado solo el dibujo (no el texto, que perdería contraste). */}
+              <span className={reached ? '' : 'opacity-50 grayscale'}>
+                <Avatar name={r.name} size="h-10 w-10 text-sm" frame={r.frame} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className={`font-bold ${reached ? rankNameClass(r.min) : 'text-slate-500 dark:text-slate-400'}`}>
+                  {r.name} <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">· {r.min.toLocaleString('es')} pts</span>
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">{rankUnlocks(r).join(' · ') || 'Punto de partida'}</p>
+              </div>
+              {reached && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 text-olo-600 dark:text-olo-400" role="img" aria-label="alcanzado">
+                  <path d="m6 12.5 4 4L18 8" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <button className="btn-secondary mt-5 w-full" onClick={onClose}>
+        Cerrar
+      </button>
+    </Modal>
+  );
+}
+
+/** Elegir el marco de la foto entre los desbloqueados (con vista previa). */
+export function FrameModal({
+  open,
+  onClose,
+  player,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  player: PlayerProfile;
+  onSaved: (frame: EquippedFrame) => void;
+}) {
+  const [frame, setFrame] = useState<EquippedFrame>(player.equippedFrame ?? null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setFrame(player.equippedFrame ?? null);
+    setError(null);
+  }, [open, player]);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await gameService.setFrame(frame);
+      haptics.success();
+      onSaved(frame);
+      onClose();
+    } catch (e) {
+      setError(getErrorMessage(e, 'No se pudo guardar el marco'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const option = (active: boolean, disabled = false) =>
+    'flex flex-col items-center gap-2 rounded-2xl border p-3 text-center transition ' +
+    (active
+      ? 'border-olo-500 bg-olo-50 ring-2 ring-olo-400/50 dark:bg-olo-500/10'
+      : 'border-slate-200 hover:bg-slate-50 dark:border-olo-dark-800 dark:hover:bg-olo-dark-850') +
+    (disabled ? ' cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent' : '');
+
+  const choices: { value: EquippedFrame; label: string; preview: FrameId | null; rank?: RankDef }[] = [
+    { value: null, label: 'Automático', preview: displayedFrame({ points: player.points }) },
+    { value: 'none', label: 'Sin marco', preview: null },
+    ...RANKS.filter((r) => r.frame).map((r) => ({ value: r.frame, label: FRAME_NAMES[r.frame!], preview: r.frame, rank: r })),
+  ];
+
+  return (
+    <Modal open={open} label="Marco de la foto" onClose={saving ? () => undefined : onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Marco de la foto</h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        Elige entre los marcos que has desbloqueado con tu {RANKS_ENABLED ? 'rango' : 'puntos'}.
+      </p>
+
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {choices.map((c) => {
+          const unlocked = !c.rank || frameUnlocked(c.rank.frame!, player.points);
+          return (
+            <button
+              key={c.label}
+              type="button"
+              disabled={!unlocked}
+              className={option(frame === c.value, !unlocked)}
+              onClick={() => setFrame(c.value)}
+              aria-pressed={frame === c.value}
+            >
+              <Avatar name={player.name} url={player.avatarUrl} size="h-12 w-12 text-base" frame={c.preview} />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{c.label}</span>
+              {!unlocked && c.rank && (
+                <span className="-mt-1 text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+                  🔒{' '}
+                  {RANKS_ENABLED && (
+                    <>
+                      {c.rank.name}
+                      <br />
+                    </>
+                  )}
+                  {c.rank.min.toLocaleString('es')} pts
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>}
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+        <button className="btn-secondary flex-1" onClick={onClose} disabled={saving}>
+          Cancelar
+        </button>
+        <button className="btn-primary flex-1" onClick={() => void save()} disabled={saving}>
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// --- Top del ranking: emblema y nombre enlazado al perfil -----------------------
+
+/** Puesto (1..TOP_PLAYERS) de un usuario en el top del ranking, o null. */
+export function useTopRank(userId: string | undefined): number | null {
+  const [top, setTop] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    void topPlayerIds().then((ids) => active && setTop(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+  const i = userId ? top.indexOf(userId) : -1;
+  return i >= 0 ? i + 1 : null;
+}
+
+const RANK_EMBLEM = {
+  1: { from: '#fde68a', to: '#d97706', text: '#78350f', label: 'Nº 1 del ranking' },
+  2: { from: '#f1f5f9', to: '#94a3b8', text: '#1e293b', label: 'Nº 2 del ranking' },
+  3: { from: '#fed7aa', to: '#c2410c', text: '#431407', label: 'Nº 3 del ranking' },
+} as const;
+
+/** Emblema del puesto (solo top 3): escudo con corona en oro, plata o bronce. */
+export function RankEmblem({ rank, className = 'h-5 w-5' }: { rank: number | null; className?: string }) {
+  const gid = useId();
+  if (!rank || !(rank in RANK_EMBLEM)) return null;
+  const e = RANK_EMBLEM[rank as 1 | 2 | 3];
+  return (
+    <svg viewBox="0 0 24 26" className={`inline-block shrink-0 drop-shadow-sm ${className}`} role="img" aria-label={e.label}>
+      <title>{e.label}</title>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={e.from} />
+          <stop offset="1" stopColor={e.to} />
+        </linearGradient>
+      </defs>
+      <path d="M12 3.5 20.5 7v6.5c0 5-3.6 9.2-8.5 10.9C7.1 22.7 3.5 18.5 3.5 13.5V7L12 3.5Z" fill={`url(#${gid})`} stroke={e.to} strokeWidth="1" />
+      <path d="m7.5 4.2 1.6-2.7 2.9 2 2.9-2 1.6 2.7" fill="none" stroke={e.to} strokeWidth="1.3" strokeLinejoin="round" />
+      <text x="12" y="17.6" textAnchor="middle" fontSize="10" fontWeight="800" fill={e.text}>
+        {rank}
+      </text>
+    </svg>
+  );
+}
+
+/** Marco que lleva un jugador (del ranking cacheado; null fuera del top 100). */
+export function usePlayerFrame(userId: string | undefined): FrameId | null {
+  const [frame, setFrame] = useState<FrameId | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (userId) void playerFrame(userId).then((f) => active && setFrame(f));
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  return frame;
+}
+
+/** ¿Es administrador? (para el emblema junto al nombre). */
+export function useIsAdmin(userId: string | undefined): boolean {
+  const [admins, setAdmins] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    void adminIds().then((ids) => active && setAdmins(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return !!userId && admins.includes(userId);
+}
+
+/**
+ * Emblema de administrador (como la insignia de creador de contenido de Clash
+ * Royale): sello verde OLO con una estrella.
+ */
+export function AdminEmblem({ className = 'h-5 w-5' }: { className?: string }) {
+  const gid = useId();
+  const label = 'Administrador de Lost & Found';
+  return (
+    <svg viewBox="0 0 24 24" className={`inline-block shrink-0 drop-shadow-sm ${className}`} role="img" aria-label={label}>
+      <title>{label}</title>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#34d399" />
+          <stop offset="0.5" stopColor="#00a785" />
+          <stop offset="1" stopColor="#047857" />
+        </linearGradient>
+      </defs>
+      {/* Sello de 8 puntas */}
+      <path
+        d="M12 1.5l2.6 2.1 3.3-.4.9 3.2 3 1.5-1.2 3.1 1.2 3.1-3 1.5-.9 3.2-3.3-.4L12 22.5l-2.6-2.1-3.3.4-.9-3.2-3-1.5 1.2-3.1-1.2-3.1 3-1.5.9-3.2 3.3.4L12 1.5Z"
+        fill={`url(#${gid})`}
+        stroke="#065f46"
+        strokeWidth="0.8"
+      />
+      <path d="m12 6.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5L12 6.8Z" fill="#fff" />
+    </svg>
+  );
+}
+
+/** ¿Tiene la insignia definitiva (Leyenda de OLO)? */
+export function useIsLegend(userId: string | undefined): boolean {
+  const [legends, setLegends] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    void legendIds().then((ids) => active && setLegends(ids));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return !!userId && legends.includes(userId);
+}
+
+/** Emblema de Leyenda de OLO: hexágono arcoíris con corona. */
+export function LegendEmblem({ className = 'h-5 w-5' }: { className?: string }) {
+  const gid = useId();
+  const label = 'Leyenda de OLO: todas las insignias al máximo';
+  return (
+    <svg viewBox="0 0 24 24" className={`inline-block shrink-0 drop-shadow-[0_0_3px_rgba(250,204,21,0.8)] ${className}`} role="img" aria-label={label}>
+      <title>{label}</title>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f472b6" />
+          <stop offset="0.35" stopColor="#facc15" />
+          <stop offset="0.65" stopColor="#34d399" />
+          <stop offset="1" stopColor="#818cf8" />
+        </linearGradient>
+      </defs>
+      <path d="M12 1.5 21.1 6.8v10.4L12 22.5l-9.1-5.3V6.8L12 1.5Z" fill={`url(#${gid})`} />
+      <path d="M12 4.2 18.8 8.1v7.8L12 19.8l-6.8-3.9V8.1L12 4.2Z" fill="#1e1b4b" />
+      <path d="M7.5 15.2h9l.8-6-3 2.2L12 7.5l-2.3 3.9-3-2.2.8 6Z" fill="#facc15" stroke="#fde68a" strokeWidth="0.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+
+/** Emblemas junto a un nombre: administrador, Leyenda de OLO y puesto del top 3 (pueden salir todos). */
+export function NameEmblems({ id, className = 'h-[1.1em] w-[1.1em]' }: { id: string | undefined; className?: string }) {
+  const admin = useIsAdmin(id);
+  const legend = useIsLegend(id);
+  const rank = useTopRank(id);
+  if (!admin && !legend && !rank) return null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5">
+      {admin && <AdminEmblem className={className} />}
+      {legend && <LegendEmblem className={className} />}
+      <RankEmblem rank={rank} className={className} />
+    </span>
+  );
+}
+
+/**
+ * Nombre de un colaborador enlazado a su perfil, con sus emblemas (admin, top 3).
+ * No usar dentro de otro enlace (los <a> no se anidan).
+ */
+export function PlayerName({ id, name, className = '' }: { id: string | undefined; name: string; className?: string }) {
+  const { user } = useAuth();
+  if (!id) return <span className={className}>{name}</span>;
+  return (
+    <Link
+      to={id === user?.id ? '/perfil' : `/perfil/${id}`}
+      className={`inline-flex max-w-full items-center gap-1 font-semibold text-olo-700 underline-offset-2 hover:underline dark:text-olo-300 ${className}`}
+    >
+      <span className="truncate">{name}</span>
+      <NameEmblems id={id} />
+    </Link>
+  );
+}
+
+// --- Insignias por niveles (al estilo del perfil de Clash Royale) ----------------
+
+/** Degradado del marco por nivel (índice = nivel - 1; ver BADGE_FRAMES). */
+const FRAME_STYLES = [
+  'from-amber-700 via-orange-300 to-amber-800', // Bronce
+  'from-slate-400 via-white to-slate-500', // Plata
+  'from-yellow-500 via-amber-100 to-yellow-600', // Oro
+  'from-emerald-600 via-green-200 to-emerald-700', // Esmeralda
+  'from-blue-600 via-sky-200 to-indigo-700', // Zafiro
+  'from-red-700 via-rose-300 to-red-800', // Rubí
+  'from-fuchsia-500 via-amber-200 to-cyan-400', // Leyenda
+];
+const FRAME_TEXT = [
+  'text-amber-950', 'text-slate-900', 'text-yellow-950', 'text-emerald-950', 'text-indigo-950', 'text-red-950', 'text-fuchsia-950',
+];
+const HEX = { clipPath: 'polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)' };
+
+const EMBLEM_SIZES = {
+  sm: { box: 'h-8 w-7', inset: 'inset-[2px]', emoji: 'text-sm', pill: '' },
+  md: { box: 'h-[4.5rem] w-16', inset: 'inset-[4px]', emoji: 'text-3xl', pill: 'text-[11px] px-2 -bottom-2' },
+  lg: { box: 'h-28 w-24', inset: 'inset-[6px]', emoji: 'text-5xl', pill: 'text-sm px-3 -bottom-3' },
+} as const;
+
+/**
+ * Insignia hexagonal: el marco mejora con cada nivel (bronce → … → leyenda) y
+ * lleva el número de nivel debajo, como las insignias del perfil de Clash Royale.
+ */
+export function BadgeEmblem({ badge, level, size = 'md' }: { badge: BadgeDef; level: number; size?: keyof typeof EMBLEM_SIZES }) {
+  if (badge === ULTIMATE_BADGE) return <UltimateEmblem level={level} size={size} />;
+  const s = EMBLEM_SIZES[size];
+  const locked = level <= 0;
+  const milestone = isMilestone(badge);
+  // Los hitos (un solo nivel) llevan siempre marco de oro y una estrella en vez del nivel.
+  const frameIdx = milestone ? 2 : Math.min(level, FRAME_STYLES.length) - 1;
+  const frame = FRAME_STYLES[frameIdx];
+  const maxed = !milestone && level >= badge.levels.length;
+  return (
+    <span className={`relative inline-flex shrink-0 ${s.box}`} aria-hidden>
+      {maxed && !locked && size !== 'sm' && (
+        <span className="absolute -inset-1.5 animate-pulse rounded-full bg-amber-300/30 blur-md dark:bg-amber-300/20" />
+      )}
+      <span
+        className={`absolute inset-0 bg-gradient-to-br ${locked ? 'from-slate-300 to-slate-400 dark:from-olo-dark-700 dark:to-olo-dark-800' : frame}`}
+        style={HEX}
+      />
+      <span
+        className={`absolute ${s.inset} flex items-center justify-center bg-gradient-to-b ${locked ? 'from-slate-100 to-slate-200 dark:from-olo-dark-850 dark:to-olo-dark-900' : 'from-slate-700 to-slate-900'}`}
+        style={HEX}
+      >
+        <span className={`${s.emoji} ${locked ? 'opacity-30 grayscale' : ''}`}>{badge.emoji}</span>
+      </span>
+      {size !== 'sm' && !locked && (
+        <span
+          className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-br font-extrabold shadow ring-1 ring-black/10 ${frame} ${FRAME_TEXT[frameIdx] ?? ''} ${s.pill}`}
+        >
+          {milestone ? '★' : level}
+        </span>
+      )}
+    </span>
+  );
+}
+
+const RAINBOW = 'conic-gradient(from 0deg, #f472b6, #facc15, #34d399, #38bdf8, #a78bfa, #f472b6)';
+
+/**
+ * Insignia definitiva (todas las demás al máximo): marco arcoíris giratorio,
+ * halo dorado, destellos y cinta "LEYENDA". Bloqueada, se ve como silueta.
+ */
+function UltimateEmblem({ level, size }: { level: number; size: keyof typeof EMBLEM_SIZES }) {
+  const s = EMBLEM_SIZES[size];
+  const locked = level <= 0;
+  const big = size !== 'sm';
+  return (
+    <span className={`relative inline-flex shrink-0 ${s.box}`} aria-hidden>
+      {!locked && big && (
+        <>
+          <span className="absolute -inset-3 animate-pulse rounded-full bg-gradient-to-r from-amber-300/50 via-fuchsia-400/40 to-sky-300/50 blur-xl motion-reduce:animate-none" />
+          <span className="absolute -right-1 -top-1 animate-ping text-xs text-amber-300 motion-reduce:animate-none">✦</span>
+          <span className="absolute -left-1.5 bottom-3 animate-ping text-[10px] text-sky-200 [animation-delay:600ms] motion-reduce:animate-none">✦</span>
+        </>
+      )}
+      <span className="absolute inset-0 overflow-hidden" style={HEX}>
+        {locked ? (
+          <span className="absolute inset-0 bg-gradient-to-br from-slate-300 to-slate-400 dark:from-olo-dark-700 dark:to-olo-dark-800" />
+        ) : (
+          <span className="absolute -inset-1/2 animate-[spin_4s_linear_infinite] motion-reduce:animate-none" style={{ background: RAINBOW }} />
+        )}
+      </span>
+      <span
+        className={`absolute ${s.inset} flex items-center justify-center bg-gradient-to-b ${locked ? 'from-slate-100 to-slate-200 dark:from-olo-dark-850 dark:to-olo-dark-900' : 'from-indigo-950 via-purple-950 to-slate-950'}`}
+        style={HEX}
+      >
+        <span className={`${s.emoji} ${locked ? 'opacity-30 grayscale' : 'drop-shadow-[0_0_8px_rgba(250,204,21,0.9)]'}`}>{ULTIMATE_BADGE.emoji}</span>
+      </span>
+      {big && !locked && (
+        <span className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-400 font-black tracking-wider text-amber-950 shadow-lg ring-1 ring-amber-600/40 ${s.pill}`}>
+          LEYENDA
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Barra de progreso hacia el siguiente nivel. */
+function ProgressBar({ p }: { p: BadgeProgress }) {
+  const prev = p.level > 0 ? p.badge.levels[p.level - 1] : 0;
+  const pct = p.maxed ? 100 : Math.round(((p.value - prev) / ((p.next ?? 1) - prev)) * 100);
+  return (
+    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-olo-dark-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`Progreso de ${p.badge.name}`}>
+      <div className={`h-full rounded-full ${p.maxed ? 'bg-gradient-to-r from-amber-400 to-fuchsia-500' : 'bg-olo-500'}`} style={{ width: `${Math.max(pct, 3)}%` }} />
+    </div>
+  );
+}
+
+/** Insignia de un solo nivel (hito): se consigue una vez y no sube de nivel. */
+const isMilestone = (b: BadgeDef) => b.levels.length === 1 && b !== ULTIMATE_BADGE;
+
+function levelLabel(p: BadgeProgress): string {
+  if (p.badge === ULTIMATE_BADGE) return p.level ? 'Completada · La insignia definitiva' : `Bloqueada · ${p.value}/${p.next} insignias al máximo`;
+  if (p.level === 0) return 'Bloqueada';
+  if (isMilestone(p.badge)) return 'Hito conseguido';
+  return `Nivel ${p.level} · ${BADGE_FRAMES[p.level - 1]}${p.maxed ? ' · Máximo' : ''}`;
+}
+
+/** Escaparate del perfil: hasta 8 insignias, las de mayor nivel primero. */
+export function BadgeShowcase({ items, onSelect }: { items: BadgeProgress[]; onSelect: (id: string) => void }) {
+  return (
+    <ul className="grid grid-cols-4 gap-x-2 gap-y-6 rounded-3xl bg-gradient-to-b from-slate-800 to-slate-900 px-3 pb-7 pt-5 shadow-inner sm:gap-x-4 sm:px-5">
+      {items.map((p) => (
+        <li key={p.badge.id} className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => onSelect(p.badge.id)}
+            className="flex flex-col items-center gap-3 rounded-xl p-1 transition hover:scale-105 active:scale-95"
+            aria-label={`${p.badge.name}: ${levelLabel(p)}`}
+          >
+            <BadgeEmblem badge={p.badge} level={p.level} />
+            <span className="line-clamp-2 max-w-[5.5rem] text-center text-[11px] font-semibold leading-tight text-slate-200">{p.badge.name}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Colección completa (todas las insignias con su progreso) y detalle de una
+ * insignia con todos sus niveles. `focus` abre directamente el detalle.
+ */
+export function BadgeCollectionModal({
+  open,
+  onClose,
+  stats,
+  focus,
+  ownerName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  stats: PlayerStats;
+  focus: string | null;
+  /** Nombre del dueño del perfil, o null si es el propio. */
+  ownerName: string | null;
+}) {
+  const [selected, setSelected] = useState<string | null>(focus);
+  useEffect(() => setSelected(focus), [focus, open]);
+  const def = BADGES.find((b) => b.id === selected);
+
+  return (
+    <Modal open={open} label={def ? `Insignia ${def.name}` : 'Colección de insignias'} onClose={onClose}>
+      {def ? <BadgeDetail p={badgeProgress(def, stats)} ownerName={ownerName} onBack={() => setSelected(null)} /> : (
+        <>
+          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Colección de insignias</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Cada insignia sube de nivel y mejora su marco: {BADGE_FRAMES.join(', ').toLowerCase()}.
+          </p>
+          <ul className="mt-4 flex flex-col gap-2">
+            {badgeCollection(stats).map((p) => (
+              <li key={p.badge.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(p.badge.id)}
+                  className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-slate-100 dark:hover:bg-olo-dark-850"
+                >
+                  <BadgeEmblem badge={p.badge} level={p.level} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{p.badge.name}</span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {isMilestone(p.badge) ? 'Hito' : `${p.level}/${p.badge.levels.length}`}
+                      </span>
+                    </span>
+                    <ProgressBar p={p} />
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                      {isMilestone(p.badge)
+                        ? p.level ? '¡Conseguida!' : p.badge.goal(1)
+                        : p.maxed ? '¡Nivel máximo!' : `${p.value}/${p.next} · ${p.badge.goal(p.next!)}`}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button className="btn-secondary mt-5 w-full" onClick={onClose}>
+            Cerrar
+          </button>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function BadgeDetail({ p, ownerName, onBack }: { p: BadgeProgress; ownerName: string | null; onBack: () => void }) {
+  return (
+    <div>
+      <div className="flex flex-col items-center text-center">
+        <div className="rounded-3xl bg-gradient-to-b from-slate-800 to-slate-900 px-10 pb-8 pt-5">
+          <BadgeEmblem badge={p.badge} level={p.level} size="lg" />
+        </div>
+        <h2 className="mt-4 text-xl font-extrabold text-slate-900 dark:text-slate-50">{p.badge.name}</h2>
+        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{levelLabel(p)}</p>
+        <div className="mt-3 w-full max-w-xs">
+          <ProgressBar p={p} />
+          <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+            {isMilestone(p.badge)
+              ? p.level ? `Hito: ${p.badge.goal(1).toLowerCase()}. ¡Conseguida!` : `Hito: ${p.badge.goal(1).toLowerCase()}.`
+              : p.badge === ULTIMATE_BADGE
+                ? p.level
+                  ? `${ownerName ?? 'Tú'}: todas las insignias al nivel máximo. ¡Leyenda!`
+                  : `${p.value}/${p.next} insignias al nivel máximo. ${p.badge.goal(p.next!)}.`
+              : p.maxed
+                ? ownerName ? `${ownerName} alcanzó el nivel máximo` : 'Has alcanzado el nivel máximo'
+                : `${p.value}/${p.next} para el nivel ${p.level + 1}: ${p.badge.goal(p.next!).toLowerCase()}`}
+          </p>
+        </div>
+      </div>
+      <ol className={'mt-5 flex flex-col gap-1.5 ' + (p.badge.levels.length === 1 ? 'hidden' : '')}>
+        {p.badge.levels.map((t, i) => {
+          const done = p.level > i;
+          return (
+            <li
+              key={t}
+              className={
+                'flex items-center gap-3 rounded-xl px-3 py-2 text-sm ' +
+                (done ? 'bg-olo-50 text-slate-800 dark:bg-olo-500/10 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400')
+              }
+            >
+              <span className={`h-3 w-3 shrink-0 rounded-full bg-gradient-to-br ${FRAME_STYLES[i]} ${done ? '' : 'opacity-40'}`} aria-hidden />
+              <span className="w-24 shrink-0 font-semibold">
+                Nivel {i + 1} <span className="sr-only">({BADGE_FRAMES[i]})</span>
+              </span>
+              <span className="flex-1">{p.badge.goal(t)}</span>
+              {done && (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 text-olo-600 dark:text-olo-400" role="img" aria-label="conseguido">
+                  <path d="m6 12.5 4 4L18 8" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <button className="btn-secondary mt-5 w-full" onClick={onBack}>
+        Ver toda la colección
+      </button>
+    </div>
+  );
+}
+
+// --- Recompensa ("+N puntos") ------------------------------------------------------
+
+const RULE = Object.fromEntries(POINT_RULES.map((r) => [r.key, r])) as Record<(typeof POINT_RULES)[number]['key'], (typeof POINT_RULES)[number]>;
+
+/**
+ * Ventana de recompensa tras publicar o devolver: puntos ganados (con desglose),
+ * cambio de puesto e insignias nuevas o que subieron de nivel. Se monta una vez
+ * en el Layout y escucha onReward().
+ */
+export function RewardModal() {
+  const [reward, setReward] = useState<Reward | null>(null);
+  useEffect(
+    () =>
+      onReward((r) => {
+        haptics.success();
+        setReward(r);
+      }),
+    [],
+  );
+  if (!reward) return null;
+  const { before, after, badges, kind } = reward;
+  const delta = after.points - before.points;
+  const lines = [
+    { rule: RULE.published, n: after.stats.published - before.stats.published },
+    { rule: RULE.returned, n: after.stats.returned - before.stats.returned },
+    { rule: RULE.fast, n: after.stats.fastReturned - before.stats.fastReturned },
+  ].filter((l) => l.n > 0);
+  const climbed = after.rank !== null && (before.rank === null || after.rank < before.rank);
+  const newRank = rankFor(after.points).id !== rankFor(before.points).id && after.points > before.points ? rankFor(after.points) : null;
+
+  return (
+    <Modal open label={delta > 0 ? `Has ganado ${delta} puntos` : kind === 'returned' ? 'Objeto devuelto' : 'Nueva insignia'} onClose={() => setReward(null)}>
+      <div className="flex flex-col items-center text-center">
+        <div className="relative mb-2 text-5xl" aria-hidden>
+          <span className="inline-block animate-scale-in">{delta <= 0 && !badges.length ? '📦' : kind === 'returned' ? '🎉' : '🔍'}</span>
+          <span className="absolute -right-4 -top-1 animate-ping text-base text-amber-400 motion-reduce:animate-none">✦</span>
+          <span className="absolute -left-4 bottom-0 animate-ping text-sm text-olo-400 [animation-delay:400ms] motion-reduce:animate-none">✦</span>
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-50">
+          {kind === 'returned' ? '¡Objeto devuelto!' : '¡Objeto publicado!'}
+        </h2>
+        {delta > 0 && (
+          <p className="mt-2 animate-scale-in bg-gradient-to-r from-olo-500 via-emerald-400 to-amber-400 bg-clip-text text-5xl font-black tabular-nums text-transparent">
+            +{delta.toLocaleString('es')}
+            <span className="ml-1.5 text-xl font-extrabold">puntos</span>
+          </p>
+        )}
+        {delta <= 0 && kind === 'returned' && (
+          <p className="mt-2 max-w-xs text-sm text-slate-600 dark:text-slate-400">
+            Esta entrega no suma puntos: solo cuentan las devoluciones con una reclamación aprobada de otra persona.
+          </p>
+        )}
+      </div>
+
+      {lines.length > 0 && (
+        <ul className="mt-4 flex flex-col gap-1.5">
+          {lines.map(({ rule, n }) => (
+            <li key={rule.key} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3.5 py-2 text-sm dark:bg-olo-dark-850">
+              <span className="text-slate-700 dark:text-slate-200">{rule.title}</span>
+              <span className="font-bold tabular-nums text-olo-700 dark:text-olo-300">+{rule.points * n}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-3 text-center text-sm text-slate-600 dark:text-slate-400">
+        Ahora tienes <strong className="text-slate-900 dark:text-slate-100">{after.points.toLocaleString('es')} puntos</strong>
+        {after.rank !== null && <> · puesto #{after.rank}</>}
+        {climbed && <span className="ml-1 font-semibold text-olo-700 dark:text-olo-300">▲ ¡subiste!</span>}
+      </p>
+
+      {/* Sin rangos visibles, subir de umbral se anuncia como marco nuevo. */}
+      {newRank && !RANKS_ENABLED && newRank.frame && (
+        <div className="mt-4 flex animate-scale-in items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-olo-50 p-3.5 ring-1 ring-amber-300/60 dark:from-amber-500/10 dark:to-olo-500/10">
+          <Avatar name={after.name} url={after.avatarUrl} size="md" frame={newRank.frame} />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">¡Nuevo marco!</p>
+            <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100">{FRAME_NAMES[newRank.frame]}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Elígelo en tu perfil, en «Personalizar marco».</p>
+          </div>
+        </div>
+      )}
+
+      {newRank && RANKS_ENABLED && (
+        <div className="mt-4 flex animate-scale-in items-center gap-3 rounded-2xl bg-gradient-to-r from-amber-50 to-olo-50 p-3.5 ring-1 ring-amber-300/60 dark:from-amber-500/10 dark:to-olo-500/10">
+          <Avatar name={after.name} url={after.avatarUrl} size="md" frame={newRank.frame} />
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">¡Nuevo rango!</p>
+            <p className={`text-lg font-extrabold ${rankNameClass(after.points)}`}>{newRank.name}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Desbloqueaste: {rankUnlocks(newRank).join(', ').toLowerCase()}</p>
+          </div>
+        </div>
+      )}
+
+      {badges.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 px-4 pb-6 pt-4">
+          <p className="mb-4 text-center text-xs font-bold uppercase tracking-wider text-amber-300">
+            {badges.length === 1 ? 'Insignia' : 'Insignias'}
+          </p>
+          <ul className="flex flex-wrap justify-center gap-5">
+            {badges.map((p) => (
+              <li key={p.badge.id} className="flex w-24 animate-scale-in flex-col items-center gap-3 text-center">
+                <BadgeEmblem badge={p.badge} level={p.level} />
+                <span className="text-xs font-semibold leading-tight text-slate-100">
+                  {p.badge.name}
+                  <span className="block text-[11px] font-medium text-amber-300">
+                    {p.level === 1 ? '¡Nueva!' : `¡Nivel ${p.level}!`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
+        <Link to="/perfil" className="btn-secondary flex-1" onClick={() => setReward(null)}>
+          Ver mi perfil
+        </Link>
+        <button className="btn-primary flex-1" onClick={() => setReward(null)}>
+          ¡Genial!
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// --- Ayuda de puntos -------------------------------------------------------------
+
+/** Ventana "¿Cómo ganar puntos?" con las reglas vigentes (POINT_RULES) y las ventajas del top 3. */
+export function PointsHelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal open={open} label="Cómo ganar puntos" onClose={onClose}>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">¿Cómo ganar puntos?</h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        Los puntos premian a quien encuentra objetos y los devuelve. Se calculan solos a partir de tus publicaciones.
+      </p>
+      <ul className="mt-4 flex flex-col gap-2.5">
+        {POINT_RULES.map((r) => (
+          <li key={r.key} className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3.5 dark:bg-olo-dark-850">
+            <span className="shrink-0 rounded-xl bg-olo-100 px-2.5 py-1 text-sm font-extrabold text-olo-800 dark:bg-olo-500/15 dark:text-olo-300">
+              +{r.points}
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{r.title}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">{r.description}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {RANKS_ENABLED ? (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          Con tus puntos subes de <strong className="text-slate-800 dark:text-slate-200">rango</strong> ({RANKS.slice(1).map((r) => r.name).join(', ')}) y
+          desbloqueas marcos para tu foto.
+        </p>
+      ) : (
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          Con tus puntos desbloqueas <strong className="text-slate-800 dark:text-slate-200">marcos</strong> para tu foto (
+          {RANKS.filter((r) => r.frame).map((r) => `${FRAME_NAMES[r.frame!]} ${r.min.toLocaleString('es')}`).join(', ')} pts).
+        </p>
+      )}
+      <div className="mt-4 rounded-2xl bg-amber-50 p-3.5 dark:bg-amber-500/10">
+        <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900 dark:text-amber-200">
+          <RankEmblem rank={1} /> Ventajas del top 3
+        </p>
+        <ul className="mt-1.5 list-disc pl-5 text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+          <li>Tus objetos perdidos aparecen primero en el muro.</li>
+          <li>Un emblema con tu puesto junto a tu nombre en toda la app.</li>
+        </ul>
+      </div>
+      <button className="btn-primary mt-5 w-full" onClick={onClose}>
+        Entendido
+      </button>
+    </Modal>
+  );
+}

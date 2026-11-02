@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../db.js';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import { remindPendingHandovers } from '../lib/handoverReminders.js';
 import { notFound } from '../lib/http.js';
 import { serializeNotification } from '../lib/serialize.js';
 import { authenticate } from '../middleware/authenticate.js';
@@ -12,6 +13,8 @@ notificationsRouter.get(
   '/',
   authenticate,
   asyncHandler(async (req, res) => {
+    // Antes de listar, los recordatorios de entregas atascadas (si falla, no bloquea).
+    await remindPendingHandovers(req.auth!.sub).catch((e) => console.error('[handover-reminders]', e));
     const items = await prisma.notification.findMany({
       where: { userId: req.auth!.sub },
       orderBy: { createdAt: 'desc' },

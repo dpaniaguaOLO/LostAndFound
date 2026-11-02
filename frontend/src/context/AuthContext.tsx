@@ -16,6 +16,8 @@ interface AuthContextValue {
   login: (body: LoginRequest, remember?: boolean) => Promise<void>;
   register: (body: RegisterRequest, remember?: boolean) => Promise<void>;
   logout: () => void;
+  /** Actualiza localmente el usuario de la sesión (p. ej. tras cambiar la foto de perfil). */
+  updateUser: (patch: Partial<User>) => void;
   isAdmin: boolean;
 }
 
@@ -65,8 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  function updateUser(patch: Partial<User>) {
+    setUser((u) => (u ? { ...u, ...patch } : u));
+  }
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, register, logout, isAdmin: user?.role === 'ADMIN' }),
+    () => ({ user, loading, login, register, logout, updateUser, isAdmin: user?.role === 'ADMIN' }),
     [user, loading],
   );
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ArchivedResponse, AuditEntry, Claim, User } from '@laf/shared';
 import { ClaimReviewDialog } from '../components/ClaimReviewDialog';
 import { CreateUserCard } from '../components/CreateUserCard';
+import { PlayerName } from '../components/game';
 import { PasswordResetCard } from '../components/PasswordResetCard';
 import { ConfirmDialog, ErrorState, ItemImage, PageHeader, Spinner, StatusBadge, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,10 @@ import { adminService, type AdminStats } from '../services/admin';
 type Stats = AdminStats;
 
 type Tab = 'overview' | 'claims' | 'audit' | 'archived';
+
+/** Colaboradores visibles al principio y cuántos más se cargan cada vez. */
+const USERS_FIRST = 5;
+const USERS_MORE = 10;
 
 const ACTION_LABELS: Record<string, string> = {
   FOUND_ITEM_EDITED: 'Editó un objeto encontrado',
@@ -67,6 +72,8 @@ export function AdminPage() {
   const [confirmRole, setConfirmRole] = useState<{ user: User; role: 'ADMIN' | 'EMPLOYEE' } | null>(null);
   const [reviewing, setReviewing] = useState<{ claim: Claim; decision: 'APPROVED' | 'REJECTED' } | null>(null);
   const [userFilter, setUserFilter] = useState('');
+  // Con cientos de colaboradores la lista se muestra por partes (la búsqueda abarca a todos).
+  const [userLimit, setUserLimit] = useState(USERS_FIRST);
   // Error al cargar una pestaña: antes se mostraba como "no hay datos" (UX-08).
   const [tabError, setTabError] = useState<Partial<Record<Tab, string>>>({});
 
@@ -173,7 +180,7 @@ export function AdminPage() {
         {/* No permitir que un admin se desactive a sí mismo */}
         {currentUser?.id !== u.id &&
           (u.active ? (
-            <button className="btn-danger" onClick={() => setConfirmDeactivate(u)}>
+            <button className="btn-danger-soft" onClick={() => setConfirmDeactivate(u)}>
               Desactivar
             </button>
           ) : (
@@ -202,6 +209,7 @@ export function AdminPage() {
   const visibleUsers = q
     ? users.filter((u) => u.name.toLowerCase().includes(q) || u.employeeId.toLowerCase().includes(q))
     : users;
+  const shownUsers = visibleUsers.slice(0, userLimit);
 
   const cards = [
     { label: 'Usuarios', value: stats?.users ?? 0 },
@@ -259,7 +267,10 @@ export function AdminPage() {
               className="input"
               placeholder="Buscar por nombre o número…"
               value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
+              onChange={(e) => {
+                setUserFilter(e.target.value);
+                setUserLimit(USERS_FIRST);
+              }}
             />
           </div>
           {visibleUsers.length === 0 && (
@@ -267,11 +278,13 @@ export function AdminPage() {
           )}
 
           <ul className="flex flex-col gap-2.5 md:hidden">
-            {visibleUsers.map((u) => (
+            {shownUsers.map((u) => (
               <li key={u.id} className="card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{u.name}</p>
+                    <p className="truncate">
+                      <PlayerName id={u.id} name={u.name} />
+                    </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       N° {u.employeeId} · desde {formatDate(u.createdAt)}
                     </p>
@@ -299,9 +312,11 @@ export function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.map((u) => (
+                {shownUsers.map((u) => (
                   <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-olo-dark-800">
-                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{u.name}</td>
+                    <td className="px-4 py-3">
+                      <PlayerName id={u.id} name={u.name} />
+                    </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{u.employeeId}</td>
                     <td className="px-4 py-3">
                       <RoleBadge role={u.role} />
@@ -318,6 +333,33 @@ export function AdminPage() {
               </tbody>
             </table>
           </div>
+
+          {visibleUsers.length > USERS_FIRST && (
+            <div className="mt-3 flex flex-col gap-2">
+              {shownUsers.length < visibleUsers.length && (
+                <button className="btn-secondary w-full" onClick={() => setUserLimit((n) => n + USERS_MORE)}>
+                  Cargar {Math.min(USERS_MORE, visibleUsers.length - shownUsers.length)} más
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+                  Mostrando {shownUsers.length} de {visibleUsers.length} colaboradores
+                  {q ? ' que coinciden' : ''}
+                </p>
+                {shownUsers.length > USERS_FIRST && (
+                  <button
+                    className="text-xs font-semibold text-slate-500 underline-offset-2 hover:text-olo-700 hover:underline dark:text-slate-400 dark:hover:text-olo-300"
+                    onClick={() => setUserLimit(USERS_FIRST)}
+                  >
+                    Mostrar menos
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Alta de colaborador por el admin (no hay auto-registro) */}
           <CreateUserCard onCreated={(u) => setUsers((prev) => [u, ...prev])} />
@@ -356,7 +398,7 @@ export function AdminPage() {
                     </div>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{c.message}</p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Reclama: {c.claimant.name} · {formatDateTime(c.createdAt)}
+                      Reclama: <PlayerName id={c.claimant.id} name={c.claimant.name} /> · {formatDateTime(c.createdAt)}
                     </p>
                     {c.reviewNote && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nota: {c.reviewNote}</p>}
                   </div>
@@ -450,7 +492,7 @@ export function AdminPage() {
                   <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-olo-500" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-slate-800 dark:text-slate-100">
-                      <span className="font-medium">{e.actor.name}</span>{' '}
+                      <PlayerName id={e.actor.id} name={e.actor.name} />{' '}
                       — {ACTION_LABELS[e.action] ?? e.action}
                     </p>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">{e.summary}</p>

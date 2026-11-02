@@ -165,7 +165,8 @@ test('contraseñas: >72 bytes rechazadas, nunca se devuelven hashes', async () =
     assert.ok(!/passwordHash|sessionVersion|imageSignature|\$2[aby]\$/.test(text), p);
   }
   const wall = (await call('GET', '/api/found-items', { token: tokens.ana })).data.data[0];
-  assert.deepEqual(Object.keys(wall.reporter).sort(), ['id', 'name'], 'el muro solo expone id y nombre del autor');
+  // Id, nombre y foto (la misma que ya muestra su perfil, con URL firmada); nada más.
+  assert.deepEqual(Object.keys(wall.reporter).sort(), ['avatarUrl', 'id', 'name'], 'el muro solo expone id, nombre y foto del autor');
 });
 
 test('login: mensaje idéntico exista o no el usuario', async () => {
@@ -338,7 +339,127 @@ test('asistente: "¿qué se devolvió esta semana?" usa la fecha de devolución'
   assert.equal(r.status, 200);
   assert.ok(r.data.foundItems.some((f: any) => f.id === item.id && f.status === 'RETURNED'));
   assert.match(r.data.answer, /devuelto/);
+  // Muro: sección "Devueltos recientemente" (devuelto hoy, aunque se encontró hace un mes).
+  const recent = (await call('GET', '/api/found-items/returned/recent', { token: tokens.ana })).data;
+  assert.ok(recent.some((f: any) => f.id === item.id && f.returnedAt));
+  assert.ok(recent.every((f: any) => f.status === 'RETURNED'));
   // Sin "devuelto", el asistente sigue mostrando solo lo disponible del muro.
   const wall = await call('POST', '/api/ai/assistant', { token: tokens.beto, body: { question: 'bufanda' } });
   assert.ok(!wall.data.foundItems.some((f: any) => f.id === item.id));
+});
+
+// --- Juego: puntos, ranking y foto de perfil (paridad con la migración 016) --------
+test('juego: 50 por publicar, +100 por devolver con reclamación, +50 si es rápida; ranking top 100', async () => {
+  const points = async () => (await call('GET', `/api/game/players/${ids.carla}`, { token: tokens.ana })).data;
+  const start = await points();
+  // Publicar da 50; "devolver" sin reclamación no suma más.
+  const solo = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Llavero' }) })).data;
+  await call('PATCH', `/api/found-items/${solo.id}/return`, { token: tokens.carla });
+  let p = await points();
+  assert.equal(p.points, start.points + 50);
+  assert.equal(p.stats.published, start.stats.published + 1);
+
+  // Con reclamación aprobada de otra persona, el mismo día: 50 + 100 + 50.
+  const item = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Cargador' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.ana, body: { foundItemId: item.id, message: 'Es mío' } })).data;
+  await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.carla, body: { status: 'APPROVED' } });
+  await call('PATCH', `/api/found-items/${item.id}/return`, { token: tokens.carla });
+  p = await points();
+  assert.equal(p.points, start.points + 250);
+  assert.ok(p.stats.categories >= 1 && p.stats.activeMonths >= 1);
+  assert.deepEqual([p.stats.returned, p.stats.fastReturned], [start.stats.returned + 1, start.stats.fastReturned + 1]);
+  assert.ok(p.rank >= 1);
+  assert.equal(p.role, 'EMPLOYEE');
+  assert.equal((await call('GET', '/api/game/players/me', { token: tokens.carla })).data.points, p.points, 'players/me');
+
+  const board = (await call('GET', '/api/game/leaderboard?offset=0&limit=30', { token: tokens.beto })).data;
+  assert.ok(board.entries.every((e: any) => e.points > 0));
+  assert.equal(board.entries.find((e: any) => e.id === ids.carla)?.rank, p.rank);
+  assert.equal(board.entries[0].passwordHash, undefined);
+  assert.equal((await call('GET', '/api/game/leaderboard?offset=100', { token: tokens.beto })).data.entries.length, 0);
+  assert.equal((await call('GET', '/api/game/leaderboard')).status, 401);
+  assert.deepEqual((await call('GET', '/api/game/admins', { token: tokens.beto })).data, [ids.admin]);
+  assert.equal((await call('GET', '/api/game/players/no-existe', { token: tokens.beto })).status, 404);
+
+  // Archivar (moderación) quita todos los puntos de ese objeto.
+  await call('PATCH', `/api/found-items/${item.id}/archive`, { token: tokens.admin });
+  assert.equal((await points()).points, start.points + 50);
+});
+
+test('juego: los perdidos activos del top 3 salen primero en el muro, en orden de ranking', async () => {
+  const board = (await call('GET', '/api/game/leaderboard?limit=3', { token: tokens.ana })).data.entries;
+  const leader = board[0].id as string;
+  const outsider = Object.values(ids).find((id) => !board.some((e: any) => e.id === id));
+  const lost = (reporterId: string, title: string, createdAt: Date) =>
+    prisma.lostReport.create({ data: { title, description: 'x', category: 'OTHER', location: '', lostAt: createdAt, createdAt, reporterId } });
+  const mine = await lost(leader, 'Del líder', new Date(Date.now() - 86_400_000));
+  if (outsider) await lost(outsider, 'Más reciente', new Date());
+  const wall = (await call('GET', '/api/lost-reports', { token: tokens.ana })).data;
+  assert.equal(wall.data[0].reporter.id, leader, 'los del nº 1 van primero aunque haya otros más recientes');
+  assert.equal(wall.data[0].pinned, true);
+  const ranks = wall.data.filter((r: any) => r.pinned).map((r: any) => board.findIndex((e: any) => e.id === r.reporter.id));
+  assert.deepEqual(ranks, [...ranks].sort((a, b) => a - b), 'destacados en orden de ranking');
+  assert.equal(wall.data.find((r: any) => r.id === mine.id)?.pinned, true);
+  assert.ok(wall.data.findIndex((r: any) => !r.pinned) > wall.data.findIndex((r: any) => r.id === mine.id));
+  assert.equal(wall.data.filter((r: any) => r.id === mine.id).length, 1, 'sin duplicados');
+  const page2 = (await call('GET', '/api/lost-reports?page=2', { token: tokens.ana })).data;
+  assert.ok(!page2.data.some((r: any) => r.pinned));
+  // Recuperado: sale del muro (ni destacado ni en el listado), pero su dueño lo sigue viendo.
+  await prisma.lostReport.update({ where: { id: mine.id }, data: { status: 'RESOLVED' } });
+  const after = (await call('GET', '/api/lost-reports', { token: tokens.ana })).data.data;
+  assert.ok(!after.some((r: any) => r.id === mine.id));
+  assert.ok((await call('GET', '/api/lost-reports?status=RESOLVED', { token: tokens.ana })).data.data.some((r: any) => r.id === mine.id));
+});
+
+test('entregas atascadas: recordatorio a ambos tras 3 días reclamado, sin repetir', async () => {
+  const item = (await call('POST', '/api/found-items', { token: tokens.carla, form: itemForm({ title: 'Termo verde' }) })).data;
+  const claim = (await call('POST', '/api/claims', { token: tokens.beto, body: { foundItemId: item.id, message: 'Es mío' } })).data;
+  await call('PATCH', `/api/claims/${claim.id}/review`, { token: tokens.carla, body: { status: 'APPROVED' } });
+  const reminders = async (who: string) =>
+    (await call('GET', '/api/notifications', { token: tokens[who] })).data.filter((n: any) => n.title === 'Entrega pendiente' && n.relatedItemId === item.id);
+  assert.equal((await reminders('carla')).length, 0, 'recién aprobada');
+  // Aprobada hace 4 días (un valor explícito de @updatedAt se respeta).
+  await prisma.claim.update({ where: { id: claim.id }, data: { updatedAt: new Date(Date.now() - 4 * 86_400_000) } });
+  assert.equal((await reminders('carla')).length, 1);
+  assert.match((await reminders('carla'))[0].body, /márcalo como devuelto/);
+  assert.equal((await reminders('carla')).length, 1, 'no se repite');
+  assert.match((await reminders('beto'))[0].body, /¿Ya recibiste/);
+  assert.equal((await reminders('ana')).length, 0, 'un tercero no');
+});
+
+test('juego: marco equipado (valor validado, visible en el perfil)', async () => {
+  assert.equal((await call('PUT', '/api/game/frame', { token: tokens.beto, body: { frame: 'gold' } })).status, 200);
+  assert.equal((await call('GET', `/api/game/players/${ids.beto}`, { token: tokens.ana })).data.equippedFrame, 'gold');
+  assert.equal((await call('PUT', '/api/game/frame', { token: tokens.beto, body: { frame: 'platino' } })).status, 400);
+  assert.equal((await call('PUT', '/api/game/frame', { body: { frame: null } })).status, 401);
+  await call('PUT', '/api/game/frame', { token: tokens.beto, body: { frame: null } });
+});
+
+test('juego: foto de perfil cuadrada, sin EXIF, con URL firmada y reemplazable', async () => {
+  const jpeg = await sharp({ create: { width: 40, height: 20, channels: 3, background: '#3a3' } })
+    .jpeg().withMetadata({ exif: { IFD0: { Make: 'CamaraEspia' } } }).toBuffer();
+  const form = () => {
+    const f = new FormData();
+    f.set('image', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'yo.jpg');
+    return f;
+  };
+  const html = new FormData();
+  html.set('image', new Blob(['<script>x</script>'], { type: 'image/png' }), 'x.png');
+  assert.equal((await call('PUT', '/api/game/avatar', { token: tokens.beto, form: html })).status, 400);
+
+  const first = await call('PUT', '/api/game/avatar', { token: tokens.beto, form: form() });
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  assert.match(first.data.avatarUrl, /^\/uploads\/[A-Za-z0-9_-]+\.jpg\?exp=\d+&sig=/);
+  const file1 = path.join(process.env.UPLOAD_DIR!, first.data.avatarUrl.split('?')[0].split('/').pop()!);
+  const meta = await sharp(file1).metadata();
+  assert.deepEqual([meta.width, meta.height, meta.exif], [512, 512, undefined]);
+  assert.equal((await fetch(base + first.data.avatarUrl)).status, 200);
+  assert.ok((await call('GET', '/api/auth/me', { token: tokens.beto })).data.avatarUrl);
+  assert.ok((await call('GET', `/api/game/players/${ids.beto}`, { token: tokens.ana })).data.avatarUrl, 'visible para otros');
+
+  const second = await call('PUT', '/api/game/avatar', { token: tokens.beto, form: form() });
+  assert.equal(second.status, 200);
+  assert.equal(fs.existsSync(file1), false, 'la foto anterior se borra');
+  const removed = await call('DELETE', '/api/game/avatar', { token: tokens.beto });
+  assert.equal(removed.data.avatarUrl, null);
 });

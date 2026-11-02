@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Claim } from '@laf/shared';
 import { ClaimReviewDialog } from '../components/ClaimReviewDialog';
+import { PlayerName } from '../components/game';
 import { ConfirmDialog, EmptyState, ErrorState, ListSkeleton, Notice, PageHeader, StatusBadge, TabPanel, Tabs } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../lib/errors';
@@ -158,11 +159,11 @@ export function ClaimsPage() {
                     <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500 dark:text-slate-400">
                       {incoming ? (
                         <>
-                          <span className="font-semibold text-slate-600 dark:text-slate-300">{claim.claimant.name}</span>·
+                          <PlayerName id={claim.claimant.id} name={claim.claimant.name} />·
                         </>
                       ) : claim.foundItem?.reporterName ? (
                         <>
-                          Encontrado por <span className="font-semibold text-slate-600 dark:text-slate-300">{claim.foundItem.reporterName}</span>·
+                          Encontrado por <PlayerName id={claim.foundItem.reporterId} name={claim.foundItem.reporterName} />·
                         </>
                       ) : null}
                       {formatDateTime(claim.createdAt)}

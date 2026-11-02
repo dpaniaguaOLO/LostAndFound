@@ -14,6 +14,7 @@ import {
   UnavailableState,
   ZoomableImage,
 } from '../components/ui';
+import { PlayerName } from '../components/game';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage, isNotAvailable } from '../lib/errors';
@@ -112,9 +113,10 @@ export function LostReportDetailPage() {
         </div>
 
         <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
+          {/* items-start: la insignia de estado ocupa solo su ancho (no una barra). */}
+          <div className="flex flex-col items-start gap-2">
             <StatusBadge status={item.status} label={LOST_STATUS_LABELS[item.status]} />
-            <h1 className="page-title break-words">{item.title}</h1>
+            <h1 className="page-title w-full break-words">{item.title}</h1>
           </div>
 
           <DetailGrid
@@ -122,7 +124,7 @@ export function LostReportDetailPage() {
               ['Categoría', CATEGORY_LABELS[item.category]],
               ['Ubicación', item.location || 'No indicada'],
               ['Perdido el', formatDate(item.lostAt)],
-              ['Reportado por', item.reporter.name],
+              ['Reportado por', <PlayerName id={item.reporter.id} name={item.reporter.name} />],
             ]}
           />
 
@@ -153,7 +155,7 @@ export function LostReportDetailPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {isOwner && (
                 <>
-                  <button className="btn-primary hidden md:inline-flex" onClick={() => setConfirmResolve(true)}>
+                  <button className="btn-primary hidden lg:inline-flex" onClick={() => setConfirmResolve(true)}>
                     Ya lo recuperé
                   </button>
                   <MobileActionBar>
@@ -167,7 +169,7 @@ export function LostReportDetailPage() {
                 Editar
               </Link>
               {canOwnerDelete && (
-                <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                <button className="btn-danger-soft" onClick={() => setConfirmDelete(true)}>
                   Eliminar reporte
                 </button>
               )}
@@ -176,7 +178,7 @@ export function LostReportDetailPage() {
           {/* Ya resuelto: solo queda la opción de borrarlo. */}
           {canOwnerDelete && !isActive && (
             <div>
-              <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+              <button className="btn-danger-soft" onClick={() => setConfirmDelete(true)}>
                 Eliminar reporte
               </button>
             </div>
@@ -194,7 +196,7 @@ export function LostReportDetailPage() {
                     Archivar
                   </button>
                 )}
-                <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                <button className="btn-danger-soft" onClick={() => setConfirmDelete(true)}>
                   Eliminar reporte
                 </button>
               </div>

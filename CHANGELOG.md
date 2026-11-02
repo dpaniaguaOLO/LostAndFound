@@ -1,5 +1,110 @@
 # Changelog
 
+## [Sin publicar]
+
+### Cambiado
+- **Rangos ocultos** (`RANKS_ENABLED = false` en `@laf/shared` y en la copia de la Edge
+  Function): ya no se muestran el rango ni su progreso, "Ver rangos", el nombre con color, el
+  fondo especial del perfil ni "¡Nuevo rango!". Los **marcos siguen desbloqueándose por
+  puntos** con los mismos umbrales; la ventana de recompensa anuncia "¡Nuevo marco!" y Olivia
+  habla de marcos (`siguiente_marco`, `marcos_de_foto`). El código de los rangos se conserva:
+  se recuperan poniendo el flag a `true` en ambos sitios.
+
+### Añadido
+- **Quién lo publicó, en las tarjetas del muro**: foto con su marco, nombre y emblemas,
+  enlazados al perfil (la tarjeta usa un enlace extendido para no anidar enlaces). Los
+  objetos traen `reporter.avatarUrl` (Supabase: `avatar_path` del autor; Express: `avatarUrl`).
+- **Recordatorio de entregas atascadas**: un objeto "Reclamado" desde hace más de 3 días
+  avisa a quien lo encontró ("márcalo como devuelto") y a quien lo reclamó ("¿ya lo
+  recibiste?"), como mucho cada 3 días. Migración 019 `remind_my_pending_handovers()` (la
+  app la llama al cargar notificaciones); Express en `GET /api/notifications`.
+- **Rangos por puntos**: Novato (0), Explorador (250), Rastreador (750), Detective (1.500),
+  Experto (3.000), Maestro (6.000) y Gran Maestro (10.000). Cada uno desbloquea un marco para
+  la foto (bronce, plata, oro, esmeralda animado, rubí, diamante animado) y, desde Maestro, un
+  fondo especial en el perfil. Desde Detective el nombre lleva el color del rango. Progreso y
+  "Ver rangos" en el perfil; la ventana de recompensa anuncia el nuevo rango.
+- **Personalizar marco** (perfil propio): elegir entre los desbloqueados, "sin marco" o
+  automático. Se guarda solo la elección (migración 018, `set_my_frame()`; Express
+  `PUT /api/game/frame`) y solo se muestra si está desbloqueado según los puntos reales
+  (`displayedFrame`). El título LEYENDA sigue siendo automático para quien tiene la insignia.
+- Perfil: cabecera rediseñada (fondo según el rango, foto superpuesta, bloque de puntos y
+  botones "Personalizar marco" / "Quitar foto" con el mismo estilo).
+- Muro: sección **"Devueltos recientemente"** (pestaña Encontrados, página 1 sin filtros):
+  tira horizontal con los objetos devueltos en los últimos 7 días (máx. 12), quién los
+  encontró (con sus emblemas) y cuándo. Express: `GET /api/found-items/returned/recent`.
+
+- **Olivia responde sobre el juego**: nuevas herramientas `mi_juego` (puntos, puesto, rango,
+  siguiente rango y cuánto falta, quién va delante, insignias y su progreso), `ranking_juego`,
+  `jugador` (perfil de otro por nombre) y `reglas_juego` (puntos, rangos, insignias, Leyenda,
+  ventajas del top 3). Alcance ampliado: responde todo lo relacionado con la app y solo
+  rechaza lo ajeno. Reglas copiadas en `supabase/functions/_shared/game.ts` (una prueba
+  comprueba que coinciden con `@laf/shared`). Edge Function `api` desplegada (2026-10-23).
+
+### Corregido
+- Coincidencias (modo Supabase): la foto del propio objeto perdido ("Tu objeto", la
+  referencia para comparar) salía siempre vacía: la Edge Function `api` devolvía
+  `imageUrl: null`. Ahora se firma como las demás. Edge Function `api` desplegada (2026-10-23).
+
+### Corregido (auditoría de diseño/UX 2026-10-24)
+- **Desbordamiento horizontal** de toda la página a 320 px y entre 768 y 1023 px (y en admin
+  a 1024): el menú de escritorio pasa a mostrarse desde `lg` (1024 px); en tabletas se usa la
+  barra inferior. El subtítulo del logo se oculta por debajo de 360 px y entre 1024 y 1279 px.
+- Contraste insuficiente (WCAG 1.4.3) en etiquetas sobre fondos tintados (perfil, publicar,
+  rangos, "¿Cómo ganar puntos?", etiqueta "Tú") y en el contador del formulario en oscuro.
+- Botones que abren una confirmación destructiva ("Eliminar publicación", "Desactivar") con el
+  nuevo estilo `btn-danger-soft`; el rojo sólido queda para el botón que confirma.
+- Ranking: los nombres largos ya no ocultan los emblemas ni la etiqueta "Tú".
+- Detalle de objeto/reporte: la insignia de estado ya no se estira como una barra.
+- Barras de progreso de la colección con nombre accesible; enlaces pequeños con área táctil
+  mínima (WCAG 2.5.8); avisos (toasts) por encima de la barra inferior en tabletas;
+  placeholder corto en la búsqueda (la etiqueta completa sigue para lectores de pantalla).
+
+### Cambiado
+- Muro: los reportes de perdidos ya recuperados (RESOLVED) dejan de mostrarse; siguen en
+  "Mis objetos" de su dueño.
+- Panel admin: la lista de colaboradores muestra 5 y el resto con "Cargar más" (de 10 en
+  10) y "Mostrar menos"; la búsqueda sigue abarcando a todos. Así el alta de colaboradores
+  y el cambio de contraseña no quedan al final de una lista de cientos.
+
+## [0.30.0] - 2026-10-23 — APK de prueba (debug) · rama `features/game`
+
+**Desplegado**: migraciones 016 y 017 aplicadas y datos demo del juego cargados en
+Supabase. APK `LostAndFound-0.30.0.apk` (firmado con clave debug: aceptado para pruebas
+internas; para distribución formal siguen pendientes firma de release y rotación de la anon key).
+
+### Añadido
+- **Perfil** (`/perfil`, `/perfil/:id`): foto de perfil personalizable (recorte cuadrado
+  512 px, sin EXIF), puntos, puesto en el ranking, estadísticas e insignias (las propias
+  también muestran las que faltan). Enlace "¿Cómo ganar puntos?" con las reglas.
+- **Ranking** (`/ranking`): top 100 por puntos, de 30 en 30 ("Cargar más"), con podio,
+  mejores insignias de cada colaborador, tu posición y acceso a cada perfil.
+- La foto de perfil se ve en la cabecera, la barra inferior y la hoja de perfil.
+- **Puntos**: +50 por publicar un objeto encontrado, +100 si se devuelve con reclamación
+  aprobada de otra persona, +50 si fue en < 24 h (migración 017). Archivar o eliminar la
+  publicación descuenta sus puntos.
+- **Insignias por niveles** al estilo del perfil de Clash Royale: escaparate de hasta 8
+  insignias y "Ver colección" con progreso; cada nivel mejora el marco (Bronce → Plata →
+  Oro → Esmeralda → Zafiro → Rubí → Leyenda). Hitos de un solo nivel (marco de oro y ★):
+  Primera devolución y Primer hallazgo. Con niveles: Buen samaritano (5-15-25-50-75-100
+  devueltos), Rayo (devueltos en < 24 h), Ojo de halcón (5-15-30-50-100 publicados),
+  Fotógrafo (con foto), Todoterreno (categorías distintas) y Constante (meses con devoluciones).
+- **Ventajas del top 3**: sus perdidos en búsqueda salen primero en el muro (en orden de
+  ranking, "Destacado") y llevan un emblema con su puesto junto al nombre.
+- Los nombres (detalle de objetos, reclamaciones, panel admin, ranking) enlazan al perfil.
+- **Emblema de administrador** junto al nombre (sello verde con estrella, como la insignia
+  de creador de Clash Royale); si un admin está en el top 3 lleva los dos emblemas.
+  Express: `GET /api/game/admins`; Supabase lee `profiles.role`.
+- **Ventana de recompensa** al publicar o devolver: "+N puntos" con desglose, puesto,
+  insignias nuevas o que suben de nivel. Usa los puntos reales del servidor (antes/después);
+  si una devolución no suma (sin reclamación aprobada) lo explica. `GET /api/game/players/me`.
+- Muro: la etiqueta de estado de las tarjetas ya no muestra una franja oscura encima.
+- **Leyenda de OLO** 👑: insignia definitiva al llevar todas las demás a su nivel máximo
+  (marco arcoíris giratorio, halo y cinta "LEYENDA"; siempre la primera del escaparate).
+- Supabase: migración 016 (`profiles.avatar_path`, bucket `avatars`, `set_my_avatar()`,
+  `leaderboard()`, `player_profile()`; los puntos los calcula `game_stats()`, nunca el
+  cliente). Aplicada en el proyecto alojado (2026-10-23).
+- Express: `/api/game/*` y migración Prisma `avatar`.
+
 ## [0.29.0] - 2026-10-22 — APK de prueba (debug)
 
 **Desplegado**: migración 015 aplicada y Edge Function `api` redesplegada. APK

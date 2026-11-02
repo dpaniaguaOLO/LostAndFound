@@ -209,7 +209,8 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | PATCH | `/api/found-items/:id/archive` | sí (admin) | — | `FoundItem` |
 | DELETE | `/api/found-items/:id` | sí (admin, o autor si `PUBLISHED`/`RETURNED`) | — | `{ ok }` (borra también sus claims) |
 | GET | `/api/found-items/mine/list` | sí | — | `FoundItem[]` |
-| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status` oculta `CLOSED`) |
+| GET | `/api/found-items/returned/recent` | sí | — | `FoundItem[]` devueltos en 7 días (máx. 12; Supabase: consulta directa) |
+| GET | `/api/lost-reports` | sí | query: `search, category, status, location, page, pageSize` | `Paginated<LostReport>` (sin `status`: solo `OPEN`/`MATCHED`, los del top 3 primero con `pinned`) |
 | GET | `/api/lost-reports/:id` | sí | — | `LostReport` |
 | POST | `/api/lost-reports` | sí | `multipart/form-data`: `title, description, category, location, lostAt(ISO)`, `image?` | `201 LostReport` |
 | PATCH | `/api/lost-reports/:id/resolve` | sí (autor o admin) | — | `LostReport` |
@@ -219,7 +220,7 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | GET | `/api/claims/incoming` | sí | — | `Claim[]` (sobre objetos que publiqué) |
 | PATCH | `/api/claims/:id/review` | sí (autor del hallazgo o admin) | `{ status: APPROVED\|REJECTED, reviewNote? }` | `Claim` |
 | PATCH | `/api/claims/:id/cancel` | sí (reclamante) | — | `Claim` |
-| GET | `/api/notifications` | sí | — | `Notification[]` (máx 100) |
+| GET | `/api/notifications` | sí | — | `Notification[]` (máx 100; antes crea los recordatorios de entregas atascadas del usuario, como `remind_my_pending_handovers()` en Supabase) |
 | PATCH | `/api/notifications/:id/read` | sí | — | `Notification` |
 | PATCH | `/api/notifications/read-all` | sí | — | `{ ok: true }` |
 | POST | `/api/ai/search` | sí | `{ query, limit? }` | `SemanticSearchResponse` (encontrados rankeados 0–100) |
@@ -237,6 +238,26 @@ Query strings tolerantes: `page`/`pageSize`/`limit` no numéricos usan el valor 
 | POST | `/api/admin/users/reset-password` | admin | `{ employeeId, newPassword(≥8) }` | `{ ok }` |
 | GET | `/api/admin/archived` | admin | — | `ArchivedResponse` |
 | POST | `/api/admin/restore` | admin | `{ kind: found\|lost, id }` | `{ ok }` |
+| GET | `/api/game/leaderboard` | sí | query: `offset, limit` (máx. puesto 100) | `LeaderboardPage` (Supabase: RPC `leaderboard`) |
+| GET | `/api/game/players/:id` | sí | — | `PlayerProfile` (Supabase: RPC `player_profile`) |
+| GET | `/api/game/admins` | sí | — | `string[]` ids de admins, para su emblema (Supabase: `profiles.role`) |
+| PUT | `/api/game/frame` | sí | `{ frame }` (null = auto, 'none') | `{ frame }` (Supabase: RPC `set_my_frame`) |
+| PUT | `/api/game/avatar` | sí | `multipart/form-data`: `image` | `User` con `avatarUrl` (Supabase: bucket `avatars` + RPC `set_my_avatar`) |
+| DELETE | `/api/game/avatar` | sí | — | `User` |
+
+Juego (rama `features/game`): los puntos se calculan en el servidor a partir de los datos
+(`game_stats()` en Supabase, `backend/src/lib/game.ts` en Express) con las reglas de
+`POINT_RULES` de `@laf/shared`; las insignias se derivan de las estadísticas con
+`badgeProgress()/showcaseBadges()` (`BADGES`, insignias con niveles). Si cambian las reglas
+o las estadísticas, actualizar los tres sitios, y también la copia para Olivia en
+`supabase/functions/_shared/game.ts` (sus herramientas `mi_juego`, `ranking_juego`, `jugador`,
+`reglas_juego`; `assistant.test.mjs` falla si la copia difiere de `@laf/shared`). Los
+**rangos están ocultos** (`RANKS_ENABLED = false`, 2026-10-26): `RANKS` sigue definiendo los
+umbrales de puntos de los marcos de la foto, pero no se muestra el nombre del rango ni sus
+ventajas; para recuperarlos, `true` en `@laf/shared` y en `_shared/game.ts`. El top 3 (`TOP_PLAYERS`) tiene sus perdidos
+OPEN/MATCHED destacados al principio del listado (`pinned: true`; Express en
+`GET /lost-reports`, Supabase en `services/supabase.ts`) y un emblema junto al nombre
+(`PlayerName`/`RankEmblem` en `components/game.tsx`).
 
 Reglas añadidas en v0.15.x: `PATCH /admin/users/:id/role` no permite dejar el sistema sin
 administradores (400). `PATCH /claims/:id/review` con `APPROVED` exige que el objeto siga
@@ -255,7 +276,9 @@ cascada reciben notificación `CLAIM_REJECTED`.
 Definido en `backend/prisma/schema.prisma`. Las enumeraciones se guardan como `String`
 (SQLite no soporta enums nativos) y su conjunto de valores vive en `@laf/shared`.
 
-**User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), createdAt, updatedAt`.
+**User**: `id, name, employeeId (único, acceso), email? (opcional, único), passwordHash, role(EMPLOYEE|ADMIN), avatarUrl?, createdAt, updatedAt`.
+- Foto de perfil: `avatarUrl` (Express, `/uploads`) / `profiles.avatar_path` (Supabase, bucket
+  privado `avatars`, `<uid>/<uuid>.<ext>`; solo se fija con `set_my_avatar()`, mig. 016).
 
 **FoundItem**: `id, title, description, category, location, foundAt, imageUrl?, imageSignature?, status, returnedAt?, reporterId→User, createdAt, updatedAt`.
 - `returnedAt` (`returned_at` en Supabase, mig. 015): cuándo pasó a `RETURNED` (trigger en
@@ -303,8 +326,11 @@ prefiere archivar.
   KEYS, BAGS, WALLET, JEWELRY, OTHER.
 
 **Migraciones**: Prisma/SQLite (modo REST) en `backend/prisma/migrations/`; Supabase en
-`supabase/migrations/` (001–015, todas aplicadas en el proyecto alojado; 012–015 el
-2026-10-22).
+`supabase/migrations/` (001–015 aplicadas en el proyecto alojado, 012–015 el
+2026-10-22; 016 `game_profiles` y 017 `game_rules`, de la rama `features/game`, el
+2026-10-23; 018 `cosmetics` (marco equipado) el 2026-10-23; 019 `handover_reminders` el
+2026-10-24). Datos demo del juego cargados en el proyecto alojado con
+`supabase/demo/seed_game_demo.sql` (se quitan con `cleanup_game_demo.sql`).
 
 ---
 
@@ -357,9 +383,9 @@ prefiere archivar.
   En producción: almacenamiento privado + URLs firmadas.
 - Rate limiting solo en login y en memoria (si se escala a varias instancias, moverlo a
   Redis o al proxy). Sin rate limiting general de la API.
-- Supabase: `enable_signup = true` y la anon key es pública → cualquiera con la URL puede
-  registrarse. Para una app interna conviene desactivar el registro abierto y dar de alta
-  usuarios desde el panel/Admin API.
+- Supabase: registro abierto **desactivado** (`enable_signup = false` en `config.toml`; en el
+  proyecto alojado, según el usuario, 2026-10-24). Las altas se hacen desde el panel admin.
+  La anon key sigue siendo pública (es por diseño); pendiente rotarla antes de distribuir.
 - Token en `localStorage` (considerar cookies httpOnly si se endurece el modelo).
 - Sin rotación/refresh de tokens.
 - `JWT_SECRET` por defecto solo para desarrollo; en producción es obligatorio definirlo.
@@ -388,7 +414,9 @@ prefiere archivar.
 
 ## H. Estado actual
 
-- **Versión**: 0.29.0 (ver `VERSION`). 0.29.0: Olivia consulta con herramientas (devueltos,
+- **Versión**: 0.30.0 (ver `VERSION`). 0.30.0 (rama `features/game`, APK debug): perfil con
+  foto, puntos, insignias por niveles, ranking, ventajas del top 3, emblemas de admin y
+  Leyenda, ventana de recompensa (migraciones 016-017). 0.29.0: Olivia consulta con herramientas (devueltos,
   estados, reclamaciones, notificaciones, resumen, coincidencias, historial admin) y fecha de
   devolución `returned_at` (migración 015). 0.28.0: el autor puede eliminar sus publicaciones
   (migración 014, aplicada en Supabase). 0.27.1: sin anillo de foco en `<main>` al navegar. 0.27.0: correcciones de la auditoría integral
@@ -412,7 +440,8 @@ prefiere archivar.
 - **Terminado**: monorepo, shared, backend completo (auth, found-items, lost-reports,
   claims con notificaciones, notifications, admin), frontend completo (10 pantallas),
   integración y pruebas manuales E2E, seed con datos demo.
-- **En desarrollo**: —
+- **En desarrollo**: rama `features/game`: perfil con foto, puntos, insignias y ranking
+  (insignias por niveles, ventajas del top 3; migraciones 016-017 aplicadas, datos demo cargados).
 - **Problemas conocidos**: ver riesgos en §F y la auditoría del 2026-10-22
   (`docs/SECURITY.md`). Sin CI; `npm run lint` falla (ESLint no está instalado); sin
   pruebas de frontend ni de las Edge Functions (Deno).

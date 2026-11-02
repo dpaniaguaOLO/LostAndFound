@@ -33,6 +33,7 @@ import {
   serializeFoundItem,
   serializeLostReport,
   serializeUser,
+  signedUrl,
 } from '../_shared/serialize.ts';
 
 const REPORTER_SELECT = '*, reporter:profiles!reporter_id (id, name)';
@@ -281,7 +282,8 @@ Deno.serve(async (req: Request) => {
         limit: 5,
         minScore: 15,
       });
-      await primeSignedUrls(sb, suggestions.map((r) => byId.get(r.item.id)?.image_path));
+      // Incluye la foto del propio perdido: es la referencia de "comparar lado a lado".
+      await primeSignedUrls(sb, [lost.image_path, ...suggestions.map((r) => byId.get(r.item.id)?.image_path)]);
       const serialized = await Promise.all(
         suggestions.map(async (r) => ({
           item: await serializeFoundItem(sb, byId.get(r.item.id)!),
@@ -297,7 +299,7 @@ Deno.serve(async (req: Request) => {
           title: lost.title,
           category: lost.category,
           location: lost.location,
-          imageUrl: null,
+          imageUrl: await signedUrl(sb, lost.image_path),
         },
         suggestions: serialized,
       });

@@ -4,10 +4,22 @@
  * La UI debe importar `services` desde aquí, no las implementaciones concretas.
  */
 import { useSupabase } from '../lib/config';
+import { trackPoints } from './game';
 import { restServices } from './rest';
 import { supabaseServices } from './supabase';
 import type { DataServices } from './types';
 
-export const services: DataServices = useSupabase ? supabaseServices : restServices;
+const base: DataServices = useSupabase ? supabaseServices : restServices;
+
+// Publicar y devolver pueden dar puntos: se envuelven para mostrar la recompensa
+// ("+N puntos", insignias nuevas) venga de la pantalla que venga.
+export const services: DataServices = {
+  ...base,
+  foundItems: {
+    ...base.foundItems,
+    create: (form) => trackPoints('published', () => base.foundItems.create(form)),
+    markReturned: (id) => trackPoints('returned', () => base.foundItems.markReturned(id)),
+  },
+};
 
 export type { DataServices } from './types';

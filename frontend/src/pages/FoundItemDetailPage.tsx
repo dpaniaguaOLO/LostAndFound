@@ -15,6 +15,7 @@ import {
   UnavailableState,
   ZoomableImage,
 } from '../components/ui';
+import { PlayerName } from '../components/game';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getErrorMessage, isNotAvailable } from '../lib/errors';
@@ -173,9 +174,10 @@ export function FoundItemDetailPage() {
         </div>
 
         <div className="flex flex-col gap-5">
-          <div className="flex flex-col gap-2">
+          {/* items-start: la insignia de estado ocupa solo su ancho (no una barra). */}
+          <div className="flex flex-col items-start gap-2">
             <StatusBadge status={item.status} label={FOUND_STATUS_LABELS[item.status]} />
-            <h1 className="page-title break-words">{item.title}</h1>
+            <h1 className="page-title w-full break-words">{item.title}</h1>
           </div>
 
           <DetailGrid
@@ -186,7 +188,7 @@ export function FoundItemDetailPage() {
               ...(item.status === 'RETURNED' && item.returnedAt
                 ? ([['Devuelto el', formatDate(item.returnedAt)]] as [string, string][])
                 : []),
-              ['Publicado por', item.reporter.name],
+              ['Publicado por', <PlayerName id={item.reporter.id} name={item.reporter.name} />],
             ]}
           />
 
@@ -227,7 +229,7 @@ export function FoundItemDetailPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {canClaim && (
-              <button className="btn-primary hidden md:inline-flex" onClick={() => setClaimOpen(true)}>
+              <button className="btn-primary hidden lg:inline-flex" onClick={() => setClaimOpen(true)}>
                 Reclamar este objeto
               </button>
             )}
@@ -235,7 +237,7 @@ export function FoundItemDetailPage() {
               <button
                 className={
                   (item.status === 'CLAIMED' ? 'btn-primary' : 'btn-secondary') +
-                  (mobilePrimary === 'return' ? ' hidden md:inline-flex' : '')
+                  (mobilePrimary === 'return' ? ' hidden lg:inline-flex' : '')
                 }
                 onClick={() => setConfirmReturn(true)}
               >
@@ -253,7 +255,7 @@ export function FoundItemDetailPage() {
               </Link>
             )}
             {canOwnerDelete && (
-              <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+              <button className="btn-danger-soft" onClick={() => setConfirmDelete(true)}>
                 Eliminar publicación
               </button>
             )}
@@ -271,7 +273,7 @@ export function FoundItemDetailPage() {
                     Archivar
                   </button>
                 )}
-                <button className="btn-danger" onClick={() => setConfirmDelete(true)}>
+                <button className="btn-danger-soft" onClick={() => setConfirmDelete(true)}>
                   Eliminar
                 </button>
               </div>

@@ -381,8 +381,8 @@ export function MobileActionBar({ children }: { children: ReactNode }) {
   return (
     <>
       {/* Hueco para que el final de la página no quede bajo la barra */}
-      <div className="h-20 md:hidden" aria-hidden />
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 animate-slide-up border-t border-slate-200/80 bg-white/90 px-4 py-3 shadow-nav backdrop-blur-xl dark:border-olo-dark-800 dark:bg-olo-dark-900/90 md:hidden">
+      <div className="h-20 lg:hidden" aria-hidden />
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 animate-slide-up border-t border-slate-200/80 bg-white/90 px-4 py-3 shadow-nav backdrop-blur-xl dark:border-olo-dark-800 dark:bg-olo-dark-900/90 lg:hidden">
         <div className="mx-auto flex max-w-md gap-2 [&>*]:flex-1">{children}</div>
       </div>
     </>

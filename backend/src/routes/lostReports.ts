@@ -9,12 +9,14 @@ import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { diskPathFor, publicUrlFor, removeUploadedImage, uploadImage } from '../middleware/upload.js';
 import { computeSignature, serializeSignature } from '../lib/visual.js';
 import { writeAudit } from '../lib/audit.js';
+import { topPlayerIds } from '../lib/game.js';
 import { likeSafe, pagination, queryString } from '../lib/query.js';
 import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const lostReportsRouter = Router();
 
-const reporterSelect = { reporter: { select: { id: true, name: true } } };
+// avatarUrl: foto del autor en las tarjetas del muro.
+const reporterSelect = { reporter: { select: { id: true, name: true, avatarUrl: true } } };
 const LOST_STATUSES = new Set(['OPEN', 'MATCHED', 'RESOLVED', 'CLOSED']);
 
 // GET /api/lost-reports â€” listado con bÃºsqueda y filtros.
@@ -34,7 +36,8 @@ lostReportsRouter.get(
     if (status && LOST_STATUSES.has(status) && (status !== 'CLOSED' || req.auth!.role === 'ADMIN')) {
       where.status = status;
     } else {
-      where.status = { in: ['OPEN', 'MATCHED', 'RESOLVED'] }; // por defecto, ocultar cerrados
+      // Por defecto, solo lo que aún se busca (como Supabase): sin recuperados ni cerrados.
+      where.status = { in: ['OPEN', 'MATCHED'] };
     }
     if (location) {
       const term = likeSafe(location);
@@ -47,10 +50,24 @@ lostReportsRouter.get(
         : [{ id: { in: [] } }];
     }
 
+    // Ventaja del top 3 del ranking: sus perdidos aún en búsqueda van arriba del
+    // muro (en el orden del ranking) y salen del listado normal.
+    const top = status ? [] : await topPlayerIds();
+    const pinned = top.length
+      ? (
+          await prisma.lostReport.findMany({
+            where: { AND: [where, { reporterId: { in: top }, status: { in: ['OPEN', 'MATCHED'] } }] },
+            include: reporterSelect,
+            orderBy: { createdAt: 'desc' },
+          })
+        ).sort((a, b) => top.indexOf(a.reporterId) - top.indexOf(b.reporterId))
+      : [];
+    const rest = pinned.length ? { AND: [where, { id: { notIn: pinned.map((p) => p.id) } }] } : where;
+
     const [total, items] = await Promise.all([
-      prisma.lostReport.count({ where }),
+      prisma.lostReport.count({ where: rest }),
       prisma.lostReport.findMany({
-        where,
+        where: rest,
         include: reporterSelect,
         orderBy: { createdAt: 'desc' },
         skip,
@@ -59,10 +76,13 @@ lostReportsRouter.get(
     ]);
 
     res.json({
-      data: items.map(serializeLostReport),
+      data: [
+        ...(page === 1 ? pinned.map((p) => ({ ...serializeLostReport(p), pinned: true })) : []),
+        ...items.map(serializeLostReport),
+      ],
       page,
       pageSize,
-      total,
+      total: total + pinned.length,
       totalPages: Math.ceil(total / pageSize) || 1,
     });
   }),

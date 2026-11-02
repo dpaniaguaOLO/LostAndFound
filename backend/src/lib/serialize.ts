@@ -17,6 +17,7 @@ export function serializeUser(u: AnyRecord) {
     // El backend REST (Prisma) no modela desactivación; sus usuarios son siempre activos.
     active: (u.active as boolean | undefined) ?? true,
     createdAt: iso(u.createdAt),
+    avatarUrl: signUploadUrl(u.avatarUrl as string | null),
   };
 }
 
@@ -33,8 +34,8 @@ export function serializeFoundItem(i: AnyRecord) {
     status: i.status as string,
     returnedAt: i.returnedAt ? iso(i.returnedAt) : null,
     reporter: reporter
-      ? { id: reporter.id as string, name: reporter.name as string }
-      : { id: i.reporterId as string, name: '' },
+      ? { id: reporter.id as string, name: reporter.name as string, avatarUrl: signUploadUrl(reporter.avatarUrl as string | null) }
+      : { id: i.reporterId as string, name: '', avatarUrl: null },
     createdAt: iso(i.createdAt),
     updatedAt: iso(i.updatedAt),
   };
@@ -52,8 +53,8 @@ export function serializeLostReport(i: AnyRecord) {
     imageUrl: signUploadUrl(i.imageUrl as string | null),
     status: i.status as string,
     reporter: reporter
-      ? { id: reporter.id as string, name: reporter.name as string }
-      : { id: i.reporterId as string, name: '' },
+      ? { id: reporter.id as string, name: reporter.name as string, avatarUrl: signUploadUrl(reporter.avatarUrl as string | null) }
+      : { id: i.reporterId as string, name: '', avatarUrl: null },
     createdAt: iso(i.createdAt),
     updatedAt: iso(i.updatedAt),
   };
@@ -71,6 +72,8 @@ export function serializeClaim(c: AnyRecord) {
           title: foundItem.title as string,
           imageUrl: signUploadUrl(foundItem.imageUrl as string | null),
           status: foundItem.status as string,
+          reporterId: (foundItem.reporterId as string | undefined) ?? undefined,
+          reporterName: ((foundItem.reporter as AnyRecord | undefined)?.name as string | undefined) ?? undefined,
         }
       : undefined,
     claimant: claimant

@@ -25,7 +25,8 @@ import { byUser, rateLimit } from '../lib/rateLimit.js';
 
 export const foundItemsRouter = Router();
 
-const reporterSelect = { reporter: { select: { id: true, name: true } } };
+// avatarUrl: foto del autor en las tarjetas del muro.
+const reporterSelect = { reporter: { select: { id: true, name: true, avatarUrl: true } } };
 const FOUND_STATUSES = new Set(['PUBLISHED', 'CLAIMED', 'RETURNED', 'ARCHIVED']);
 
 // GET /api/found-items â€” muro con bÃºsqueda, filtros y paginaciÃ³n.
@@ -313,6 +314,25 @@ foundItemsRouter.delete(
 );
 
 // GET /api/found-items/mine/list â€” mis publicaciones.
+// GET /api/found-items/returned/recent — devueltos en los últimos 7 días (sección
+// "Devueltos recientemente" del muro), los más recientes primero.
+const RECENT_RETURNED_DAYS = 7;
+const RECENT_RETURNED_MAX = 12;
+foundItemsRouter.get(
+  '/returned/recent',
+  authenticate,
+  asyncHandler(async (_req, res) => {
+    const since = new Date(Date.now() - RECENT_RETURNED_DAYS * 86_400_000);
+    const items = await prisma.foundItem.findMany({
+      where: { status: 'RETURNED', returnedAt: { gte: since } },
+      include: reporterSelect,
+      orderBy: { returnedAt: 'desc' },
+      take: RECENT_RETURNED_MAX,
+    });
+    res.json(items.map(serializeFoundItem));
+  }),
+);
+
 foundItemsRouter.get(
   '/mine/list',
   authenticate,

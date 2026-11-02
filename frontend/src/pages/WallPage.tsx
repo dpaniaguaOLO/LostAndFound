@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import type { FoundItem, LostReport, Paginated } from '@laf/shared';
 import { Filters, type FilterValues } from '../components/Filters';
 import { FoundItemCard, LostReportCard } from '../components/ItemCard';
-import { CardGridSkeleton, EmptyState, ErrorState, Notice, PageHeader, TabPanel, Tabs } from '../components/ui';
+import { NameEmblems } from '../components/game';
+import { CardGridSkeleton, EmptyState, ErrorState, ItemImage, Notice, PageHeader, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { cacheGet, cacheSet } from '../lib/cache';
 import { getErrorMessage } from '../lib/errors';
-import { formatDateTime } from '../lib/format';
+import { formatDateTime, formatRelativeDay } from '../lib/format';
 import { useDebounce } from '../lib/useDebounce';
 import { services } from '../services';
 
@@ -83,6 +84,101 @@ function ForYouCard({ to, tone, title, text }: { to: string; tone: 'amber' | 'ol
         <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
       </svg>
     </Link>
+  );
+}
+
+const RECENT_HIDDEN_KEY = 'laf.wall.recentHidden';
+
+/**
+ * "Devueltos recientemente": objetos que volvieron a su dueño en los últimos 7
+ * días, en una tira horizontal. Muestra que la app funciona (y a quién se debe).
+ * Si no hay ninguno o falla la carga, no se muestra nada.
+ */
+function RecentlyReturned({ reload }: { reload: number }) {
+  const [items, setItems] = useState<FoundItem[]>([]);
+  useEffect(() => {
+    let active = true;
+    services.foundItems
+      .recentlyReturned()
+      .then((r) => active && setItems(r))
+      .catch(() => void 0);
+    return () => {
+      active = false;
+    };
+  }, [reload]);
+
+  // Mostrar u ocultar la tira (se recuerda en este dispositivo).
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(RECENT_HIDDEN_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  function toggle() {
+    setOpen((v) => {
+      try {
+        localStorage.setItem(RECENT_HIDDEN_KEY, v ? '1' : '0');
+      } catch {
+        /* sin almacenamiento: solo dura esta sesión */
+      }
+      return !v;
+    });
+  }
+
+  if (items.length === 0) return null;
+  return (
+    <section className="mb-6 animate-fade-up" aria-labelledby="recent-returned-title">
+      <div className={'flex items-center justify-between gap-3 ' + (open ? 'mb-2.5' : '')}>
+        <div className="min-w-0">
+          <h2 id="recent-returned-title" className="text-base font-bold text-slate-900 dark:text-slate-50">
+            Devueltos recientemente
+          </h2>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            {/* El servicio devuelve como mucho 12: con 12 puede haber más. */}
+            {items.length === 1 ? '1 objeto volvió' : `${items.length}${items.length >= 12 ? '+' : ''} objetos volvieron`} a su dueño en los últimos 7 días
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-controls="recent-returned-list"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-olo-dark-850"
+        >
+          {open ? 'Ocultar' : 'Mostrar'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className={'transition-transform duration-200 ' + (open ? 'rotate-180' : '')}>
+            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      {open && (
+      <ul id="recent-returned-list" className="-mx-4 flex animate-fade-in snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:px-0">
+        {items.map((item) => (
+          <li key={item.id} className="w-40 shrink-0 snap-start sm:w-44">
+            <Link to={`/objetos/${item.id}`} className="card-interactive group flex h-full flex-col overflow-hidden">
+              <div className="relative">
+                <ItemImage src={item.imageUrl} alt="" />
+                <span className="absolute left-2 top-2 rounded-full bg-green-600/95 px-2 py-0.5 text-[11px] font-bold text-white shadow-card">
+                  ✓ Devuelto
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col gap-0.5 p-2.5">
+                <h3 className="line-clamp-1 text-sm font-semibold text-slate-900 group-hover:text-olo-700 dark:text-slate-100 dark:group-hover:text-olo-300">
+                  {item.title}
+                </h3>
+                <p className="flex min-w-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="truncate">por {item.reporter.name}</span>
+                  <NameEmblems id={item.reporter.id} className="h-3.5 w-3.5" />
+                </p>
+                {item.returnedAt && <p className="text-[11px] text-slate-500 dark:text-slate-400">{formatRelativeDay(item.returnedAt)}</p>}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      )}
+    </section>
   );
 }
 
@@ -188,7 +284,7 @@ export function WallPage() {
         title="Muro de objetos"
         subtitle={`${firstName ? `${greeting()}, ${firstName}. ` : ''}Objetos publicados por los colaboradores en las instalaciones.`}
         action={
-          <Link to="/publicar" className="btn-primary hidden md:inline-flex">
+          <Link to="/publicar" className="btn-primary hidden lg:inline-flex">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
@@ -212,6 +308,11 @@ export function WallPage() {
 
       <TabPanel id="wall" active={tab}>
       <Filters value={filters} onChange={setFilters} />
+
+      {/* Solo en la vista principal de Encontrados (no al buscar ni en otras páginas). */}
+      {tab === 'found' && page === 1 && !debouncedSearch && !filters.category && !debouncedLocation && !offlineSince && (
+        <RecentlyReturned reload={reload} />
+      )}
 
       {offlineSince && (
         <div className="mb-4">
